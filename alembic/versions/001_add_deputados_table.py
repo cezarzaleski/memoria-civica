@@ -8,6 +8,7 @@ Create Date: 2026-01-23 16:25:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "001"
@@ -18,7 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema - criar tabela deputados."""
-    sa.create_table(
+    op.create_table(
         "deputados",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
@@ -28,14 +29,14 @@ def upgrade() -> None:
         sa.Column("email", sa.String(length=255), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    sa.create_index("ix_deputados_id", "deputados", ["id"], unique=False)
-    sa.create_index("ix_deputados_nome", "deputados", ["nome"], unique=False)
-    sa.create_index("ix_deputados_uf", "deputados", ["uf"], unique=False)
+    op.create_index("ix_deputados_id", "deputados", ["id"], unique=False)
+    op.create_index("ix_deputados_nome", "deputados", ["nome"], unique=False)
+    op.create_index("ix_deputados_uf", "deputados", ["uf"], unique=False)
 
 
 def downgrade() -> None:
     """Downgrade schema - remover tabela deputados."""
-    sa.drop_index("ix_deputados_uf", table_name="deputados")
-    sa.drop_index("ix_deputados_nome", table_name="deputados")
-    sa.drop_index("ix_deputados_id", table_name="deputados")
-    sa.drop_table("deputados")
+    op.drop_index("ix_deputados_uf", table_name="deputados")
+    op.drop_index("ix_deputados_nome", table_name="deputados")
+    op.drop_index("ix_deputados_id", table_name="deputados")
+    op.drop_table("deputados")
