@@ -73,9 +73,11 @@ memoria_civica/
 
 ## Migrations
 
+Migrations de banco de dados são gerenciadas via Alembic. Cada mudança de schema deve ter uma migration correspondente.
+
 - **Criar migration:**
   ```bash
-  alembic revision -m "description"
+  alembic revision -m "descrição_da_mudança"
   ```
 
 - **Aplicar migrations:**
@@ -88,9 +90,290 @@ memoria_civica/
   alembic downgrade -1
   ```
 
+- **Verificar status:**
+  ```bash
+  alembic current
+  ```
+
+### Quando criar uma migration
+
+Crie uma migration sempre que:
+- Adicionar uma nova tabela
+- Adicionar ou remover colunas
+- Modificar tipos de coluna
+- Adicionar índices ou constraints
+- Alterar foreign keys
+
+**Nunca modifique migrations já aplicadas.** Crie uma nova migration para corrigir erros.
+
+### Testing migrations
+
+Para garantir que migrations funcionam corretamente:
+
+```bash
+# Testar upgrade
+alembic upgrade head
+
+# Testar downgrade (rollback)
+alembic downgrade -1
+
+# Testar upgrade novamente
+alembic upgrade head
+```
+
+### Convenção de naming
+
+Use o padrão: `NNN_verb_subject.py`
+
+Exemplos:
+- `001_add_deputados_table.py`
+- `002_add_proposicoes_table.py`
+- `003_add_votacoes_table.py`
+- `004_add_votos_table.py`
+
+## Desenvolvimento
+
+### Padrões de código
+
+Este projeto segue padrões rigorosos de qualidade:
+
+- **Type hints**: Todas as funções públicas devem ter type hints
+- **Docstrings**: Google style docstrings para funções e classes públicas
+- **Linting**: Ruff com line length 120
+- **Testes**: Mínimo 70% coverage para repositories e ETL
+
+### Executar linting
+
+```bash
+make lint
+```
+
+Ou diretamente com Ruff:
+
+```bash
+ruff check src tests
+```
+
+### Formatar código
+
+```bash
+make format
+```
+
+### Estrutura de testes
+
+```
+tests/
+├── test_smoke.py                # Testes de smoke (verificação básica)
+├── test_deputados/
+│   ├── conftest.py             # Fixtures específicas do domínio
+│   ├── test_repository.py       # Testes do repositório
+│   ├── test_etl.py             # Testes do pipeline ETL
+│   └── test_schemas.py         # Testes de validação
+├── test_proposicoes/
+│   └── [similar structure]
+├── test_votacoes/
+│   └── [similar structure]
+├── test_shared/
+│   ├── test_config.py          # Testes de configuração
+│   ├── test_database.py        # Testes de banco de dados
+│   └── test_integration.py     # Testes de integração
+└── test_integration/
+    └── test_orchestration.py   # Testes end-to-end
+```
+
+### Rodar testes específicos
+
+```bash
+# Todos os testes
+pytest
+
+# Testes de um domínio
+pytest tests/test_deputados/
+
+# Apenas testes de integração
+pytest -m integration
+
+# Com coverage
+pytest --cov=src --cov-report=html
+```
+
+## Troubleshooting
+
+### Erro: "no such table"
+
+**Problema**: Ao rodar ETL, você vê erro "no such table: deputados"
+
+**Solução**: Execute o script de inicialização do banco:
+```bash
+python scripts/init_db.py
+```
+
+Este script cria todas as tabelas via Alembic migrations.
+
+### Erro: "FOREIGN KEY constraint failed"
+
+**Problema**: ETL falha com erro de constraint de chave estrangeira
+
+**Possíveis causas**:
+1. ETL foi executado fora de ordem (não seguiu: deputados → proposicoes → votacoes)
+2. Dados referenciados não existem (ex: proposição referencia deputado que não existe)
+
+**Solução**:
+- Execute ETL na ordem correta: `python scripts/run_etl.py` (já faz isso automaticamente)
+- Verifique que os CSVs de entrada têm dados válidos (sem referências quebradas)
+
+### Erro: "database is locked"
+
+**Problema**: Ao rodar testes em paralelo, database is locked
+
+**Solução**: Use in-memory SQLite para testes (já configurado em conftest.py)
+
+### Performance lenta
+
+**Problema**: ETL é muito lento
+
+**Possíveis causas**:
+1. Falta de índices em colunas frequentemente consultadas
+2. Bulk operations ineficientes
+
+**Solução**:
+- Adicione índices nas colunas de foreign key
+- Use `bulk_upsert()` em vez de loops com inserts individuais
+- Verifique que `sqlite_synchronous` está configurado
+
+### Erro: "ValidationError" durante ETL
+
+**Problema**: Registros no CSV são rejeitados na validação Pydantic
+
+**Comportamento esperado**: Validação é não-fatal. Registros inválidos são pulados e logados como warnings.
+
+**Para investigar**:
+1. Procure por "Validation error" nos logs
+2. Verifique o CSV de entrada tem dados válidos (encoding UTF-8, separador ";", datas em ISO 8601)
+
+**Solução**: Corrija os dados no CSV e reexecute.
+
+### Erro: "IntegrityError" com duplicates
+
+**Problema**: Ao rodar ETL duas vezes, falha com erro de duplicate
+
+**Solução**: Use `bulk_upsert()` que já trata upserts corretamente (UPDATE se existe, INSERT se novo)
+
+## Exemplos de uso
+
+### Setup completo do zero
+
+```bash
+# 1. Clonar e entrar no diretório
+git clone <repo>
+cd memoria_civica
+
+# 2. Instalar dependências
+poetry install
+
+# 3. Ativar ambiente
+poetry shell
+
+# 4. Inicializar banco
+python scripts/init_db.py
+
+# 5. Rodar ETL completo
+python scripts/run_etl.py
+
+# 6. Verificar testes
+pytest
+```
+
+### Rodar apenas um domínio
+
+```bash
+# Só ETL de deputados (nota: existem dependências entre domínios)
+from src.deputados.etl import run_deputados_etl
+exit_code = run_deputados_etl(Path("data/dados_camara/deputados.csv"))
+```
+
+### Acessar dados diretamente
+
+```python
+from src.shared.database import SessionLocal, get_db
+from src.deputados.repository import DeputadoRepository
+
+# Criar session
+session = SessionLocal()
+repo = DeputadoRepository(session)
+
+# Buscar deputados
+deputados = repo.get_all()
+
+# Filtrar por UF
+deputados_sp = repo.get_by_uf("SP")
+
+# Buscar específico
+deputado = repo.get_by_id(1)
+
+session.close()
+```
+
+### Adicionar domínio novo
+
+1. Criar diretório `src/{novo_dominio}/`
+2. Criar `models.py` com SQLAlchemy models
+3. Criar `schemas.py` com Pydantic schemas
+4. Criar `repository.py` com operações CRUD
+5. Criar `etl.py` com pipeline (extract → transform → load)
+6. Criar `tests/test_{novo_dominio}/` com tests
+7. Criar migration: `alembic revision -m "add_{novo_dominio}_table"`
+8. Atualizar `scripts/run_etl.py` para orquestrar o novo domínio
+
 ## Status
 
 🚧 **Em desenvolvimento** - Setup inicial em andamento
+
+Fases completadas:
+- ✅ Estrutura do projeto e dependências
+- ✅ Módulo shared (database, config)
+- ✅ Domínio de Deputados (models, schemas, repository, ETL)
+- ✅ Domínio de Proposições (models, schemas, repository, ETL)
+- ✅ Domínio de Votações (models, schemas, repository, ETL)
+- ✅ Scripts de orquestração ETL
+- 🚧 Documentação e validação end-to-end
+
+## Contribuição
+
+### Como contribuir
+
+1. Crie uma branch para sua feature: `git checkout -b feature/minha-feature`
+2. Faça commits descritivos: `git commit -m "feat: descrição clara da mudança"`
+3. Certifique-se que testes passam: `make test`
+4. Certifique-se que linting passa: `make lint`
+5. Envie pull request com descrição clara
+
+### Convenções de commit
+
+Use conventional commits:
+- `feat:` para novas features
+- `fix:` para bug fixes
+- `docs:` para mudanças em documentação
+- `test:` para testes
+- `refactor:` para refactoring sem mudança de comportamento
+- `perf:` para melhorias de performance
+
+### Guidelines
+
+- Mantenha type hints atualizado
+- Escreva docstrings completos
+- Mantenha coverage acima de 70%
+- Teste sua mudança antes de enviar PR
+- Respeite os padrões de código estabelecidos
+
+## Recursos
+
+- [Câmara API](https://www2.camara.leg.br/a-camara/conheca/historia/timeline) - Fonte dos dados
+- [SQLAlchemy](https://docs.sqlalchemy.org/) - ORM utilizado
+- [Alembic](https://alembic.sqlalchemy.org/) - Migrations
+- [Pydantic](https://docs.pydantic.dev/) - Data validation
+- [Pytest](https://docs.pytest.org/) - Testing framework
 
 ---
 
