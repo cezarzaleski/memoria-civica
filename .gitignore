@@ -61,3 +61,34 @@ Thumbs.db
 data/dados_camara/*.csv
 # Mas manter o diretório
 !data/dados_camara/.gitkeep
+
+# Frontend - Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/.vercel/
+frontend/out/
+frontend/dist/
+frontend/build/
+
+# Frontend - Testing
+frontend/.nyc_output/
+frontend/coverage/
+frontend/vitest.config.*.local
+
+# Frontend - Environment
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Frontend - Build outputs
+frontend/public/sw.js
+frontend/public/workbox-*.js
+frontend/public/workbox-*.js.map
+
+# Frontend - IDE
+frontend/.vscode/
+frontend/.idea/
+
+# Frontend - OS
+frontend/.DS_Store
+frontend/Thumbs.db

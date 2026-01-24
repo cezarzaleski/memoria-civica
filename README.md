@@ -8,6 +8,61 @@ Este projeto estabelece a **fundação de dados** do Memória Cívica, uma ferra
 
 Esta fase inicial (Setup Inicial) valida a viabilidade de coletar e estruturar dados de votações da Câmara dos Deputados de 2025, estabelecendo a base para o MVP futuro.
 
+## Estrutura do Projeto
+
+O projeto está organizado em dois componentes principais:
+
+### **frontend/** - PWA de Frontend (Next.js 15)
+
+Interface mobile-first para visualizar votações e acompanhar deputados. Stack: React 19, Tailwind CSS, Shadcn/UI, MSW (mocks), next-pwa (PWA capabilities).
+
+**Iniciar desenvolvimento:**
+```bash
+cd frontend
+npm install
+npm run dev  # http://localhost:3000
+```
+
+**Testes e qualidade:**
+```bash
+npm run test       # Vitest + React Testing Library
+npm run lint       # ESLint
+npm run format     # Prettier
+```
+
+Veja [frontend/README.md](frontend/README.md) para documentação completa.
+
+### **etl/** - Pipeline ETL (Python)
+
+Coleta, validação e estruturação de dados da Câmara dos Deputados. O código Python original foi reorganizado de `src/` para `etl/src/` para separar concerns entre frontend e backend.
+
+**Estrutura ETL:**
+```
+etl/
+├── src/               # Código Python (deputados, proposicoes, votacoes, shared)
+├── scripts/           # Scripts de orquestração (init_db.py, run_etl.py)
+├── tests/             # Testes (unitários, integração)
+└── pyproject.toml     # Dependências Python
+```
+
+**Iniciar ETL:**
+```bash
+python etl/scripts/init_db.py  # Inicializar banco
+python etl/scripts/run_etl.py  # Executar pipeline
+```
+
+**Testes:**
+```bash
+pytest etl/tests/  # Ou `make test` (roda de raiz)
+```
+
+### **Arquivo de configuração raiz**
+
+- `pyproject.toml` (Python): Configuração de dependências e linting
+- `Makefile`: Comandos convenientes (make test, make lint, etc)
+- `pytest.ini`: Configuração de testes (aponta para etl/tests/)
+- `alembic/`: Migrations de banco (mantém na raiz para acesso fácil)
+
 ## Pré-requisitos
 
 - Python 3.11+
@@ -50,19 +105,35 @@ Esta fase inicial (Setup Inicial) valida a viabilidade de coletar e estruturar d
 
 ## Arquitetura
 
-Estrutura feature-based organizada por domínio:
+Estrutura feature-based organizada por domínio, com separação clara entre frontend (Next.js) e backend (Python ETL):
 
 ```
 memoria_civica/
-├── src/
-│   ├── deputados/      # Domínio de Deputados
-│   ├── proposicoes/    # Domínio de Proposições
-│   ├── votacoes/       # Domínio de Votações
-│   └── shared/         # Infraestrutura compartilhada (DB, config)
-├── scripts/            # Scripts de orquestração
-├── tests/              # Testes unitários e de integração
-├── data/               # Dados CSV
-└── alembic/            # Migrations de banco
+├── frontend/                  # PWA com Next.js 15
+│   ├── app/                   # Rotas e páginas (App Router)
+│   ├── components/            # Componentes React (ui/ + features/)
+│   ├── lib/                   # Hooks, types, utils
+│   ├── mocks/                 # MSW (Mock Service Worker)
+│   ├── __tests__/             # Testes frontend
+│   ├── next.config.mjs        # Config Next.js + PWA
+│   ├── package.json           # Dependências Node
+│   └── README.md              # Docs frontend
+│
+├── etl/                       # Pipeline Python (reorganizado de src/)
+│   ├── src/
+│   │   ├── deputados/         # Domínio de Deputados
+│   │   ├── proposicoes/       # Domínio de Proposições
+│   │   ├── votacoes/          # Domínio de Votações
+│   │   └── shared/            # Config, database, utils
+│   ├── scripts/               # ETL orchestration (init_db.py, run_etl.py)
+│   ├── tests/                 # Testes Python
+│   └── pyproject.toml         # Dependências Python
+│
+├── alembic/                   # Database migrations (na raiz para fácil acesso)
+├── data/                      # Dados CSV de entrada
+├── pyproject.toml             # Config Python (pytest, ruff)
+├── Makefile                   # Comandos convenientes
+└── README.md                  # Esse arquivo
 ```
 
 ## Domínios
