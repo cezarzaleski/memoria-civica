@@ -90,14 +90,88 @@ A aplicação está configurada como PWA com:
 
 - **Manifest**: `app/manifest.ts` com metadados de instalação
 - **Service Worker**: Configurado via next-pwa
-- **Ícones**: Placeholders em `public/icons/` (adicionar ícones reais)
-- **Offline Support**: Estratégias de cache para assets estáticos
+- **Ícones**: Disponíveis em `public/icons/` (192x192, 512x512 e variantes maskable)
+- **Screenshots**: Screenshots em `public/screenshots/` para instalação
+- **Offline Support**: Estratégias de cache para assets estáticos e fotos do CDN da Câmara
+- **iOS Support**: Metadados específicos para Safari iOS em `app/layout.tsx`
 
-Para testar a instalação:
+### Testes de PWA
+
+Testes unitários e de integração para PWA:
+
+```bash
+# Rodar testes específicos de PWA
+npm run test -- app/manifest.test.ts
+npm run test -- config/next-config.test.ts
+npm run test -- integration/pwa-installability.test.ts
+
+# Cobertura completa
+npm run test:coverage
+```
+
+Testes cobrem:
+- Estrutura e campos obrigatórios do manifest
+- Cores de tema conforme design system
+- Presença e validade de ícones
+- Configuração do next-pwa no next.config.mjs
+- Desabilitação de service worker em desenvolvimento
+- Caching runtime para fotos do CDN da Câmara
+- Metadados iOS no layout
+- Requisitos de instalação PWA
+
+### Verificação de Instalação Manual
+
+#### Chrome Desktop
 
 1. Build: `npm run build && npm run start`
-2. Abra DevTools → Application → Manifest
-3. Instale no celular (Chrome Android) ou "Instalar app" (Safari iOS)
+2. Abra http://localhost:3000
+3. DevTools → Application → Manifest
+4. Verifique se manifest.webmanifest está acessível
+5. Clique em "Instalar" ou use menu (⋮ → "Instalar app")
+
+#### Chrome Android
+
+1. Build e deploy em HTTPS (localhost não requer HTTPS em dev)
+2. Abra app em Chrome Android
+3. Aguarde banner de instalação (geralmente dentro de 1-2 segundos)
+4. Toque "Instalar" no banner
+5. App será instalado na home screen
+
+#### Safari iOS
+
+1. Abra app em Safari iOS
+2. Toque "Compartilhar" (⇧)
+3. Toque "Adicionar à Tela de Início"
+4. App será instalado com ícone e nome do manifest
+
+### Verificação Lighthouse PWA Audit
+
+```bash
+npm run build && npm run start
+# Depois use Lighthouse no DevTools ou CLI
+```
+
+Alvo de score PWA: **≥90**
+
+Verifica:
+- Manifest accessibility
+- Service worker registration
+- HTTPS (localhost exempt)
+- Icon sizes
+- Offline functionality
+
+### Requisitos de Instalação PWA
+
+Para que a app seja instalável, deve atender:
+
+- ✅ HTTPS (localhost exempt em dev)
+- ✅ Manifest válido em app/manifest.ts
+- ✅ Service worker via next-pwa (desabilitado em dev, ativado em prod)
+- ✅ Ícones em 192x192 e 512x512
+- ✅ display: 'standalone' no manifest
+- ✅ start_url e scope definidos
+- ✅ theme_color e background_color configurados
+- ✅ Metadados iOS em layout.tsx (apple-touch-icon, statusBarStyle)
 
 ## Integração com Backend
 
