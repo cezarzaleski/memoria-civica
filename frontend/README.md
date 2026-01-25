@@ -94,6 +94,7 @@ A aplicação está configurada como PWA com:
 - **Offline Support**: Estratégias de cache para assets estáticos
 
 Para testar a instalação:
+
 1. Build: `npm run build && npm run start`
 2. Abra DevTools → Application → Manifest
 3. Instale no celular (Chrome Android) ou "Instalar app" (Safari iOS)
@@ -143,6 +144,7 @@ export function VotacaoCard({ votacao, onClick }: VotacaoCardProps) {
 ### Testes
 
 Target mínimo de cobertura:
+
 - **Componentes features**: 70%
 - **Componentes UI (Shadcn)**: 50% (ou sem testes)
 - **Integração**: Fluxos principais cobertes

@@ -12,8 +12,11 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@radix-ui/react-select": "^1.2.2",
+    "@radix-ui/react-slot": "^1.0.2",
     "class-variance-authority": "^0",
     "clsx": "^2",
+    "lucide-react": "^0.263.1",
     "next": "^15",
     "next-pwa": "^5",
     "react": "^19",
@@ -24,18 +27,20 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6",
     "@testing-library/react": "latest",
+    "@testing-library/user-event": "^14.5.1",
     "@types/node": "latest",
     "@types/react": "19.2.9",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4",
+    "@vitest/coverage-v8": "^1.6.1",
     "autoprefixer": "^10.4.23",
     "eslint": "^8",
     "eslint-config-next": "^15",
-    "jsdom": "^23",
+    "jsdom": "^23.2.0",
     "msw": "^2",
     "postcss": "^8.5.6",
     "prettier": "^3",
     "typescript": "5.9.3",
-    "vitest": "^1"
+    "vitest": "1.6.1"
   }
 }
