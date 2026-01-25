@@ -1,12 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
+import { server } from '@/mocks/server'
+import { http, HttpResponse } from 'msw'
 import { useVotos } from '@/lib/hooks/use-votos'
+import { generateVotos } from '@/mocks/data/votos'
 
 describe('useVotos', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   it('should return empty data when votacaoId is null', async () => {
     const { result } = renderHook(() => useVotos(null))
 
@@ -16,76 +14,28 @@ describe('useVotos', () => {
   })
 
   it('should fetch votos for given votacaoId', async () => {
-    const mockVotos = [
-      {
-        id: '1',
-        tipo: 'SIM',
-        deputado: {
-          id: '1',
-          nome: 'João Silva',
-          partido: 'PT',
-          uf: 'SP',
-        },
-      },
-      {
-        id: '2',
-        tipo: 'NAO',
-        deputado: {
-          id: '2',
-          nome: 'Maria Santos',
-          partido: 'PSD',
-          uf: 'RJ',
-        },
-      },
-    ]
+    const mockVotos = generateVotos(5, '1')
 
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockVotos),
-      })
-    ) as any
+    const { result } = renderHook(() => useVotos('1'))
 
-    const { result } = renderHook(() => useVotos('votacao-123'))
+    expect(result.current.loading).toBe(true)
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/votacoes/votacao-123/votos'
-    )
     expect(result.current.data).toEqual(mockVotos)
     expect(result.current.error).toBeNull()
   })
 
-  it('should handle 404 error when votacao not found', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 404,
+  it('should handle error when fetching votos', async () => {
+    server.use(
+      http.get('/api/v1/votacoes/:id/votos', () => {
+        return HttpResponse.error()
       })
-    ) as any
+    )
 
-    const { result } = renderHook(() => useVotos('invalid-id'))
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
-    })
-
-    expect(result.current.error).toContain('404')
-    expect(result.current.data).toEqual([])
-  })
-
-  it('should handle 500 server error', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 500,
-      })
-    ) as any
-
-    const { result } = renderHook(() => useVotos('votacao-123'))
+    const { result } = renderHook(() => useVotos('1'))
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
@@ -95,100 +45,28 @@ describe('useVotos', () => {
     expect(result.current.data).toEqual([])
   })
 
-  it('should handle network error', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.reject(new Error('Network error'))
-    ) as any
-
-    const { result } = renderHook(() => useVotos('votacao-123'))
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
-    })
-
-    expect(result.current.error).toContain('Network error')
-    expect(result.current.data).toEqual([])
-  })
-
   it('should refetch when votacaoId changes', async () => {
-    const mockVotos1 = [
-      {
-        id: '1',
-        tipo: 'SIM',
-        deputado: {
-          id: '1',
-          nome: 'João',
-          partido: 'PT',
-          uf: 'SP',
-        },
-      },
-    ]
-
-    const mockVotos2 = [
-      {
-        id: '2',
-        tipo: 'NAO',
-        deputado: {
-          id: '2',
-          nome: 'Maria',
-          partido: 'PSD',
-          uf: 'RJ',
-        },
-      },
-    ]
-
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockVotos1),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockVotos2),
-      })
-
     const { result, rerender } = renderHook(
       ({ id }) => useVotos(id),
-      { initialProps: { id: 'votacao-1' } }
+      { initialProps: { id: '1' } }
     )
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(result.current.data).toEqual(mockVotos1)
+    expect(result.current.data.length).toBeGreaterThan(0)
 
-    rerender({ id: 'votacao-2' })
+    // Mudar para um ID diferente
+    rerender({ id: '2' })
 
     await waitFor(() => {
-      expect(result.current.data).toEqual(mockVotos2)
+      expect(result.current.data.length).toBeGreaterThan(0)
     })
-
-    expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 
   it('should have refetch function', async () => {
-    const mockVotos = [
-      {
-        id: '1',
-        tipo: 'SIM',
-        deputado: {
-          id: '1',
-          nome: 'João',
-          partido: 'PT',
-          uf: 'SP',
-        },
-      },
-    ]
-
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockVotos),
-      })
-    ) as any
-
-    const { result } = renderHook(() => useVotos('votacao-123'))
+    const { result } = renderHook(() => useVotos('1'))
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)

@@ -5,7 +5,6 @@ import { Votacao } from '@/lib/types/votacao'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 interface VotacaoDetalhesProps {
   votacao: Votacao
@@ -35,6 +34,19 @@ export function VotacaoDetalhes({
     })
   }
 
+  const getProposicaoTitle = () => {
+    if (!votacao.proposicao) return 'Votação'
+    const { tipo, numero, ano } = votacao.proposicao
+    return `${tipo} ${numero}/${ano}`
+  }
+
+  const buildDocumentLink = () => {
+    if (!votacao.proposicao) return null
+    const { tipo, numero, ano } = votacao.proposicao
+    // Link para Câmara dos Deputados com tipo/numero/ano
+    return `https://www.camara.leg.br/internet/sitaqweb/resultadoPesquisa.asp?tipo=${tipo}&numero=${numero}&ano=${ano}`
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -44,6 +56,8 @@ export function VotacaoDetalhes({
       </div>
     )
   }
+
+  const documentLink = buildDocumentLink()
 
   return (
     <div className="space-y-4">
@@ -55,29 +69,28 @@ export function VotacaoDetalhes({
 
       <Card>
         <CardHeader>
-          {onBack && <div className="flex items-start justify-between gap-4 mb-4" />}
           <CardTitle className="text-2xl">
-            {votacao.proposicao?.descricao || 'Votação'}
+            {getProposicaoTitle()}
           </CardTitle>
           <CardDescription className="mt-4">
             {votacao.data && formatDate(votacao.data)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {votacao.proposicao?.ementa && (
+            <div>
+              <label className="font-medium text-sm">Ementa</label>
+              <p className="text-sm text-muted-foreground mt-1">
+                {votacao.proposicao.ementa}
+              </p>
+            </div>
+          )}
+
           {votacao.proposicao?.tipo && (
             <div>
               <label className="font-medium text-sm">Tipo de Proposição</label>
               <p className="text-sm text-muted-foreground mt-1">
                 {votacao.proposicao.tipo}
-              </p>
-            </div>
-          )}
-
-          {votacao.proposicao?.tema && (
-            <div>
-              <label className="font-medium text-sm">Tema</label>
-              <p className="text-sm text-muted-foreground mt-1">
-                {votacao.proposicao.tema}
               </p>
             </div>
           )}
@@ -94,15 +107,31 @@ export function VotacaoDetalhes({
               </div>
             </div>
           )}
+
+          {documentLink && (
+            <div>
+              <label className="font-medium text-sm">Documento Oficial</label>
+              <div className="mt-2">
+                <a
+                  href={documentLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline text-sm"
+                >
+                  Ver na Câmara dos Deputados →
+                </a>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {(llmExplanation || llmLoading) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Explicação (IA)</CardTitle>
+            <CardTitle className="text-lg">Explicação Simplificada</CardTitle>
             <CardDescription>
-              Resumo gerado por inteligência artificial
+              Resumo em linguagem acessível
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -120,40 +149,6 @@ export function VotacaoDetalhes({
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Resultado da Votação</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {votacao.placar?.sim || 0}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Sim</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {votacao.placar?.nao || 0}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Não</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
-              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                {votacao.placar?.abstencao || 0}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Abstenção</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {votacao.placar?.obstrucao || 0}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Obstrução</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

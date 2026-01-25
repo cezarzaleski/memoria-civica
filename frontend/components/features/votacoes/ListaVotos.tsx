@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import { Voto, TipoVoto } from '@/lib/types/voto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -43,8 +43,11 @@ const getTipoColor = (tipo: TipoVoto) => {
   }
 }
 
+type SortOrder = 'nome-asc' | 'nome-desc' | 'partido-asc'
+type FilterType = 'todos' | TipoVoto
+
 /**
- * Displays a list of votes from a votacao
+ * Displays a list of votes from a votacao with filtering and sorting
  * Shows each deputado and their vote type
  */
 export function ListaVotos({
@@ -53,6 +56,54 @@ export function ListaVotos({
   error = null,
   emptyMessage = 'Nenhum voto encontrado',
 }: ListaVotosProps) {
+  const [filterType, setFilterType] = useState<FilterType>('todos')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('nome-asc')
+
+  const partidos = useMemo(() => {
+    return [...new Set(votos.map((v) => v.deputado?.partido).filter(Boolean))]
+      .sort() as string[]
+  }, [votos])
+
+  const [filterPartido, setFilterPartido] = useState<string>('todos')
+
+  const filteredAndSortedVotos = useMemo(() => {
+    let result = votos
+
+    // Aplicar filtro por tipo de voto
+    if (filterType !== 'todos') {
+      result = result.filter((v) => v.tipo === filterType)
+    }
+
+    // Aplicar filtro por partido
+    if (filterPartido !== 'todos') {
+      result = result.filter((v) => v.deputado?.partido === filterPartido)
+    }
+
+    // Aplicar ordenação
+    result = [...result].sort((a, b) => {
+      const nomeA = a.deputado?.nome || ''
+      const nomeB = b.deputado?.nome || ''
+      const partidoA = a.deputado?.partido || ''
+      const partidoB = b.deputado?.partido || ''
+
+      switch (sortOrder) {
+        case 'nome-asc':
+          return nomeA.localeCompare(nomeB, 'pt-BR')
+        case 'nome-desc':
+          return nomeB.localeCompare(nomeA, 'pt-BR')
+        case 'partido-asc':
+          return (
+            partidoA.localeCompare(partidoB, 'pt-BR') ||
+            nomeA.localeCompare(nomeB, 'pt-BR')
+          )
+        default:
+          return 0
+      }
+    })
+
+    return result
+  }, [votos, filterType, filterPartido, sortOrder])
+
   if (error) {
     return (
       <Card className="border-red-200 dark:border-red-800">
@@ -96,11 +147,64 @@ export function ListaVotos({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Votos ({votos.length})</CardTitle>
+        <CardTitle className="text-lg">
+          Votos ({filteredAndSortedVotos.length} de {votos.length})
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Filtros e Ordenação */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          {/* Filtro por Tipo de Voto */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Tipo</label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as FilterType)}
+              className="text-xs px-2 py-1 border rounded bg-background"
+            >
+              <option value="todos">Todos</option>
+              <option value={TipoVoto.SIM}>Sim</option>
+              <option value={TipoVoto.NAO}>Não</option>
+              <option value={TipoVoto.ABSTENCAO}>Abstenção</option>
+              <option value={TipoVoto.OBSTRUCAO}>Obstrução</option>
+            </select>
+          </div>
+
+          {/* Filtro por Partido */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Partido</label>
+            <select
+              value={filterPartido}
+              onChange={(e) => setFilterPartido(e.target.value)}
+              className="text-xs px-2 py-1 border rounded bg-background"
+            >
+              <option value="todos">Todos</option>
+              {partidos.map((partido) => (
+                <option key={partido} value={partido}>
+                  {partido}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Ordenação */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Ordenar</label>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className="text-xs px-2 py-1 border rounded bg-background"
+            >
+              <option value="nome-asc">Nome (A-Z)</option>
+              <option value="nome-desc">Nome (Z-A)</option>
+              <option value="partido-asc">Partido</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Lista de Votos */}
         <div className="space-y-2 max-h-[500px] overflow-y-auto">
-          {votos.map((voto) => (
+          {filteredAndSortedVotos.map((voto) => (
             <div
               key={voto.id}
               className={cn(
@@ -127,6 +231,12 @@ export function ListaVotos({
             </div>
           ))}
         </div>
+
+        {filteredAndSortedVotos.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-4">
+            Nenhum voto encontrado com os filtros selecionados
+          </p>
+        )}
       </CardContent>
     </Card>
   )

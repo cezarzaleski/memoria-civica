@@ -1,153 +1,131 @@
-import React from 'react'
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ListaVotos } from '@/components/features/votacoes/ListaVotos'
-import { TipoVoto } from '@/lib/types/voto'
+import { Voto, TipoVoto } from '@/lib/types/voto'
+import { Deputado } from '@/lib/types/deputado'
 
 describe('ListaVotos', () => {
-  const mockVotos = [
-    {
-      id: '1',
-      tipo: TipoVoto.SIM,
-      deputado: {
-        id: '1',
-        nome: 'João Silva',
-        partido: 'PT',
-        uf: 'SP',
-      },
-    },
-    {
-      id: '2',
-      tipo: TipoVoto.NAO,
-      deputado: {
-        id: '2',
-        nome: 'Maria Santos',
-        partido: 'PSD',
-        uf: 'RJ',
-      },
-    },
-    {
-      id: '3',
-      tipo: TipoVoto.ABSTENCAO,
-      deputado: {
-        id: '3',
-        nome: 'Carlos Oliveira',
-        partido: 'MDB',
-        uf: 'MG',
-      },
-    },
+  const mockDeputados: Deputado[] = [
+    { id: 1, nome: 'João Silva', partido: 'PT', uf: 'SP', foto_url: 'http://example.com/1.jpg' },
+    { id: 2, nome: 'Maria Santos', partido: 'PSDB', uf: 'MG', foto_url: 'http://example.com/2.jpg' },
+    { id: 3, nome: 'Pedro Oliveira', partido: 'PT', uf: 'RJ', foto_url: 'http://example.com/3.jpg' },
+    { id: 4, nome: 'Ana Costa', partido: 'MDB', uf: 'BA', foto_url: 'http://example.com/4.jpg' },
   ]
 
-  it('should render lista votos with title', () => {
+  const mockVotos: Voto[] = [
+    { id: '1', votacao_id: '1', deputado_id: 1, tipo: TipoVoto.SIM, deputado: mockDeputados[0] },
+    { id: '2', votacao_id: '1', deputado_id: 2, tipo: TipoVoto.NAO, deputado: mockDeputados[1] },
+    { id: '3', votacao_id: '1', deputado_id: 3, tipo: TipoVoto.ABSTENCAO, deputado: mockDeputados[2] },
+    { id: '4', votacao_id: '1', deputado_id: 4, tipo: TipoVoto.OBSTRUCAO, deputado: mockDeputados[3] },
+  ]
+
+  it('should render list of votes with correct count', () => {
     render(<ListaVotos votos={mockVotos} />)
 
-    expect(screen.getByText(/Votos \(3\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Votos \(4 de 4\)/)).toBeInTheDocument()
+    expect(screen.getByText('João Silva')).toBeInTheDocument()
+    expect(screen.getByText('Maria Santos')).toBeInTheDocument()
   })
 
-  it('should render all votos', () => {
+  it('should display deputy info correctly', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     expect(screen.getByText('João Silva')).toBeInTheDocument()
-    expect(screen.getByText('Maria Santos')).toBeInTheDocument()
-    expect(screen.getByText('Carlos Oliveira')).toBeInTheDocument()
+    expect(screen.getByText('PT - SP')).toBeInTheDocument()
   })
 
-  it('should display deputado party and state', () => {
+  it('should display vote types as badges', () => {
     render(<ListaVotos votos={mockVotos} />)
 
-    expect(screen.getByText(/PT - SP/)).toBeInTheDocument()
-    expect(screen.getByText(/PSD - RJ/)).toBeInTheDocument()
-    expect(screen.getByText(/MDB - MG/)).toBeInTheDocument()
+    expect(screen.getByText('SIM')).toBeInTheDocument()
+    expect(screen.getByText('NAO')).toBeInTheDocument()
+    expect(screen.getByText('ABSTENCAO')).toBeInTheDocument()
+    expect(screen.getByText('OBSTRUCAO')).toBeInTheDocument()
   })
 
-  it('should display vote type badges', () => {
-    render(<ListaVotos votos={mockVotos} />)
+  it('should show loading state', () => {
+    render(<ListaVotos votos={[]} loading={true} />)
 
-    expect(screen.getByText(TipoVoto.SIM)).toBeInTheDocument()
-    expect(screen.getByText(TipoVoto.NAO)).toBeInTheDocument()
-    expect(screen.getByText(TipoVoto.ABSTENCAO)).toBeInTheDocument()
+    expect(screen.getByText('Votos')).toBeInTheDocument()
   })
 
-  it('should show loading skeleton when loading is true', () => {
-    const { container } = render(<ListaVotos votos={[]} loading={true} />)
+  it('should show error state', () => {
+    const errorMessage = 'Erro ao carregar dados'
+    render(<ListaVotos votos={[]} error={errorMessage} />)
 
-    const skeletons = container.querySelectorAll('.animate-pulse')
-    expect(skeletons.length).toBeGreaterThan(0)
+    expect(screen.getByText('Erro ao carregar votos')).toBeInTheDocument()
+    expect(screen.getByText(errorMessage)).toBeInTheDocument()
   })
 
-  it('should display empty message when no votos', () => {
-    render(<ListaVotos votos={[]} emptyMessage="Nenhum voto encontrado" />)
+  it('should show empty state', () => {
+    render(<ListaVotos votos={[]} />)
 
     expect(screen.getByText('Nenhum voto encontrado')).toBeInTheDocument()
   })
 
-  it('should display custom empty message', () => {
-    render(
-      <ListaVotos votos={[]} emptyMessage="Nenhum voto disponível" />
-    )
+  it('should filter by vote type', () => {
+    render(<ListaVotos votos={mockVotos} />)
 
-    expect(screen.getByText('Nenhum voto disponível')).toBeInTheDocument()
+    const typeSelect = screen.getAllByDisplayValue('Todos')[0]
+    fireEvent.change(typeSelect, { target: { value: TipoVoto.SIM } })
+
+    expect(screen.getByText(/Votos \(1 de 4\)/)).toBeInTheDocument()
+    expect(screen.getByText('João Silva')).toBeInTheDocument()
+    expect(screen.queryByText('Maria Santos')).not.toBeInTheDocument()
   })
 
-  it('should display error message when error is provided', () => {
-    render(
-      <ListaVotos votos={[]} error="Erro ao carregar votos" />
-    )
+  it('should filter by party', () => {
+    render(<ListaVotos votos={mockVotos} />)
 
-    expect(screen.getByText('Erro ao carregar votos')).toBeInTheDocument()
+    const partySelects = screen.getAllByDisplayValue('Todos')
+    const partySelect = partySelects[1]
+    fireEvent.change(partySelect, { target: { value: 'PT' } })
+
+    expect(screen.getByText(/Votos \(2 de 4\)/)).toBeInTheDocument()
+    expect(screen.getByText('João Silva')).toBeInTheDocument()
+    expect(screen.getByText('Pedro Oliveira')).toBeInTheDocument()
   })
 
-  it('should display "Erro ao carregar votos" header on error', () => {
-    render(
-      <ListaVotos votos={[]} error="Network error" />
-    )
+  it('should sort by name ascending', () => {
+    render(<ListaVotos votos={mockVotos} />)
 
-    expect(screen.getByText('Erro ao carregar votos')).toBeInTheDocument()
+    const sortSelect = screen.getAllByDisplayValue('Nome (A-Z)')[0]
+    fireEvent.change(sortSelect, { target: { value: 'nome-asc' } })
+
+    const names = screen.getAllByText(/Silva|Santos|Oliveira|Costa/)
+    expect(names[0].textContent).toContain('Ana Costa')
   })
 
-  it('should handle votos without deputado', () => {
-    const votosComVazio = [
-      {
-        id: '1',
-        tipo: TipoVoto.SIM,
-        deputado: undefined,
-      },
+  it('should combine filters and sort correctly', () => {
+    render(<ListaVotos votos={mockVotos} />)
+
+    const typeSelects = screen.getAllByDisplayValue('Todos')
+    const typeSelect = typeSelects[0]
+    fireEvent.change(typeSelect, { target: { value: TipoVoto.SIM } })
+
+    expect(screen.getByText(/Votos \(1 de 4\)/)).toBeInTheDocument()
+  })
+
+  it('should show message when no votes match filters', () => {
+    render(<ListaVotos votos={mockVotos} />)
+
+    const typeSelects = screen.getAllByDisplayValue('Todos')
+    const typeSelect = typeSelects[0]
+    fireEvent.change(typeSelect, { target: { value: TipoVoto.SIM } })
+
+    const partySelects = screen.getAllByDisplayValue('Todos')
+    const partySelect = partySelects[1]
+    fireEvent.change(partySelect, { target: { value: 'PSDB' } })
+
+    expect(screen.getByText('Nenhum voto encontrado com os filtros selecionados')).toBeInTheDocument()
+  })
+
+  it('should handle votes without deputado info', () => {
+    const votosWithoutDeputado: Voto[] = [
+      { id: '1', votacao_id: '1', deputado_id: 1, tipo: TipoVoto.SIM },
     ]
 
-    render(<ListaVotos votos={votosComVazio} />)
+    render(<ListaVotos votos={votosWithoutDeputado} />)
 
     expect(screen.getByText('Deputado desconhecido')).toBeInTheDocument()
-  })
-
-  it('should render all vote types with correct styling', () => {
-    const votosCompletos = [
-      {
-        id: '1',
-        tipo: TipoVoto.SIM,
-        deputado: { id: '1', nome: 'Test1', partido: 'PT', uf: 'SP' },
-      },
-      {
-        id: '2',
-        tipo: TipoVoto.NAO,
-        deputado: { id: '2', nome: 'Test2', partido: 'PSD', uf: 'RJ' },
-      },
-      {
-        id: '3',
-        tipo: TipoVoto.ABSTENCAO,
-        deputado: { id: '3', nome: 'Test3', partido: 'MDB', uf: 'MG' },
-      },
-      {
-        id: '4',
-        tipo: TipoVoto.OBSTRUCAO,
-        deputado: { id: '4', nome: 'Test4', partido: 'PP', uf: 'BA' },
-      },
-    ]
-
-    render(<ListaVotos votos={votosCompletos} />)
-
-    expect(screen.getByText(TipoVoto.SIM)).toBeInTheDocument()
-    expect(screen.getByText(TipoVoto.NAO)).toBeInTheDocument()
-    expect(screen.getByText(TipoVoto.ABSTENCAO)).toBeInTheDocument()
-    expect(screen.getByText(TipoVoto.OBSTRUCAO)).toBeInTheDocument()
   })
 })

@@ -2,18 +2,21 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VotacaoDetalhes } from '@/components/features/votacoes/VotacaoDetalhes'
+import { Votacao } from '@/lib/types/votacao'
 
 describe('VotacaoDetalhes', () => {
-  const mockVotacao = {
+  const mockVotacao: Votacao = {
     id: '1',
     data: '2024-01-15T10:00:00Z',
     resultado: 'APROVADO',
     placar: { sim: 200, nao: 100, abstencao: 50, obstrucao: 13 },
+    proposicao_id: 1,
     proposicao: {
-      id: '1',
+      id: 1,
       tipo: 'PL',
-      descricao: 'Reforma Tributária',
-      tema: 'Impostos',
+      numero: 1234,
+      ano: 2024,
+      ementa: 'Reforma Tributária',
     },
   }
 
@@ -36,26 +39,11 @@ describe('VotacaoDetalhes', () => {
     expect(screen.getByText('PL')).toBeInTheDocument()
   })
 
-  it('should render tema', () => {
-    render(<VotacaoDetalhes votacao={mockVotacao} />)
-
-    expect(screen.getByText('Tema')).toBeInTheDocument()
-    expect(screen.getByText('Impostos')).toBeInTheDocument()
-  })
-
   it('should render resultado badge', () => {
     render(<VotacaoDetalhes votacao={mockVotacao} />)
 
     expect(screen.getByText('Resultado')).toBeInTheDocument()
     expect(screen.getByText('APROVADO')).toBeInTheDocument()
-  })
-
-  it('should display placar summary', () => {
-    render(<VotacaoDetalhes votacao={mockVotacao} />)
-
-    expect(screen.getByText(/Resultado da Votação/)).toBeInTheDocument()
-    expect(screen.getByText('Sim')).toBeInTheDocument()
-    expect(screen.getByText('Não')).toBeInTheDocument()
   })
 
   it('should show loading skeleton when loading is true', () => {
@@ -133,14 +121,5 @@ describe('VotacaoDetalhes', () => {
     render(<VotacaoDetalhes votacao={votacaoSemProposicao} />)
 
     expect(screen.getByText('Votação')).toBeInTheDocument()
-  })
-
-  it('should display all placar values', () => {
-    render(<VotacaoDetalhes votacao={mockVotacao} />)
-
-    expect(screen.getByText('200')).toBeInTheDocument()
-    expect(screen.getByText('100')).toBeInTheDocument()
-    expect(screen.getByText('50')).toBeInTheDocument()
-    expect(screen.getByText('13')).toBeInTheDocument()
   })
 })
