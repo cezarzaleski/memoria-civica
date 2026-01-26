@@ -11,7 +11,7 @@ describe('MSW Handlers', () => {
 
   describe('Deputados handlers', () => {
     it('should return list of deputados', async () => {
-      const response = await fetch('/api/v1/deputados');
+      const response = await fetch('http://localhost/api/v1/deputados');
       const data = (await response.json()) as Deputado[];
 
       expect(response.status).toBe(200);
@@ -24,7 +24,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should filter deputados by nome query parameter', async () => {
-      const response = await fetch('/api/v1/deputados?nome=João');
+      const response = await fetch('http://localhost/api/v1/deputados?nome=João');
       const data = (await response.json()) as Deputado[];
 
       expect(response.status).toBe(200);
@@ -36,12 +36,12 @@ describe('MSW Handlers', () => {
 
     it('should filter deputados by partido query parameter', async () => {
       // First, get a list to know what parties exist
-      const listResponse = await fetch('/api/v1/deputados');
+      const listResponse = await fetch('http://localhost/api/v1/deputados');
       const allDeputados = (await listResponse.json()) as Deputado[];
       const testPartido = allDeputados[0].partido;
 
       // Now filter by that party
-      const response = await fetch(`/api/v1/deputados?partido=${testPartido}`);
+      const response = await fetch(`http://localhost/api/v1/deputados?partido=${testPartido}`);
       const data = (await response.json()) as Deputado[];
 
       expect(response.status).toBe(200);
@@ -51,7 +51,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should filter deputados by uf query parameter', async () => {
-      const response = await fetch('/api/v1/deputados?uf=SP');
+      const response = await fetch('http://localhost/api/v1/deputados?uf=SP');
       const data = (await response.json()) as Deputado[];
 
       expect(response.status).toBe(200);
@@ -61,7 +61,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should support multiple filters combined', async () => {
-      const response = await fetch('/api/v1/deputados?nome=Silva&uf=RJ');
+      const response = await fetch('http://localhost/api/v1/deputados?nome=Silva&uf=RJ');
       const data = (await response.json()) as Deputado[];
 
       expect(response.status).toBe(200);
@@ -72,7 +72,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should return single deputado by ID', async () => {
-      const response = await fetch('/api/v1/deputados/1');
+      const response = await fetch('http://localhost/api/v1/deputados/1');
       const data = (await response.json()) as Deputado;
 
       expect(response.status).toBe(200);
@@ -82,7 +82,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should return 404 for non-existent deputado ID', async () => {
-      const response = await fetch('/api/v1/deputados/99999');
+      const response = await fetch('http://localhost/api/v1/deputados/99999');
 
       expect(response.status).toBe(404);
     });
@@ -90,7 +90,7 @@ describe('MSW Handlers', () => {
 
   describe('Votações handlers', () => {
     it('should return list of votações', async () => {
-      const response = await fetch('/api/v1/votacoes');
+      const response = await fetch('http://localhost/api/v1/votacoes');
       const data = (await response.json()) as Votacao[];
 
       expect(response.status).toBe(200);
@@ -99,7 +99,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should return votações ordered by data descending', async () => {
-      const response = await fetch('/api/v1/votacoes');
+      const response = await fetch('http://localhost/api/v1/votacoes');
       const data = (await response.json()) as Votacao[];
 
       // Check that votações are ordered by date descending
@@ -111,7 +111,7 @@ describe('MSW Handlers', () => {
     });
 
     it('should include nested proposicao in votações', async () => {
-      const response = await fetch('/api/v1/votacoes');
+      const response = await fetch('http://localhost/api/v1/votacoes');
       const data = (await response.json()) as Votacao[];
 
       data.forEach((votacao) => {
@@ -123,12 +123,12 @@ describe('MSW Handlers', () => {
 
     it('should return single votação by ID', async () => {
       // First get a list to find a valid ID
-      const listResponse = await fetch('/api/v1/votacoes');
+      const listResponse = await fetch('http://localhost/api/v1/votacoes');
       const votacoes = (await listResponse.json()) as Votacao[];
       const testId = votacoes[0].id;
 
       // Now fetch that specific votação
-      const response = await fetch(`/api/v1/votacoes/${testId}`);
+      const response = await fetch(`http://localhost/api/v1/votacoes/${testId}`);
       const data = (await response.json()) as Votacao;
 
       expect(response.status).toBe(200);
@@ -138,13 +138,13 @@ describe('MSW Handlers', () => {
     });
 
     it('should return 404 for non-existent votação ID', async () => {
-      const response = await fetch('/api/v1/votacoes/non-existent-id');
+      const response = await fetch('http://localhost/api/v1/votacoes/non-existent-id');
 
       expect(response.status).toBe(404);
     });
 
     it('should have valid placar in votações', async () => {
-      const response = await fetch('/api/v1/votacoes');
+      const response = await fetch('http://localhost/api/v1/votacoes');
       const data = (await response.json()) as Votacao[];
 
       data.forEach((votacao) => {
@@ -162,12 +162,12 @@ describe('MSW Handlers', () => {
   describe('Votos handlers', () => {
     it('should return list of votos for a votação', async () => {
       // First, get a votação ID
-      const votacaoResponse = await fetch('/api/v1/votacoes');
+      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes');
       const votacoes = (await votacaoResponse.json()) as Votacao[];
       const testVotacaoId = votacoes[0].id;
 
       // Now get votos for that votação
-      const response = await fetch(`/api/v1/votacoes/${testVotacaoId}/votos`);
+      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
       const data = (await response.json()) as Voto[];
 
       expect(response.status).toBe(200);
@@ -176,11 +176,11 @@ describe('MSW Handlers', () => {
     });
 
     it('should include nested deputado in votos', async () => {
-      const votacaoResponse = await fetch('/api/v1/votacoes');
+      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes');
       const votacoes = (await votacaoResponse.json()) as Votacao[];
       const testVotacaoId = votacoes[0].id;
 
-      const response = await fetch(`/api/v1/votacoes/${testVotacaoId}/votos`);
+      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
       const data = (await response.json()) as Voto[];
 
       data.forEach((voto) => {
@@ -191,11 +191,11 @@ describe('MSW Handlers', () => {
     });
 
     it('should have valid voto tipos', async () => {
-      const votacaoResponse = await fetch('/api/v1/votacoes');
+      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes');
       const votacoes = (await votacaoResponse.json()) as Votacao[];
       const testVotacaoId = votacoes[0].id;
 
-      const response = await fetch(`/api/v1/votacoes/${testVotacaoId}/votos`);
+      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
       const data = (await response.json()) as Voto[];
 
       const validTipos = ['SIM', 'NAO', 'ABSTENCAO', 'OBSTRUCAO'];
@@ -206,11 +206,11 @@ describe('MSW Handlers', () => {
     });
 
     it('should have correct votacao_id in votos', async () => {
-      const votacaoResponse = await fetch('/api/v1/votacoes');
+      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes');
       const votacoes = (await votacaoResponse.json()) as Votacao[];
       const testVotacaoId = votacoes[0].id;
 
-      const response = await fetch(`/api/v1/votacoes/${testVotacaoId}/votos`);
+      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
       const data = (await response.json()) as Voto[];
 
       data.forEach((voto) => {
@@ -219,15 +219,15 @@ describe('MSW Handlers', () => {
     });
 
     it('should return consistent votos for same votação across multiple requests', async () => {
-      const votacaoResponse = await fetch('/api/v1/votacoes');
+      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes');
       const votacoes = (await votacaoResponse.json()) as Votacao[];
       const testVotacaoId = votacoes[0].id;
 
       // Request votos twice
-      const response1 = await fetch(`/api/v1/votacoes/${testVotacaoId}/votos`);
+      const response1 = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
       const data1 = (await response1.json()) as Voto[];
 
-      const response2 = await fetch(`/api/v1/votacoes/${testVotacaoId}/votos`);
+      const response2 = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
       const data2 = (await response2.json()) as Voto[];
 
       // Verify same data returned both times
@@ -241,7 +241,7 @@ describe('MSW Handlers', () => {
 
   describe('Error handling', () => {
     it('should handle empty filter results gracefully', async () => {
-      const response = await fetch('/api/v1/deputados?nome=XYZ_NONEXISTENT_');
+      const response = await fetch('http://localhost/api/v1/deputados?nome=XYZ_NONEXISTENT_');
       const data = (await response.json()) as Deputado[];
 
       expect(response.status).toBe(200);

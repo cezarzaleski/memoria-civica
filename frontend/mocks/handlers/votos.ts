@@ -22,7 +22,7 @@ export const votosHandlers = [
    * Note: In a real API, you'd validate that the votacao_id exists.
    * For this mock, we generate votos for any requested votação_id.
    */
-  http.get('/api/v1/votacoes/:votacao_id/votos', ({ params }) => {
+  http.get('http://localhost/api/v1/votacoes/:votacao_id/votos', ({ params }) => {
     const votacao_id = params.votacao_id as string;
 
     // Check if we've already generated votos for this votação
