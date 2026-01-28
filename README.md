@@ -1,5 +1,7 @@
 # Memória Cívica - Fundação de Dados
 
+[![Tests](https://github.com/cezarzaleski/memoria-civica/actions/workflows/test.yml/badge.svg)](https://github.com/cezarzaleski/memoria-civica/actions/workflows/test.yml)
+
 > "Democracia não é só votar. É lembrar, cobrar e participar."
 
 ## Visão Geral

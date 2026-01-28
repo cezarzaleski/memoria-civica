@@ -1,5 +1,7 @@
 # Frontend Memória Cívica
 
+[![Tests](https://github.com/cezarzaleski/memoria-civica/actions/workflows/test.yml/badge.svg)](https://github.com/cezarzaleski/memoria-civica/actions/workflows/test.yml)
+
 Frontend da aplicação Memória Cívica - PWA para acompanhar votações e deputados do Congresso Nacional.
 
 ## Stack Tecnológico
