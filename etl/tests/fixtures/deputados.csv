@@ -1,0 +1,6 @@
+"uri";"nome";"idLegislaturaInicial";"idLegislaturaFinal";"nomeCivil";"cpf";"siglaSexo";"urlRedeSocial";"urlWebsite";"dataNascimento";"dataFalecimento";"ufNascimento";"municipioNascimento";"partido";"foto_url";"email"
+"https://dadosabertos.camara.leg.br/api/v2/deputados/220593";"João Silva";"57";"57";"JOÃO JOSÉ SILVA";"";"";"";"";"1984-01-31";"";"SP";"São Paulo";"PT";"https://example.com/joao.jpg";"joao@camara.leg.br"
+"https://dadosabertos.camara.leg.br/api/v2/deputados/204379";"Maria Santos";"56";"57";"MARIA DA SILVA SANTOS";"";"F";"";"";"1983-09-28";"";"RJ";"Rio de Janeiro";"PDT";"https://example.com/maria.jpg";"maria@camara.leg.br"
+"https://dadosabertos.camara.leg.br/api/v2/deputados/220714";"Carlos Oliveira";"57";"57";"CARLOS ALBERTO OLIVEIRA";"";"M";"";"";"1992-02-16";"";"MG";"Belo Horizonte";"PSDB";"https://example.com/carlos.jpg";"carlos@camara.leg.br"
+"https://dadosabertos.camara.leg.br/api/v2/deputados/221328";"Ana Costa";"57";"57";"ANA PAULA COSTA";"";"F";"";"";"1964-06-14";"";"BA";"Salvador";"PMDB";"https://example.com/ana.jpg";""
+"https://dadosabertos.camara.leg.br/api/v2/deputados/204560";"Pedro Lima";"56";"57";"PEDRO HENRIQUE LIMA";"";"M";"";"";"1981-02-02";"";"DF";"Brasília";"PP";"";""

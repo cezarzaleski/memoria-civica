@@ -1,0 +1,61 @@
+[tool.poetry]
+name = "memoria-civica"
+version = "0.1.0"
+description = "Fundação de dados para o Memória Cívica - tracking de votações da Câmara dos Deputados"
+authors = ["Memória Cívica Team"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+sqlalchemy = "^2.0"
+alembic = "^1.13"
+pydantic = "^2.5"
+pydantic-settings = "^2.1"
+pandas = "^2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4"
+pytest-cov = "^3.0"
+pytest-mock = "^3.12"
+ruff = "^0.14.14"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+fix = true
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E", "W",
+    # pyflakes
+    "F",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # pyupgrade
+    "UP",
+    # flake8-comprehensions
+    "C4",
+    # ruff-specific
+    "RUF",
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # allow assert in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
