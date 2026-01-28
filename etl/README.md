@@ -82,10 +82,11 @@ python etl/scripts/run_etl.py
 
 ```bash
 # Da raiz do projeto
-make test
-
-# Ou diretamente com pytest
 pytest etl/tests/
+
+# Ou do diretório etl
+cd etl
+poetry run pytest tests/
 ```
 
 ### Cobertura de testes
@@ -102,9 +103,10 @@ Target de cobertura: **≥80%**
 
 ```bash
 # Da raiz do projeto
-make lint
+cd etl
+poetry run ruff check src tests
 
-# Ou diretamente com Ruff
+# Ou diretamente com Ruff (se instalado globalmente)
 ruff check etl/
 ```
 
@@ -112,9 +114,10 @@ ruff check etl/
 
 ```bash
 # Da raiz do projeto
-make format
+cd etl
+poetry run ruff format src tests
 
-# Ou diretamente com Ruff
+# Ou diretamente com Ruff (se instalado globalmente)
 ruff format etl/
 ```
 

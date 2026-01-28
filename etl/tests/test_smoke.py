@@ -67,9 +67,11 @@ def test_config_files_exist():
 
     # Arquivos na raiz do projeto
     required_files_root = [
-        "pytest.ini",
         ".gitignore",
         "README.md",
+        "alembic.ini",
+        ".python-version",
+        ".env.example",
     ]
 
     for file_path in required_files_root:

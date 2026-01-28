@@ -73,7 +73,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pypoetry
-          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+          key: poetry-${{ runner.os }}-${{ hashFiles('etl/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
 
@@ -82,9 +82,12 @@ jobs:
 
       - name: Install dependencies
         run: poetry install
+        working-directory: etl
 
       - name: Run linting
-        run: make lint
+        run: poetry run ruff check src tests
+        working-directory: etl
 
       - name: Run tests
-        run: make test
+        run: poetry run pytest tests/
+        working-directory: etl

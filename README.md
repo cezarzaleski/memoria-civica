@@ -55,54 +55,60 @@ python etl/scripts/run_etl.py  # Executar pipeline
 
 **Testes:**
 ```bash
-pytest etl/tests/  # Ou `make test` (roda de raiz)
+pytest etl/tests/
 ```
 
-### **Arquivo de configuração raiz**
+### **Arquivos de configuração raiz**
 
-- `pyproject.toml` (Python): Configuração de dependências e linting
-- `Makefile`: Comandos convenientes (make test, make lint, etc)
-- `pytest.ini`: Configuração de testes (aponta para etl/tests/)
-- `alembic/`: Migrations de banco (mantém na raiz para acesso fácil)
+- `alembic/` e `alembic.ini`: Migrations de banco (mantidos na raiz para acesso fácil)
+- `.python-version`: Especificação da versão do Python (monorepo-wide)
+- `.env.example`: Template de variáveis de ambiente (monorepo-wide)
 
 ## Pré-requisitos
 
 - Python 3.11+
-- Poetry (gerenciador de dependências)
+- Poetry (gerenciador de dependências Python - instalado no diretório etl/)
+- Node.js 20+ (para frontend)
 - SQLite 3.35+
 
-## Setup
+## Setup ETL
 
-1. **Instalar dependências:**
+1. **Navegar para o diretório ETL:**
+   ```bash
+   cd etl
+   ```
+
+2. **Instalar dependências:**
    ```bash
    poetry install
    ```
 
-2. **Ativar ambiente virtual:**
+3. **Ativar ambiente virtual:**
    ```bash
    poetry shell
    ```
 
-3. **Inicializar banco de dados:**
+4. **Inicializar banco de dados (da raiz do projeto):**
    ```bash
-   python scripts/init_db.py
+   cd ..
+   python etl/scripts/init_db.py
    ```
 
-## Execução
+## Execução ETL
 
 - **ETL completo:**
   ```bash
-  python scripts/run_etl.py
+  python etl/scripts/run_etl.py
   ```
 
 - **Executar testes:**
   ```bash
-  pytest
+  pytest etl/tests/
   ```
 
 - **Coverage:**
   ```bash
-  pytest --cov=src --cov-report=html
+  pytest etl/tests/ --cov=etl/src --cov-report=html
   ```
 
 ## Arquitetura
@@ -133,8 +139,8 @@ memoria_civica/
 │
 ├── alembic/                   # Database migrations (na raiz para fácil acesso)
 ├── data/                      # Dados CSV de entrada
-├── pyproject.toml             # Config Python (pytest, ruff)
-├── Makefile                   # Comandos convenientes
+├── .python-version            # Versão Python (monorepo-wide)
+├── .env.example               # Template de variáveis de ambiente
 └── README.md                  # Esse arquivo
 ```
 
@@ -218,25 +224,21 @@ Este projeto segue padrões rigorosos de qualidade:
 ### Executar linting
 
 ```bash
-make lint
-```
-
-Ou diretamente com Ruff:
-
-```bash
-ruff check src tests
+cd etl
+poetry run ruff check src tests
 ```
 
 ### Formatar código
 
 ```bash
-make format
+cd etl
+poetry run ruff format src tests
 ```
 
 ### Estrutura de testes
 
 ```
-tests/
+etl/tests/
 ├── test_smoke.py                # Testes de smoke (verificação básica)
 ├── test_deputados/
 │   ├── conftest.py             # Fixtures específicas do domínio
@@ -259,16 +261,16 @@ tests/
 
 ```bash
 # Todos os testes
-pytest
+pytest etl/tests/
 
 # Testes de um domínio
-pytest tests/test_deputados/
+pytest etl/tests/test_deputados/
 
 # Apenas testes de integração
-pytest -m integration
+pytest etl/tests/ -m integration
 
 # Com coverage
-pytest --cov=src --cov-report=html
+pytest etl/tests/ --cov=etl/src --cov-report=html
 ```
 
 ## Troubleshooting
@@ -279,7 +281,7 @@ pytest --cov=src --cov-report=html
 
 **Solução**: Execute o script de inicialização do banco:
 ```bash
-python scripts/init_db.py
+python etl/scripts/init_db.py
 ```
 
 Este script cria todas as tabelas via Alembic migrations.
@@ -293,7 +295,7 @@ Este script cria todas as tabelas via Alembic migrations.
 2. Dados referenciados não existem (ex: proposição referencia deputado que não existe)
 
 **Solução**:
-- Execute ETL na ordem correta: `python scripts/run_etl.py` (já faz isso automaticamente)
+- Execute ETL na ordem correta: `python etl/scripts/run_etl.py` (já faz isso automaticamente)
 - Verifique que os CSVs de entrada têm dados válidos (sem referências quebradas)
 
 ### Erro: "database is locked"
@@ -342,35 +344,42 @@ Este script cria todas as tabelas via Alembic migrations.
 git clone <repo>
 cd memoria_civica
 
-# 2. Instalar dependências
+# 2. Instalar dependências ETL
+cd etl
 poetry install
-
-# 3. Ativar ambiente
 poetry shell
+cd ..
 
-# 4. Inicializar banco
-python scripts/init_db.py
+# 3. Inicializar banco
+python etl/scripts/init_db.py
 
-# 5. Rodar ETL completo
-python scripts/run_etl.py
+# 4. Rodar ETL completo
+python etl/scripts/run_etl.py
 
-# 6. Verificar testes
-pytest
+# 5. Verificar testes
+pytest etl/tests/
+
+# 6. Setup Frontend (opcional)
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Rodar apenas um domínio
 
-```bash
+```python
 # Só ETL de deputados (nota: existem dependências entre domínios)
-from src.deputados.etl import run_deputados_etl
+from pathlib import Path
+from etl.src.deputados.etl import run_deputados_etl
+
 exit_code = run_deputados_etl(Path("data/dados_camara/deputados.csv"))
 ```
 
 ### Acessar dados diretamente
 
 ```python
-from src.shared.database import SessionLocal, get_db
-from src.deputados.repository import DeputadoRepository
+from etl.src.shared.database import SessionLocal, get_db
+from etl.src.deputados.repository import DeputadoRepository
 
 # Criar session
 session = SessionLocal()
@@ -390,14 +399,14 @@ session.close()
 
 ### Adicionar domínio novo
 
-1. Criar diretório `src/{novo_dominio}/`
+1. Criar diretório `etl/src/{novo_dominio}/`
 2. Criar `models.py` com SQLAlchemy models
 3. Criar `schemas.py` com Pydantic schemas
 4. Criar `repository.py` com operações CRUD
 5. Criar `etl.py` com pipeline (extract → transform → load)
-6. Criar `tests/test_{novo_dominio}/` com tests
+6. Criar `etl/tests/test_{novo_dominio}/` com tests
 7. Criar migration: `alembic revision -m "add_{novo_dominio}_table"`
-8. Atualizar `scripts/run_etl.py` para orquestrar o novo domínio
+8. Atualizar `etl/scripts/run_etl.py` para orquestrar o novo domínio
 
 ## Status
 
@@ -418,8 +427,8 @@ Fases completadas:
 
 1. Crie uma branch para sua feature: `git checkout -b feature/minha-feature`
 2. Faça commits descritivos: `git commit -m "feat: descrição clara da mudança"`
-3. Certifique-se que testes passam: `make test`
-4. Certifique-se que linting passa: `make lint`
+3. Certifique-se que testes passam: `pytest etl/tests/` (para ETL) ou `npm run test` (para frontend)
+4. Certifique-se que linting passa: `cd etl && poetry run ruff check src tests` (para ETL) ou `npm run lint` (para frontend)
 5. Envie pull request com descrição clara
 
 ### Convenções de commit

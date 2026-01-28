@@ -248,9 +248,9 @@ on:
   2. Setup Python 3.11
   3. Restaurar cache do Poetry
   4. Instalar Poetry
-  5. `poetry install` (instalar dependências)
-  6. `make lint` (Ruff linter)
-  7. `make test` (pytest, excluindo testes de integração)
+  5. `poetry install` (instalar dependências no diretório etl/)
+  6. `poetry run ruff check src tests` (Ruff linter)
+  7. `poetry run pytest tests/` (pytest, excluindo testes de integração)
 
 ---
 

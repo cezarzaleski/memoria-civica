@@ -11,8 +11,8 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 # Importar Base e settings do módulo shared
-from src.shared.config import settings
-from src.shared.database import Base
+from etl.src.shared.config import settings
+from etl.src.shared.database import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,9 +25,9 @@ if config.config_file_name is not None:
 
 # Configurar target_metadata com Base.metadata do shared
 # Quando novos models forem criados, importá-los aqui para autogenerate funcionar:
-# from src.deputados.models import Deputado
-# from src.proposicoes.models import Proposicao
-# from src.votacoes.models import Votacao, Voto
+# from etl.src.deputados.models import Deputado
+# from etl.src.proposicoes.models import Proposicao
+# from etl.src.votacoes.models import Votacao, Voto
 target_metadata = Base.metadata
 
 # Sobrescrever sqlalchemy.url com valor de settings
