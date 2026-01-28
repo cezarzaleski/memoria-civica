@@ -237,7 +237,7 @@ Use React Testing Library focando em comportamento do usuário, não implementa�
 
 **Workarounds:**
 
-1. **Usar yarn (Recomendado):**
+1. **Usar yarn (Recomendado para desenvolvimento local):**
    ```bash
    npm install -g yarn
    cd frontend
@@ -255,13 +255,18 @@ Use React Testing Library focando em comportamento do usuário, não implementa�
    pnpm test
    ```
 
-3. **Downgrade para React 18 (não recomendado):**
+3. **CI/CD (GitHub Actions):**
+   - O workflow CI usa `npm ci --legacy-peer-deps` para contornar o conflito
+   - Esta é uma solução temporária até o Radix UI lançar suporte oficial para React 19
+   - Ver `.github/workflows/test.yml` linha 52 para detalhes da implementação
+
+4. **Downgrade para React 18 (não recomendado):**
    - Perde features do React 19 e Next.js 15
    - Requer downgrades massivos em múltiplas dependências
 
-4. **Aguardar Radix UI React 19 support:**
+5. **Aguardar Radix UI React 19 support:**
    - Monitorar [@radix-ui/react-select releases](https://github.com/radix-ui/primitives/releases)
-   - Quando disponível, remover `--legacy-peer-deps`
+   - Quando disponível, remover `--legacy-peer-deps` do CI e atualizar esta documentação
 
 **Status da Implementação:**
 - ✅ Infraestrutura de testes completa (277 testes em 18 arquivos)
