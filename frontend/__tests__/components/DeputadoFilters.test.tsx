@@ -17,14 +17,16 @@ describe('DeputadoFilters', () => {
   it('should have partido select trigger', () => {
     render(<DeputadoFilters onFilterChange={onFilterChange} />)
 
-    const partidoSelect = screen.getByRole('combobox', { name: /Selecione um partido/ })
+    // Radix/Shadcn UI Select uses role="combobox"
+    const partidoSelect = screen.getByRole('combobox', { name: /Partido/ })
     expect(partidoSelect).toBeInTheDocument()
   })
 
   it('should have uf select trigger', () => {
     render(<DeputadoFilters onFilterChange={onFilterChange} />)
 
-    const ufSelect = screen.getByRole('combobox', { name: /Selecione um estado/ })
+    // Radix/Shadcn UI Select uses role="combobox"
+    const ufSelect = screen.getByRole('combobox', { name: /Estado \(UF\)/ })
     expect(ufSelect).toBeInTheDocument()
   })
 
@@ -32,7 +34,8 @@ describe('DeputadoFilters', () => {
     vi.clearAllMocks()
     render(<DeputadoFilters onFilterChange={onFilterChange} />)
 
-    const partidoSelect = screen.getByRole('combobox', { name: /Selecione um partido/ })
+    // Radix/Shadcn UI Select uses role="combobox"
+    const partidoSelect = screen.getByRole('combobox', { name: /Partido/ })
     fireEvent.click(partidoSelect)
 
     // Note: This test assumes the select opens and items appear
@@ -75,6 +78,7 @@ describe('DeputadoFilters', () => {
   it('should disable all controls when disabled prop is true', () => {
     render(<DeputadoFilters onFilterChange={onFilterChange} disabled={true} />)
 
+    // Radix/Shadcn UI Select uses role="combobox"
     const selects = screen.getAllByRole('combobox')
     selects.forEach((select) => {
       expect(select).toBeDisabled()
@@ -102,8 +106,8 @@ describe('DeputadoFilters', () => {
       />
     )
 
-    // Check if the selected value is displayed in the trigger
-    expect(screen.getByDisplayValue('PT')).toBeInTheDocument()
+    // Check if the selected value is displayed in the trigger (Shadcn UI Select shows value as text content)
+    expect(screen.getByText('PT')).toBeInTheDocument()
   })
 
   it('should show selected uf value', () => {
@@ -114,7 +118,8 @@ describe('DeputadoFilters', () => {
       />
     )
 
-    expect(screen.getByDisplayValue('SP')).toBeInTheDocument()
+    // Shadcn UI Select shows selected value as text content
+    expect(screen.getByText('SP')).toBeInTheDocument()
   })
 
   it('should have partido options', () => {

@@ -20,7 +20,7 @@ export const votacoesHandlers = [
    * List all votações ordered by date descending (most recent first)
    * Each votação includes its nested proposicao object
    */
-  http.get('http://localhost/api/v1/votacoes', () => {
+  http.get('*/api/v1/votacoes', () => {
     return HttpResponse.json(votacoes);
   }),
 
@@ -29,7 +29,7 @@ export const votacoesHandlers = [
    * Get a single votação by ID with its nested proposicao
    * Returns 404 if votação not found
    */
-  http.get('http://localhost/api/v1/votacoes/:id', ({ params }) => {
+  http.get('*/api/v1/votacoes/:id', ({ params }) => {
     const votacao = getVotacaoById(votacoes, params.id as string);
 
     if (!votacao) {

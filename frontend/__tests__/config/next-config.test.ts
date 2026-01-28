@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';

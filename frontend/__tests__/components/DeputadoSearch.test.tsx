@@ -1,13 +1,16 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { DeputadoSearch } from '@/components/features/deputados/DeputadoSearch'
 import userEvent from '@testing-library/user-event'
 
 describe('DeputadoSearch', () => {
   beforeEach(() => {
-    vi.clearAllTimers()
     vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('should render input with placeholder', () => {
@@ -34,24 +37,31 @@ describe('DeputadoSearch', () => {
     const onSearch = vi.fn()
     render(<DeputadoSearch onSearch={onSearch} debounceMs={300} />)
 
+    // Component calls onSearch('') on mount
+    expect(onSearch).toHaveBeenCalledWith('')
+    onSearch.mockClear()
+
     const input = screen.getByPlaceholderText('Pesquisar deputados...')
 
     fireEvent.change(input, { target: { value: 'João' } })
 
-    // Search should not be called immediately
+    // Search should not be called immediately after change
     expect(onSearch).not.toHaveBeenCalled()
 
     // Move time forward by 300ms
-    vi.advanceTimersByTime(300)
-
-    await waitFor(() => {
-      expect(onSearch).toHaveBeenCalledWith('João')
+    await act(async () => {
+      vi.advanceTimersByTime(300)
     })
+
+    expect(onSearch).toHaveBeenCalledWith('João')
   })
 
   it('should debounce rapid input changes', async () => {
     const onSearch = vi.fn()
     render(<DeputadoSearch onSearch={onSearch} debounceMs={300} />)
+
+    // Clear initial mount call
+    onSearch.mockClear()
 
     const input = screen.getByPlaceholderText('Pesquisar deputados...')
 
@@ -60,29 +70,36 @@ describe('DeputadoSearch', () => {
     fireEvent.change(input, { target: { value: 'Joa' } })
     fireEvent.change(input, { target: { value: 'João' } })
 
-    // None should be called yet
+    // None should be called yet (after clearing mount call)
     expect(onSearch).not.toHaveBeenCalled()
 
-    vi.advanceTimersByTime(300)
-
-    await waitFor(() => {
-      expect(onSearch).toHaveBeenCalledTimes(1)
-      expect(onSearch).toHaveBeenCalledWith('João')
+    await act(async () => {
+      vi.advanceTimersByTime(300)
     })
+
+    expect(onSearch).toHaveBeenCalledTimes(1)
+    expect(onSearch).toHaveBeenCalledWith('João')
   })
 
   it('should respect custom debounce time', async () => {
     const onSearch = vi.fn()
     render(<DeputadoSearch onSearch={onSearch} debounceMs={500} />)
 
+    // Clear initial mount call
+    onSearch.mockClear()
+
     const input = screen.getByPlaceholderText('Pesquisar deputados...')
 
     fireEvent.change(input, { target: { value: 'Maria' } })
 
-    vi.advanceTimersByTime(300)
+    await act(async () => {
+      vi.advanceTimersByTime(300)
+    })
     expect(onSearch).not.toHaveBeenCalled()
 
-    vi.advanceTimersByTime(200)
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
     expect(onSearch).toHaveBeenCalledWith('Maria')
   })
 
@@ -108,11 +125,11 @@ describe('DeputadoSearch', () => {
 
     fireEvent.change(input, { target: { value: 'João' } })
 
-    vi.advanceTimersByTime(300)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Buscando por: "João"/)).toBeInTheDocument()
+    await act(async () => {
+      vi.advanceTimersByTime(300)
     })
+
+    expect(screen.getByText(/Buscando por: "João"/)).toBeInTheDocument()
   })
 
   it('should clear search hint on empty input', async () => {
@@ -123,19 +140,19 @@ describe('DeputadoSearch', () => {
 
     fireEvent.change(input, { target: { value: 'João' } })
 
-    vi.advanceTimersByTime(300)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Buscando por: "João"/)).toBeInTheDocument()
+    await act(async () => {
+      vi.advanceTimersByTime(300)
     })
+
+    expect(screen.getByText(/Buscando por: "João"/)).toBeInTheDocument()
 
     fireEvent.change(input, { target: { value: '' } })
 
-    vi.advanceTimersByTime(300)
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Buscando por:/)).not.toBeInTheDocument()
+    await act(async () => {
+      vi.advanceTimersByTime(300)
     })
+
+    expect(screen.queryByText(/Buscando por:/)).not.toBeInTheDocument()
   })
 
   it('should disable input when disabled prop is true', () => {
@@ -152,11 +169,16 @@ describe('DeputadoSearch', () => {
       <DeputadoSearch onSearch={onSearch} disabled={false} />
     )
 
-    const input = screen.getByPlaceholderText('Pesquisar deputados..') as HTMLInputElement
+    // Clear initial mount call
+    onSearch.mockClear()
+
+    const input = screen.getByPlaceholderText('Pesquisar deputados...') as HTMLInputElement
 
     fireEvent.change(input, { target: { value: 'João' } })
 
-    vi.advanceTimersByTime(300)
+    await act(async () => {
+      vi.advanceTimersByTime(300)
+    })
 
     expect(onSearch).toHaveBeenCalledWith('João')
 
@@ -169,12 +191,7 @@ describe('DeputadoSearch', () => {
     const onSearch = vi.fn()
     render(<DeputadoSearch onSearch={onSearch} debounceMs={300} />)
 
-    const input = screen.getByPlaceholderText('Pesquisar deputados...')
-
-    fireEvent.change(input, { target: { value: '' } })
-
-    vi.advanceTimersByTime(300)
-
+    // Component already calls onSearch('') on mount
     expect(onSearch).toHaveBeenCalledWith('')
   })
 
@@ -182,11 +199,16 @@ describe('DeputadoSearch', () => {
     const onSearch = vi.fn()
     render(<DeputadoSearch onSearch={onSearch} debounceMs={300} />)
 
+    // Clear initial mount call
+    onSearch.mockClear()
+
     const input = screen.getByPlaceholderText('Pesquisar deputados...')
 
     fireEvent.change(input, { target: { value: 'João & Silva' } })
 
-    vi.advanceTimersByTime(300)
+    await act(async () => {
+      vi.advanceTimersByTime(300)
+    })
 
     expect(onSearch).toHaveBeenCalledWith('João & Silva')
   })

@@ -30,7 +30,7 @@ export const deputadosHandlers = [
    * GET /api/v1/deputados
    * List all deputados with optional filtering by query parameters
    */
-  http.get('http://localhost/api/v1/deputados', ({ request }) => {
+  http.get('*/api/v1/deputados', ({ request }) => {
     const url = new URL(request.url);
     const nome = url.searchParams.get('nome');
     const partido = url.searchParams.get('partido');
@@ -59,7 +59,7 @@ export const deputadosHandlers = [
    * Get a single deputado by ID
    * Returns 404 if deputy not found
    */
-  http.get('http://localhost/api/v1/deputados/:id', ({ params }) => {
+  http.get('*/api/v1/deputados/:id', ({ params }) => {
     const deputado = getDeputadoById(deputados, parseInt(params.id as string));
 
     if (!deputado) {

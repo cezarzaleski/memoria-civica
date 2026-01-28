@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';

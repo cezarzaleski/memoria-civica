@@ -67,9 +67,10 @@ describe('DeputadoCard', () => {
     const deputadoUmNome = {
       ...mockDeputado,
       nome: 'João',
+      foto_url: undefined, // Remove foto to show initials
     }
 
-    const { container } = render(<DeputadoCard deputado={deputadoUmNome} />)
+    render(<DeputadoCard deputado={deputadoUmNome} />)
 
     // Should create initials from first letter
     expect(screen.getByText('J')).toBeInTheDocument()
@@ -79,9 +80,10 @@ describe('DeputadoCard', () => {
     const deputadoSemNome = {
       ...mockDeputado,
       nome: null as any,
+      foto_url: undefined, // Remove foto to show initials
     }
 
-    const { container } = render(<DeputadoCard deputado={deputadoSemNome} />)
+    render(<DeputadoCard deputado={deputadoSemNome} />)
 
     expect(screen.getByText('?')).toBeInTheDocument()
   })

@@ -20,10 +20,11 @@ describe('PlacarVotos', () => {
   it('should display correct vote counts', () => {
     render(<PlacarVotos placar={mockPlacar} title="Test" />)
 
+    // Math.round is used: 300/513=58%, 150/513=29%, 50/513=10%, 13/513=3%
     expect(screen.getByText(/300 \(58%\)/)).toBeInTheDocument()
     expect(screen.getByText(/150 \(29%\)/)).toBeInTheDocument()
-    expect(screen.getByText(/50 \(9%\)/)).toBeInTheDocument()
-    expect(screen.getByText(/13 \(2%\)/)).toBeInTheDocument()
+    expect(screen.getByText(/50 \(10%\)/)).toBeInTheDocument()
+    expect(screen.getByText(/13 \(3%\)/)).toBeInTheDocument()
   })
 
   it('should display all vote types', () => {
@@ -45,7 +46,9 @@ describe('PlacarVotos', () => {
 
     render(<PlacarVotos placar={zeroPlacar} />)
 
-    expect(screen.getByText(/0 \(0%\)/)).toBeInTheDocument()
+    // All 4 vote types show "0 (0%)"
+    const zeroTexts = screen.getAllByText(/0 \(0%\)/)
+    expect(zeroTexts.length).toBe(4)
     expect(screen.getByText(/Total: 0 votos/)).toBeInTheDocument()
   })
 
@@ -60,7 +63,9 @@ describe('PlacarVotos', () => {
     render(<PlacarVotos placar={partialPlacar} />)
 
     expect(screen.getByText(/100 \(100%\)/)).toBeInTheDocument()
-    expect(screen.getByText(/0 \(0%\)/)).toBeInTheDocument()
+    // 3 vote types show "0 (0%)"
+    const zeroTexts = screen.getAllByText(/0 \(0%\)/)
+    expect(zeroTexts.length).toBe(3)
   })
 
   it('should use default title when not provided', () => {

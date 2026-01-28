@@ -3,6 +3,7 @@
 import React from 'react'
 import { Votacao, ResultadoVotacao } from '@/lib/types/votacao'
 import { Badge } from '@/components/ui/badge'
+import { CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 interface VotacaoCardProps {
@@ -93,7 +94,7 @@ export function VotacaoCard({ votacao }: VotacaoCardProps) {
             <div className="text-xs text-muted-foreground">Obstrução</div>
           </div>
         </div>
-      </div>
+      </CardContent>
     </article>
   )
 }

@@ -87,7 +87,7 @@ describe('VotacaoDetalhes', () => {
       />
     )
 
-    expect(screen.getByText('Explicação (IA)')).toBeInTheDocument()
+    expect(screen.getByText('Explicação Simplificada')).toBeInTheDocument()
     expect(screen.getByText(explanation)).toBeInTheDocument()
   })
 
@@ -100,7 +100,7 @@ describe('VotacaoDetalhes', () => {
       />
     )
 
-    expect(screen.getByText('Explicação (IA)')).toBeInTheDocument()
+    expect(screen.getByText('Explicação Simplificada')).toBeInTheDocument()
 
     const skeletons = container.querySelectorAll('.animate-pulse')
     expect(skeletons.length).toBeGreaterThan(0)
@@ -109,7 +109,7 @@ describe('VotacaoDetalhes', () => {
   it('should not display LLM explanation section when not provided and not loading', () => {
     render(<VotacaoDetalhes votacao={mockVotacao} />)
 
-    expect(screen.queryByText('Explicação (IA)')).not.toBeInTheDocument()
+    expect(screen.queryByText('Explicação Simplificada')).not.toBeInTheDocument()
   })
 
   it('should handle votacao without proposicao', () => {
