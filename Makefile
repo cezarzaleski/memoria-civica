@@ -5,10 +5,10 @@ install:
 	@echo "Instalando dependências..."
 	poetry install
 
-# Executar testes com cobertura
+# Executar testes com cobertura (excluindo testes de integração)
 test:
 	@echo "Executando testes..."
-	poetry run pytest -v --cov=src --cov-report=term-missing --cov-report=html
+	poetry run pytest -v --cov=src --cov-report=term-missing --cov-report=html -m "not integration"
 
 # Executar linting
 lint:

@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def test_python_version():
     """Verifica se a versão do Python é 3.11 ou superior."""
@@ -106,6 +108,7 @@ def test_dependencies_installed():
             raise AssertionError(f"Dependência crítica não instalada: {dep}") from e
 
 
+@pytest.mark.integration
 def test_data_directory_has_csv_files():
     """Verifica se o diretório de dados contém arquivos CSV."""
     etl_root = Path(__file__).parent.parent
