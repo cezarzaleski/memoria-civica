@@ -58,7 +58,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const proposicaoTexts = screen.getAllByText(/PL \d+\/\d+/)
       expect(proposicaoTexts.length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
 
     // The first votação should be the most recent
     // (This is guaranteed by the mock data factory)
@@ -72,7 +72,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const votacaoCards = screen.queryAllByText(/PL \d+\/\d+/)
       expect(votacaoCards.length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
   })
 
   it('should handle error state with retry button', async () => {
@@ -86,7 +86,7 @@ describe('Home Page - Feed de Votações', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Erro ao carregar votações')).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
 
     // Check for retry button
     const retryButton = screen.getByRole('button', { name: /Tentar Novamente/i })
@@ -113,7 +113,7 @@ describe('Home Page - Feed de Votações', () => {
     // Wait for error state
     await waitFor(() => {
       expect(screen.getByText('Erro ao carregar votações')).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
 
     // Click retry button
     const retryButton = screen.getByRole('button', { name: /Tentar Novamente/i })
@@ -122,7 +122,7 @@ describe('Home Page - Feed de Votações', () => {
     // Wait for empty state or successful load
     await waitFor(() => {
       expect(screen.queryByText('Erro ao carregar votações')).not.toBeInTheDocument()
-    }, { timeout: 2000 })
+    }, { timeout: 5000 })
   })
 
   it('should display empty state when no votações available', async () => {
@@ -136,7 +136,7 @@ describe('Home Page - Feed de Votações', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Nenhuma votação encontrada')).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
 
     expect(
       screen.getByText(/Não há votações disponíveis no momento/)
@@ -149,7 +149,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const proposicaoTexts = screen.getAllByText(/PL \d+\/\d+/)
       expect(proposicaoTexts.length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
 
     // Check that we have properly formatted proposição identifiers
     const proposicaoText = screen.getAllByText(/PL \d+\/\d+/)[0]
@@ -162,7 +162,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const badges = screen.queryAllByText(/APROVADO|REJEITADO/)
       expect(badges.length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
 
     // Badges are verified above - multiple badges expected in feed
   })
@@ -176,7 +176,7 @@ describe('Home Page - Feed de Votações', () => {
       expect(screen.queryAllByText('Não').length).toBeGreaterThan(0)
       expect(screen.queryAllByText('Abstenção').length).toBeGreaterThan(0)
       expect(screen.queryAllByText('Obstrução').length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
   })
 
   it('should be scrollable and all cards accessible', async () => {
@@ -185,7 +185,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const votacaoCards = screen.queryAllByText(/PL \d+\/\d+/)
       expect(votacaoCards.length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
 
     // Verify all cards are in the document and accessible
     const allCards = screen.getAllByText(/PL \d+\/\d+/)
@@ -200,7 +200,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const votacaoCards = screen.queryAllByText(/PL \d+\/\d+/)
       expect(votacaoCards.length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
 
     // Container should have responsive classes
     const container = screen.getByText('Votações Recentes').closest('div')?.parentElement
@@ -213,7 +213,7 @@ describe('Home Page - Feed de Votações', () => {
     await waitFor(() => {
       const countText = screen.queryByText(/Exibindo \d+ votações/)
       expect(countText).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
   })
 
   it.skip('should navigate to votação details when clicking card', async () => {

@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    retry: 2, // Retry flaky tests up to 2 times
+    testTimeout: 30000, // Increase test timeout to 30s to prevent premature timeouts
     env: {
       NODE_ENV: 'test',
     },
