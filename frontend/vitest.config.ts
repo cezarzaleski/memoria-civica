@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    testTimeout: 30000, // Increase timeout for coverage runs (default is 5000ms)
     env: {
       NODE_ENV: 'test',
     },

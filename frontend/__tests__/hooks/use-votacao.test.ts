@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { server } from '@/mocks/server'
 import { http, HttpResponse } from 'msw'
 import { useVotacao } from '@/lib/hooks/use-votacao'
@@ -78,7 +78,9 @@ describe('useVotacao', () => {
     expect(result.current.data?.id).toBe(testVotacaoId)
 
     // Chamar refetch
-    result.current.refetch()
+    act(() => {
+      result.current.refetch()
+    })
 
     // Deve retornar os mesmos dados após refetch
     await waitFor(() => {
