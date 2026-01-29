@@ -12,6 +12,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# Exceção: permitir frontend/lib/ (hooks e utilitários React)
+!frontend/lib/
 parts/
 sdist/
 var/

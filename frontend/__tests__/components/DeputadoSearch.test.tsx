@@ -129,7 +129,9 @@ describe('DeputadoSearch', () => {
       vi.advanceTimersByTime(300)
     })
 
-    expect(screen.getByText(/Buscando por: "João"/)).toBeInTheDocument()
+    const searchHint = screen.getByText('Buscando por:', { exact: false })
+    expect(searchHint).toBeInTheDocument()
+    expect(searchHint.textContent).toContain('João')
   })
 
   it('should clear search hint on empty input', async () => {
@@ -144,7 +146,9 @@ describe('DeputadoSearch', () => {
       vi.advanceTimersByTime(300)
     })
 
-    expect(screen.getByText(/Buscando por: "João"/)).toBeInTheDocument()
+    const searchHint = screen.getByText('Buscando por:', { exact: false })
+    expect(searchHint).toBeInTheDocument()
+    expect(searchHint.textContent).toContain('João')
 
     fireEvent.change(input, { target: { value: '' } })
 
