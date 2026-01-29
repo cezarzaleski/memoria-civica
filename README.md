@@ -273,6 +273,64 @@ pytest etl/tests/ -m integration
 pytest etl/tests/ --cov=etl/src --cov-report=html
 ```
 
+## Continuous Integration (CI)
+
+O projeto usa GitHub Actions para CI/CD com jobs separados para frontend e ETL. O pipeline detecta automaticamente mudanças e executa apenas os jobs relevantes.
+
+### Workflow ETL
+
+O job de testes do ETL no CI executa os seguintes steps:
+
+1. **Setup**: Checkout, Python 3.11, Poetry instalação
+2. **Cache**: Cache de dependências Poetry para performance
+3. **Dependências**: `poetry install` em `etl/`
+4. **Migrations**: `poetry -C etl run python etl/scripts/init_db.py` para criar banco e tabelas
+5. **Linting**: `poetry run ruff check src tests` em `etl/`
+6. **Testes**: `poetry run pytest tests/` em `etl/`
+
+### Setup de banco de dados no CI
+
+**IMPORTANTE**: O CI executa migrações Alembic automaticamente antes dos testes usando o script `etl/scripts/init_db.py`. Isso garante que:
+
+- A tabela `alembic_version` existe e está atualizada
+- Todas as tabelas do schema (deputados, proposicoes, votacoes, votos) são criadas
+- O banco de dados SQLite está inicializado no caminho correto (`./memoria_civica.db`)
+
+O comando usado no CI é:
+```bash
+poetry -C etl run python etl/scripts/init_db.py
+```
+
+Este comando:
+- Usa o Poetry instalado em `etl/` (`-C etl`)
+- Executa do diretório raiz do projeto (onde `alembic.ini` está localizado)
+- Roda todas as migrações pendentes com `alembic upgrade head`
+
+### Dados de teste no CI
+
+O CI usa arquivos CSV mock mínimos em `data/dados_camara/` para testes de smoke que verificam a presença de dados:
+
+- `deputados.csv`
+- `proposicoes.csv`
+- `votacoes.csv`
+- `votos.csv`
+
+Estes arquivos contêm apenas uma linha de dados cada (além do header) e são suficientes para validar que o diretório de dados está corretamente configurado. Os testes unitários usam fixtures mais completas em `etl/tests/fixtures/`.
+
+### Troubleshooting CI
+
+**Erro: `no such table: alembic_version`**
+- Causa: Migrações não foram executadas antes dos testes
+- Solução: Verificar que o step "Run Alembic migrations" está presente e sendo executado antes do step "Run tests"
+
+**Erro: `Nenhum arquivo CSV encontrado`**
+- Causa: Diretório `data/dados_camara/` está vazio
+- Solução: Verificar que arquivos CSV mock existem no diretório (não apenas `.gitkeep`)
+
+**Erro: `database is locked`**
+- Causa: Testes unitários usando banco real em vez de in-memory SQLite
+- Solução: Fixtures de teste devem usar `sqlite:///:memory:` para testes unitários
+
 ## Troubleshooting
 
 ### Erro: "no such table"

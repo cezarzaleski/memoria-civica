@@ -61,6 +61,11 @@ Thumbs.db
 data/dados_camara/*.csv
 # Mas manter o diretório
 !data/dados_camara/.gitkeep
+# Incluir arquivos CSV mock mínimos para CI
+!data/dados_camara/deputados.csv
+!data/dados_camara/proposicoes.csv
+!data/dados_camara/votacoes.csv
+!data/dados_camara/votos.csv
 
 # Frontend - Node.js
 frontend/node_modules/

@@ -13,6 +13,7 @@ Exit codes:
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from alembic.config import Config
 # Add parent (etl) to path so imports work
 ETL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ETL_DIR))
+
+# Project root is parent of etl directory
+PROJECT_ROOT = ETL_DIR.parent
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -69,12 +73,23 @@ def main() -> int:
         logger.info("Inicializando banco de dados...")
         logger.info("=" * 60)
 
-        # Configurar Alembic
-        alembic_cfg = Config("alembic.ini")
+        # Change to project root so database file is created in correct location
+        # and alembic.ini can be found
+        original_cwd = Path.cwd()
+        os.chdir(PROJECT_ROOT)
+        logger.info(f"Working directory: {PROJECT_ROOT}")
+
+        # Configurar Alembic com caminho absoluto para alembic.ini
+        alembic_ini_path = PROJECT_ROOT / "alembic.ini"
+        logger.info(f"Using alembic.ini at: {alembic_ini_path}")
+        alembic_cfg = Config(str(alembic_ini_path))
 
         # Executar upgrade para HEAD (última migration)
         logger.info("Executando migrations Alembic...")
         command.upgrade(alembic_cfg, "head")
+
+        # Restore original working directory
+        os.chdir(original_cwd)
 
         logger.info("=" * 60)
         logger.info("Banco de dados inicializado com sucesso!")

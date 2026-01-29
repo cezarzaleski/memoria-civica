@@ -88,6 +88,14 @@ jobs:
         run: poetry install
         working-directory: etl
 
+      - name: Run Alembic migrations
+        run: poetry run python scripts/init_db.py
+        working-directory: etl
+
+      - name: Create database symlink
+        run: ln -sf ../memoria_civica.db memoria_civica.db
+        working-directory: etl
+
       - name: Run linting
         run: poetry run ruff check src tests
         working-directory: etl
