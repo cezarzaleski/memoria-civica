@@ -39,7 +39,7 @@ describe('Home Page - Feed de Votações', () => {
     expect(screen.getByText('Votações Recentes')).toBeInTheDocument()
   })
 
-  it.skip('should render feed with votações after loading', async () => {
+  it('should render feed with votações after loading', async () => {
     render(<Home />)
 
     // Wait for votações to be fetched and rendered
@@ -216,22 +216,21 @@ describe('Home Page - Feed de Votações', () => {
     })
   })
 
-  it.skip('should navigate to votação details when clicking card', async () => {
-    const user = userEvent.setup()
+  it('should navigate to votação details when clicking card', async () => {
     render(<Home />)
 
+    // Wait for votações to be rendered
     await waitFor(() => {
-      const links = screen.queryAllByRole('link', { name: /PL/ })
-      expect(links.length).toBeGreaterThan(0)
+      const votacaoTexts = screen.queryAllByText(/PL \d+\/\d+/)
+      expect(votacaoTexts.length).toBeGreaterThan(0)
     })
 
-    // Get first votação link
+    // Get all links and find first votação link
     const firstVotacaoLink = screen.getAllByRole('link').find(
       link => link.getAttribute('href')?.startsWith('/votacoes/')
     )
 
-    if (firstVotacaoLink) {
-      expect(firstVotacaoLink.getAttribute('href')).toMatch(/^\/votacoes\/\d+$/)
-    }
+    expect(firstVotacaoLink).toBeDefined()
+    expect(firstVotacaoLink?.getAttribute('href')).toMatch(/^\/votacoes\/votacao-\d+$/)
   })
 })

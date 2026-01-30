@@ -105,16 +105,17 @@ describe('ListaVotos', () => {
     expect(screen.getByText(/Votos \(1 de 4\)/)).toBeInTheDocument()
   })
 
-  it.skip('should show message when no votes match filters', () => {
+  it('should show message when no votes match filters', () => {
     render(<ListaVotos votos={mockVotos} />)
 
-    const typeSelects = screen.getAllByDisplayValue('Todos')
-    const typeSelect = typeSelects[0]
-    fireEvent.change(typeSelect, { target: { value: TipoVoto.SIM } })
+    // Get all selects in order: [Tipo, Partido, Ordenar]
+    const selects = screen.getAllByRole('combobox')
 
-    const partySelects = screen.getAllByDisplayValue('Todos')
-    const partySelect = partySelects[1]
-    fireEvent.change(partySelect, { target: { value: 'PSDB' } })
+    // Filter by vote type (first select)
+    fireEvent.change(selects[0], { target: { value: TipoVoto.SIM } })
+
+    // Filter by party (second select) - SIM + PSDB should result in 0 votes
+    fireEvent.change(selects[1], { target: { value: 'PSDB' } })
 
     expect(screen.getByText('Nenhum voto encontrado com os filtros selecionados')).toBeInTheDocument()
   })
