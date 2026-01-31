@@ -103,6 +103,320 @@ pytest etl/tests/  # Ou `make test` (roda de raiz)
   pytest --cov=src --cov-report=html
   ```
 
+## Download Automatizado de Dados
+
+O projeto inclui um script para download automatizado de arquivos CSV da API Dados Abertos da Câmara dos Deputados. Este script pode ser executado manualmente ou agendado via cron para execução periódica.
+
+### Uso do Script
+
+O script `scripts/download_camara.py` baixa os seguintes arquivos:
+- `deputados.csv`: Lista de todos os deputados federais
+- `proposicoes-{legislatura}.csv`: Proposições da legislatura
+- `votacoes-{legislatura}.csv`: Votações da legislatura
+- `votacoesVotos-{legislatura}.csv`: Votos individuais
+
+#### Argumentos CLI
+
+```bash
+python scripts/download_camara.py --help
+```
+
+| Argumento | Descrição | Padrão |
+|-----------|-----------|--------|
+| `--data-dir PATH` | Diretório de destino para os arquivos | `/tmp/camara_downloads` |
+| `--file ARQUIVO` | Arquivo específico para baixar (pode ser repetido) | Todos |
+| `--dry-run` | Simula downloads sem executar | Desabilitado |
+| `-v, --verbose` | Habilita logging detalhado (DEBUG) | Desabilitado |
+
+Arquivos válidos para `--file`: `deputados`, `proposicoes`, `votacoes`, `votos`
+
+#### Exemplos de Uso
+
+```bash
+# Baixar todos os arquivos para diretório padrão
+python scripts/download_camara.py
+
+# Especificar diretório de destino
+python scripts/download_camara.py --data-dir ./data/dados_camara
+
+# Baixar apenas arquivo de deputados
+python scripts/download_camara.py --file deputados
+
+# Baixar múltiplos arquivos específicos
+python scripts/download_camara.py --file votacoes --file votos
+
+# Simular download (verifica URLs sem baixar)
+python scripts/download_camara.py --dry-run
+
+# Executar com logging detalhado
+python scripts/download_camara.py --verbose
+```
+
+#### Códigos de Saída
+
+| Código | Significado |
+|--------|-------------|
+| `0` | Sucesso - todos os downloads concluídos |
+| `1` | Falha - pelo menos um download falhou |
+
+### Variáveis de Ambiente
+
+Configure as seguintes variáveis no arquivo `.env` ou no ambiente:
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `CAMARA_API_BASE_URL` | URL base da API Dados Abertos | `https://dadosabertos.camara.leg.br/arquivos` |
+| `CAMARA_LEGISLATURA` | Número da legislatura (57 = 2023-2027) | `57` |
+| `TEMP_DOWNLOAD_DIR` | Diretório temporário para downloads | `/tmp/camara_downloads` |
+| `WEBHOOK_URL` | URL do webhook para notificações de erro (opcional) | Vazio (desabilitado) |
+
+#### Configuração do Webhook
+
+Quando configurado, o script envia notificações HTTP POST para a URL especificada quando ocorrem erros. O payload JSON tem a seguinte estrutura:
+
+```json
+{
+  "etapa": "download_deputados",
+  "mensagem": "descrição do erro",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+Exemplos de URLs de webhook:
+- Slack: `https://hooks.slack.com/services/T00000000/B00000000/XXXXXXX`
+- Discord: `https://discord.com/api/webhooks/000000000000000000/XXXXXXX`
+- Microsoft Teams: `https://outlook.office.com/webhook/...`
+- Endpoint customizado: `https://api.example.com/webhooks/alerts`
+
+### Agendamento via Cron
+
+Para automatizar a coleta de dados, configure um job cron para executar o script periodicamente.
+
+#### Configuração Básica
+
+1. **Abra o crontab para edição:**
+   ```bash
+   crontab -e
+   ```
+
+2. **Adicione uma linha para agendar a execução:**
+   ```bash
+   # Download diário às 3h da manhã
+   0 3 * * * cd /caminho/para/projeto && /caminho/para/venv/bin/python scripts/download_camara.py --data-dir ./data/dados_camara >> /var/log/camara_download.log 2>&1
+   ```
+
+#### Exemplos de Agendamento
+
+```bash
+# Diário às 3h da manhã
+0 3 * * * cd /home/user/memoria_civica && poetry run python scripts/download_camara.py --data-dir ./data/dados_camara
+
+# Semanal aos domingos às 2h
+0 2 * * 0 cd /home/user/memoria_civica && poetry run python scripts/download_camara.py --data-dir ./data/dados_camara
+
+# A cada 6 horas
+0 */6 * * * cd /home/user/memoria_civica && poetry run python scripts/download_camara.py --data-dir ./data/dados_camara
+
+# Dias úteis (segunda a sexta) às 4h
+0 4 * * 1-5 cd /home/user/memoria_civica && poetry run python scripts/download_camara.py --data-dir ./data/dados_camara
+```
+
+#### Cron com Variáveis de Ambiente
+
+Para incluir variáveis de ambiente customizadas:
+
+```bash
+# Opção 1: Definir variáveis inline
+0 3 * * * WEBHOOK_URL="https://hooks.slack.com/..." cd /home/user/memoria_civica && poetry run python scripts/download_camara.py
+
+# Opção 2: Carregar arquivo .env
+0 3 * * * cd /home/user/memoria_civica && source .env && poetry run python scripts/download_camara.py
+
+# Opção 3: Usar script wrapper
+0 3 * * * /home/user/memoria_civica/scripts/run_download.sh
+```
+
+#### Script Wrapper (Recomendado)
+
+Crie um script wrapper `scripts/run_download.sh` para facilitar o agendamento:
+
+```bash
+#!/bin/bash
+# scripts/run_download.sh - Script wrapper para agendamento via cron
+
+# Configurações
+PROJECT_DIR="/home/user/memoria_civica"
+LOG_DIR="/var/log/memoria_civica"
+LOG_FILE="$LOG_DIR/download_$(date +%Y%m%d).log"
+
+# Criar diretório de logs se não existir
+mkdir -p "$LOG_DIR"
+
+# Mudar para diretório do projeto
+cd "$PROJECT_DIR" || exit 1
+
+# Carregar variáveis de ambiente
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
+# Executar download com logging
+echo "=== Início: $(date) ===" >> "$LOG_FILE"
+poetry run python scripts/download_camara.py --data-dir ./data/dados_camara >> "$LOG_FILE" 2>&1
+EXIT_CODE=$?
+echo "=== Fim: $(date) - Exit code: $EXIT_CODE ===" >> "$LOG_FILE"
+
+exit $EXIT_CODE
+```
+
+Torne executável e agende:
+
+```bash
+chmod +x scripts/run_download.sh
+
+# Adicionar ao crontab
+0 3 * * * /home/user/memoria_civica/scripts/run_download.sh
+```
+
+### Integração com Pipeline ETL
+
+O download de dados é a primeira etapa do pipeline completo. Após o download, execute o ETL para processar os dados:
+
+```bash
+# 1. Download dos CSVs
+python scripts/download_camara.py --data-dir ./data/dados_camara
+
+# 2. Inicializar banco (se necessário)
+python scripts/init_db.py
+
+# 3. Executar ETL
+python scripts/run_etl.py
+```
+
+#### Pipeline Completo via Cron
+
+```bash
+# Execução completa diária às 3h
+0 3 * * * cd /home/user/memoria_civica && poetry run python scripts/download_camara.py --data-dir ./data/dados_camara && poetry run python scripts/run_etl.py >> /var/log/memoria_civica_etl.log 2>&1
+```
+
+### Logs e Histórico de Execução
+
+O script utiliza o módulo `logging` do Python com formato padronizado:
+
+```
+%(asctime)s - %(name)s - %(levelname)s - %(message)s
+```
+
+#### Níveis de Log
+
+| Nível | Uso |
+|-------|-----|
+| `INFO` | Operações normais, progresso de download |
+| `WARNING` | Arquivos pulados (cache hit via ETag) |
+| `ERROR` | Falhas de download, erros de rede |
+| `DEBUG` | Detalhes técnicos (habilitar com `-v`) |
+
+#### Saída de Exemplo
+
+```
+2024-01-15 03:00:01 - __main__ - INFO - ============================================================
+2024-01-15 03:00:01 - __main__ - INFO - Iniciando download de 4 arquivo(s) da Câmara dos Deputados
+2024-01-15 03:00:01 - __main__ - INFO - Legislatura: 57
+2024-01-15 03:00:01 - __main__ - INFO - ============================================================
+2024-01-15 03:00:01 - __main__ - INFO - [1/4] DEPUTADOS
+2024-01-15 03:00:02 - __main__ - INFO -   Download concluído: deputados.csv (tamanho: 256.00 KB, tempo: 1.23s)
+2024-01-15 03:00:02 - __main__ - INFO - [2/4] PROPOSICOES
+2024-01-15 03:00:03 - __main__ - WARNING -   Arquivo não alterado, pulando: proposicoes-57.csv (tempo: 0.45s)
+...
+2024-01-15 03:00:10 - __main__ - INFO - ============================================================
+2024-01-15 03:00:10 - __main__ - INFO - SUMÁRIO DE DOWNLOADS
+2024-01-15 03:00:10 - __main__ - INFO - ============================================================
+2024-01-15 03:00:10 - __main__ - INFO - Estatísticas de arquivos:
+2024-01-15 03:00:10 - __main__ - INFO -   Total processado: 4 arquivo(s)
+2024-01-15 03:00:10 - __main__ - INFO -   Baixados: 2
+2024-01-15 03:00:10 - __main__ - INFO -   Pulados (cache): 2
+2024-01-15 03:00:10 - __main__ - INFO -   Falhas: 0
+2024-01-15 03:00:10 - __main__ - INFO - ✓ Download concluído com sucesso!
+```
+
+#### Redirecionando Logs para Arquivo
+
+```bash
+# Redirecionar stdout e stderr para arquivo
+python scripts/download_camara.py >> /var/log/camara_download.log 2>&1
+
+# Logs rotativos por data
+python scripts/download_camara.py >> /var/log/camara_download_$(date +%Y%m%d).log 2>&1
+```
+
+### Troubleshooting de Downloads
+
+#### Erro: Falha de conexão / Timeout
+
+**Problema**: Download falha com erro de rede ou timeout.
+
+**Causa**: Instabilidade de rede ou API temporariamente indisponível.
+
+**Solução**:
+1. O script já implementa retry automático com backoff exponencial (3 tentativas: 2s, 4s, 8s)
+2. Verifique conectividade: `curl -I https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv`
+3. Se persistir, aguarde e tente novamente mais tarde
+
+#### Erro: HTTP 404 Not Found
+
+**Problema**: Arquivo não encontrado na API.
+
+**Causa**: Legislatura inválida ou arquivo temporariamente indisponível.
+
+**Solução**:
+1. Verifique `CAMARA_LEGISLATURA` no `.env` (atual: 57 para 2023-2027)
+2. Consulte legislaturas válidas: 55 (2015-2019), 56 (2019-2023), 57 (2023-2027)
+
+#### Erro: HTTP 429 Too Many Requests
+
+**Problema**: Rate limit excedido na API.
+
+**Causa**: Muitas requisições em curto período.
+
+**Solução**:
+1. Aguarde alguns minutos antes de tentar novamente
+2. Se usando cron, evite agendar execuções frequentes (mínimo recomendado: 1x por dia)
+
+#### Erro: Permission denied ao salvar arquivo
+
+**Problema**: Sem permissão para escrever no diretório de destino.
+
+**Solução**:
+1. Verifique permissões: `ls -la /tmp/camara_downloads`
+2. Crie diretório manualmente: `mkdir -p /tmp/camara_downloads && chmod 755 /tmp/camara_downloads`
+3. Use diretório alternativo: `--data-dir ~/camara_data`
+
+#### Erro: Webhook não envia notificações
+
+**Problema**: Erros ocorrem mas webhooks não são recebidos.
+
+**Solução**:
+1. Verifique se `WEBHOOK_URL` está configurada corretamente
+2. Teste o webhook manualmente:
+   ```bash
+   curl -X POST -H "Content-Type: application/json" \
+     -d '{"etapa":"teste","mensagem":"teste","timestamp":"2024-01-15T10:00:00Z"}' \
+     "$WEBHOOK_URL"
+   ```
+3. Webhooks são fire-and-forget: falhas de envio não interrompem o download
+
+#### Cache (ETag) não funciona
+
+**Problema**: Arquivos são sempre baixados novamente, mesmo sem alteração.
+
+**Causa**: O servidor pode não suportar ETag ou arquivo foi modificado.
+
+**Comportamento esperado**:
+- Se o arquivo não mudou (mesmo ETag), o download é pulado
+- Arquivos pulados aparecem como `WARNING` no log
+- Isso é uma otimização, não um erro
+
 ## Arquitetura
 
 Estrutura feature-based organizada por domínio, com separação clara entre frontend (Next.js) e backend (Python ETL):
