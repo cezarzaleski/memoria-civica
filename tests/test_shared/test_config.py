@@ -31,6 +31,21 @@ class TestSettingsDefaults:
         settings = Settings()
         assert settings.LOG_FILE is None
 
+    def test_default_camara_api_base_url(self):
+        """Testa que CAMARA_API_BASE_URL tem valor padrão correto."""
+        settings = Settings()
+        assert settings.CAMARA_API_BASE_URL == "https://dadosabertos.camara.leg.br/arquivos"
+
+    def test_default_camara_legislatura(self):
+        """Testa que CAMARA_LEGISLATURA tem valor padrão correto."""
+        settings = Settings()
+        assert settings.CAMARA_LEGISLATURA == 57
+
+    def test_default_temp_download_dir(self):
+        """Testa que TEMP_DOWNLOAD_DIR tem valor padrão correto."""
+        settings = Settings()
+        assert Path("/tmp/camara_downloads") == settings.TEMP_DOWNLOAD_DIR
+
 
 class TestSettingsFromEnvironment:
     """Testes para carregamento de configurações via variáveis de ambiente."""
@@ -72,6 +87,26 @@ class TestSettingsFromEnvironment:
         assert Path("/test/data") == settings.DATA_DIR
         assert settings.LOG_LEVEL == "WARNING"
 
+    def test_camara_api_base_url_from_env(self, monkeypatch):
+        """Testa que CAMARA_API_BASE_URL é carregada de variável de ambiente."""
+        custom_url = "https://custom.api.example.com/arquivos"
+        monkeypatch.setenv("CAMARA_API_BASE_URL", custom_url)
+        settings = Settings()
+        assert custom_url == settings.CAMARA_API_BASE_URL
+
+    def test_camara_legislatura_from_env(self, monkeypatch):
+        """Testa que CAMARA_LEGISLATURA é carregada de variável de ambiente."""
+        monkeypatch.setenv("CAMARA_LEGISLATURA", "56")
+        settings = Settings()
+        assert settings.CAMARA_LEGISLATURA == 56
+
+    def test_temp_download_dir_from_env(self, monkeypatch):
+        """Testa que TEMP_DOWNLOAD_DIR é carregada de variável de ambiente e convertida para Path."""
+        custom_dir = "/custom/temp/downloads"
+        monkeypatch.setenv("TEMP_DOWNLOAD_DIR", custom_dir)
+        settings = Settings()
+        assert Path(custom_dir) == settings.TEMP_DOWNLOAD_DIR
+
 
 class TestSettingsValidation:
     """Testes para validação de configurações."""
@@ -110,3 +145,12 @@ class TestSettingsSingleton:
         assert hasattr(settings, "DATA_DIR")
         assert hasattr(settings, "LOG_LEVEL")
         assert hasattr(settings, "LOG_FILE")
+
+    def test_settings_singleton_has_camara_fields(self):
+        """Testa que o singleton inclui os campos de configuração da API Câmara."""
+        from src.shared.config import settings
+
+        # Verifica existência dos novos campos
+        assert hasattr(settings, "CAMARA_API_BASE_URL")
+        assert hasattr(settings, "CAMARA_LEGISLATURA")
+        assert hasattr(settings, "TEMP_DOWNLOAD_DIR")

@@ -27,7 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import TypeVar
+from typing import Optional, TypeVar
 
 import requests
 
@@ -54,9 +54,9 @@ class DownloadResult:
     """
 
     success: bool
-    path: Path | None
+    path: Optional[Path]  # noqa: UP045
     skipped: bool
-    error: str | None
+    error: Optional[str]  # noqa: UP045
 
 
 def retry_with_backoff(
@@ -86,7 +86,7 @@ def retry_with_backoff(
         def wrapper(*args, **kwargs) -> T:
             """Wrapper que implementa lógica de retry."""
             wait_time = initial_wait
-            last_exception: Exception | None = None
+            last_exception: Optional[Exception] = None  # noqa: UP045
 
             for attempt in range(max_retries):
                 try:
@@ -145,7 +145,7 @@ def _get_file_etag_path(dest_path: Path) -> Path:
     return dest_path.with_suffix(dest_path.suffix + ".etag")
 
 
-def _load_cached_etag(dest_path: Path) -> str | None:
+def _load_cached_etag(dest_path: Path) -> Optional[str]:  # noqa: UP045
     """Carrega o ETag salvo em cache para um arquivo.
 
     Args:
@@ -175,7 +175,7 @@ def _check_file_unchanged(
     url: str,
     dest_path: Path,
     timeout: int,
-) -> tuple[bool, str | None]:
+) -> tuple[bool, Optional[str]]:  # noqa: UP045
     """Verifica se o arquivo remoto foi alterado usando ETag ou Content-Length.
 
     Args:
@@ -222,7 +222,7 @@ def _download_file_internal(
     url: str,
     dest_path: Path,
     timeout: int,
-) -> tuple[bool, str | None]:
+) -> tuple[bool, Optional[str]]:  # noqa: UP045
     """Baixa um arquivo usando streaming.
 
     Args:

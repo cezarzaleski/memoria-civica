@@ -5,7 +5,7 @@ fallback para valores padrão sensatos. Usado por todos os domínios do projeto.
 """
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,12 +18,20 @@ class Settings(BaseSettings):
         DATA_DIR: Diretório contendo arquivos CSV da Câmara dos Deputados.
         LOG_LEVEL: Nível de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL).
         LOG_FILE: Caminho do arquivo de log (None desabilita log em arquivo).
+        CAMARA_API_BASE_URL: URL base da API Dados Abertos da Câmara dos Deputados.
+        CAMARA_LEGISLATURA: Número da legislatura atual (57 = 2023-2027).
+        TEMP_DOWNLOAD_DIR: Diretório temporário para downloads de arquivos CSV.
     """
 
     DATABASE_URL: str = "sqlite:///./memoria_civica.db"
     DATA_DIR: Path = Path("./data/dados_camara")
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    LOG_FILE: Path | None = None
+    LOG_FILE: Optional[Path] = None  # noqa: UP045
+
+    # Configurações da API Câmara dos Deputados
+    CAMARA_API_BASE_URL: str = "https://dadosabertos.camara.leg.br/arquivos"
+    CAMARA_LEGISLATURA: int = 57
+    TEMP_DOWNLOAD_DIR: Path = Path("/tmp/camara_downloads")
 
     model_config = SettingsConfigDict(
         env_file=".env",
