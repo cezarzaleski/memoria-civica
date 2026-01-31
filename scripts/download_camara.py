@@ -39,6 +39,7 @@ from pathlib import Path
 
 from src.shared.config import settings
 from src.shared.downloader import DownloadResult, download_file
+from src.shared.webhook import send_webhook_notification
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -267,6 +268,13 @@ def download_single_file(
         stats.failed += 1
         stats.errors.append(error_msg)
         stats.retry_count += result.retry_attempts
+
+        # Enviar notificação via webhook (não bloqueia em caso de falha)
+        send_webhook_notification(
+            stage=f"download_{file_key}",
+            message=result.error or "Erro desconhecido no download",
+        )
+
         return False
 
 
