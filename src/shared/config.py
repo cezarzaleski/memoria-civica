@@ -20,6 +20,7 @@ class Settings(BaseSettings):
         LOG_FILE: Caminho do arquivo de log (None desabilita log em arquivo).
         CAMARA_API_BASE_URL: URL base da API Dados Abertos da Câmara dos Deputados.
         CAMARA_LEGISLATURA: Número da legislatura atual (57 = 2023-2027).
+        CAMARA_ANO: Ano para download de proposições (arquivos são organizados por ano).
         TEMP_DOWNLOAD_DIR: Diretório temporário para downloads de arquivos CSV.
         WEBHOOK_URL: URL do webhook para notificações de erro (None desabilita notificações).
     """
@@ -32,6 +33,7 @@ class Settings(BaseSettings):
     # Configurações da API Câmara dos Deputados
     CAMARA_API_BASE_URL: str = "https://dadosabertos.camara.leg.br/arquivos"
     CAMARA_LEGISLATURA: int = 57
+    CAMARA_ANO: int = 2025
     TEMP_DOWNLOAD_DIR: Path = Path("/tmp/camara_downloads")
 
     # Configuração de webhook para notificações de erro

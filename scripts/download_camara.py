@@ -6,7 +6,7 @@ O import de annotations permite sintaxe moderna de tipos.
 
 Este script baixa os arquivos CSV necessários para o pipeline ETL:
 - deputados.csv: Lista de todos os deputados
-- proposicoes-{legislatura}.csv: Proposições da legislatura
+- proposicoes-{ano}.csv: Proposições do ano
 - votacoes-{legislatura}.csv: Votações da legislatura
 - votacoesVotos-{legislatura}.csv: Votos individuais
 
@@ -117,21 +117,25 @@ FILE_CONFIGS = {
         "url_path": "deputados/csv/deputados.csv",
         "filename": "deputados.csv",
         "requires_legislatura": False,
+        "requires_ano": False,
     },
     "proposicoes": {
-        "url_path": "proposicoes/csv/proposicoes-{legislatura}.csv",
-        "filename": "proposicoes-{legislatura}.csv",
-        "requires_legislatura": True,
+        "url_path": "proposicoes/csv/proposicoes-{ano}.csv",
+        "filename": "proposicoes-{ano}.csv",
+        "requires_legislatura": False,
+        "requires_ano": True,
     },
     "votacoes": {
         "url_path": "votacoes/csv/votacoes-{legislatura}.csv",
         "filename": "votacoes-{legislatura}.csv",
         "requires_legislatura": True,
+        "requires_ano": False,
     },
     "votos": {
         "url_path": "votacoesVotos/csv/votacoesVotos-{legislatura}.csv",
         "filename": "votacoesVotos-{legislatura}.csv",
         "requires_legislatura": True,
+        "requires_ano": False,
     },
 }
 
@@ -172,6 +176,8 @@ def build_url(file_key: str) -> str:
 
     if config["requires_legislatura"]:
         url_path = url_path.format(legislatura=settings.CAMARA_LEGISLATURA)
+    elif config["requires_ano"]:
+        url_path = url_path.format(ano=settings.CAMARA_ANO)
 
     return f"{settings.CAMARA_API_BASE_URL}/{url_path}"
 
@@ -191,6 +197,8 @@ def get_dest_path(file_key: str, data_dir: Path) -> Path:
 
     if config["requires_legislatura"]:
         filename = filename.format(legislatura=settings.CAMARA_LEGISLATURA)
+    elif config["requires_ano"]:
+        filename = filename.format(ano=settings.CAMARA_ANO)
 
     return data_dir / filename
 
@@ -319,7 +327,7 @@ def download_all_files(
 
     logger.info("=" * 60)
     logger.info("Iniciando download de %d arquivo(s) da Câmara dos Deputados", len(ordered_files))
-    logger.info("Legislatura: %d", settings.CAMARA_LEGISLATURA)
+    logger.info("Legislatura: %d | Ano: %d", settings.CAMARA_LEGISLATURA, settings.CAMARA_ANO)
     if dry_run:
         logger.info("Modo: DRY-RUN (simulação)")
     logger.info("=" * 60)

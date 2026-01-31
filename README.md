@@ -47,8 +47,8 @@ etl/
 
 **Iniciar ETL:**
 ```bash
-python etl/scripts/init_db.py  # Inicializar banco
-python etl/scripts/run_etl.py  # Executar pipeline
+PYTHONPATH=. python etl/scripts/init_db.py  # Inicializar banco
+PYTHONPATH=. python etl/scripts/run_etl.py  # Executar pipeline
 ```
 
 **Testes:**
@@ -83,14 +83,14 @@ pytest etl/tests/  # Ou `make test` (roda de raiz)
 
 3. **Inicializar banco de dados:**
    ```bash
-   python scripts/init_db.py
+   PYTHONPATH=. python scripts/init_db.py
    ```
 
 ## Execução
 
 - **ETL completo:**
   ```bash
-  python scripts/run_etl.py
+  PYTHONPATH=. python scripts/run_etl.py
   ```
 
 - **Executar testes:**
@@ -111,14 +111,14 @@ O projeto inclui um script para download automatizado de arquivos CSV da API Dad
 
 O script `scripts/download_camara.py` baixa os seguintes arquivos:
 - `deputados.csv`: Lista de todos os deputados federais
-- `proposicoes-{legislatura}.csv`: Proposições da legislatura
+- `proposicoes-{ano}.csv`: Proposições do ano (ex: proposicoes-2025.csv)
 - `votacoes-{legislatura}.csv`: Votações da legislatura
 - `votacoesVotos-{legislatura}.csv`: Votos individuais
 
 #### Argumentos CLI
 
 ```bash
-python scripts/download_camara.py --help
+PYTHONPATH=. python scripts/download_camara.py --help
 ```
 
 | Argumento | Descrição | Padrão |
@@ -132,24 +132,26 @@ Arquivos válidos para `--file`: `deputados`, `proposicoes`, `votacoes`, `votos`
 
 #### Exemplos de Uso
 
+**Importante**: Execute os scripts a partir da raiz do projeto com `PYTHONPATH=.` para que os módulos sejam encontrados:
+
 ```bash
 # Baixar todos os arquivos para diretório padrão
-python scripts/download_camara.py
+PYTHONPATH=. python scripts/download_camara.py
 
 # Especificar diretório de destino
-python scripts/download_camara.py --data-dir ./data/dados_camara
+PYTHONPATH=. python scripts/download_camara.py --data-dir ./data/dados_camara
 
 # Baixar apenas arquivo de deputados
-python scripts/download_camara.py --file deputados
+PYTHONPATH=. python scripts/download_camara.py --file deputados
 
 # Baixar múltiplos arquivos específicos
-python scripts/download_camara.py --file votacoes --file votos
+PYTHONPATH=. python scripts/download_camara.py --file votacoes --file votos
 
 # Simular download (verifica URLs sem baixar)
-python scripts/download_camara.py --dry-run
+PYTHONPATH=. python scripts/download_camara.py --dry-run
 
 # Executar com logging detalhado
-python scripts/download_camara.py --verbose
+PYTHONPATH=. python scripts/download_camara.py --verbose
 ```
 
 #### Códigos de Saída
@@ -167,6 +169,7 @@ Configure as seguintes variáveis no arquivo `.env` ou no ambiente:
 |----------|-----------|--------|
 | `CAMARA_API_BASE_URL` | URL base da API Dados Abertos | `https://dadosabertos.camara.leg.br/arquivos` |
 | `CAMARA_LEGISLATURA` | Número da legislatura (57 = 2023-2027) | `57` |
+| `CAMARA_ANO` | Ano para download de proposições | `2025` |
 | `TEMP_DOWNLOAD_DIR` | Diretório temporário para downloads | `/tmp/camara_downloads` |
 | `WEBHOOK_URL` | URL do webhook para notificações de erro (opcional) | Vazio (desabilitado) |
 
@@ -284,13 +287,13 @@ O download de dados é a primeira etapa do pipeline completo. Após o download, 
 
 ```bash
 # 1. Download dos CSVs
-python scripts/download_camara.py --data-dir ./data/dados_camara
+PYTHONPATH=. python scripts/download_camara.py --data-dir ./data/dados_camara
 
 # 2. Inicializar banco (se necessário)
-python scripts/init_db.py
+PYTHONPATH=. python scripts/init_db.py
 
 # 3. Executar ETL
-python scripts/run_etl.py
+PYTHONPATH=. python scripts/run_etl.py
 ```
 
 #### Pipeline Completo via Cron
@@ -327,7 +330,7 @@ O script utiliza o módulo `logging` do Python com formato padronizado:
 2024-01-15 03:00:01 - __main__ - INFO - [1/4] DEPUTADOS
 2024-01-15 03:00:02 - __main__ - INFO -   Download concluído: deputados.csv (tamanho: 256.00 KB, tempo: 1.23s)
 2024-01-15 03:00:02 - __main__ - INFO - [2/4] PROPOSICOES
-2024-01-15 03:00:03 - __main__ - WARNING -   Arquivo não alterado, pulando: proposicoes-57.csv (tempo: 0.45s)
+2024-01-15 03:00:03 - __main__ - WARNING -   Arquivo não alterado, pulando: proposicoes-2025.csv (tempo: 0.45s)
 ...
 2024-01-15 03:00:10 - __main__ - INFO - ============================================================
 2024-01-15 03:00:10 - __main__ - INFO - SUMÁRIO DE DOWNLOADS
@@ -344,13 +347,30 @@ O script utiliza o módulo `logging` do Python com formato padronizado:
 
 ```bash
 # Redirecionar stdout e stderr para arquivo
-python scripts/download_camara.py >> /var/log/camara_download.log 2>&1
+PYTHONPATH=. python scripts/download_camara.py >> /var/log/camara_download.log 2>&1
 
 # Logs rotativos por data
-python scripts/download_camara.py >> /var/log/camara_download_$(date +%Y%m%d).log 2>&1
+PYTHONPATH=. python scripts/download_camara.py >> /var/log/camara_download_$(date +%Y%m%d).log 2>&1
 ```
 
 ### Troubleshooting de Downloads
+
+#### Erro: ModuleNotFoundError: No module named 'src'
+
+**Problema**: Ao executar scripts, você vê erro "ModuleNotFoundError: No module named 'src'"
+
+**Causa**: O Python não encontra o módulo `src` porque o diretório raiz do projeto não está no `PYTHONPATH`.
+
+**Solução**: Execute os scripts com `PYTHONPATH=.` na frente:
+```bash
+PYTHONPATH=. python scripts/download_camara.py --help
+```
+
+Ou exporte a variável para a sessão toda:
+```bash
+export PYTHONPATH=/caminho/para/memoria_civica
+python scripts/download_camara.py --help
+```
 
 #### Erro: Falha de conexão / Timeout
 
@@ -591,7 +611,7 @@ pytest --cov=src --cov-report=html
 
 **Solução**: Execute o script de inicialização do banco:
 ```bash
-python scripts/init_db.py
+PYTHONPATH=. python scripts/init_db.py
 ```
 
 Este script cria todas as tabelas via Alembic migrations.
@@ -605,7 +625,7 @@ Este script cria todas as tabelas via Alembic migrations.
 2. Dados referenciados não existem (ex: proposição referencia deputado que não existe)
 
 **Solução**:
-- Execute ETL na ordem correta: `python scripts/run_etl.py` (já faz isso automaticamente)
+- Execute ETL na ordem correta: `PYTHONPATH=. python scripts/run_etl.py` (já faz isso automaticamente)
 - Verifique que os CSVs de entrada têm dados válidos (sem referências quebradas)
 
 ### Erro: "database is locked"
@@ -661,10 +681,10 @@ poetry install
 poetry shell
 
 # 4. Inicializar banco
-python scripts/init_db.py
+PYTHONPATH=. python scripts/init_db.py
 
 # 5. Rodar ETL completo
-python scripts/run_etl.py
+PYTHONPATH=. python scripts/run_etl.py
 
 # 6. Verificar testes
 pytest

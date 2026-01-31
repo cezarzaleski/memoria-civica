@@ -117,11 +117,18 @@ class TestFileConfigs:
     def test_deputados_does_not_require_legislatura(self):
         """Testa que deputados não requer legislatura."""
         assert FILE_CONFIGS["deputados"]["requires_legislatura"] is False
+        assert FILE_CONFIGS["deputados"]["requires_ano"] is False
 
-    def test_other_files_require_legislatura(self):
-        """Testa que outros arquivos requerem legislatura."""
-        for key in ["proposicoes", "votacoes", "votos"]:
+    def test_proposicoes_requires_ano(self):
+        """Testa que proposições requer ano (não legislatura)."""
+        assert FILE_CONFIGS["proposicoes"]["requires_legislatura"] is False
+        assert FILE_CONFIGS["proposicoes"]["requires_ano"] is True
+
+    def test_votacoes_and_votos_require_legislatura(self):
+        """Testa que votações e votos requerem legislatura."""
+        for key in ["votacoes", "votos"]:
             assert FILE_CONFIGS[key]["requires_legislatura"] is True
+            assert FILE_CONFIGS[key]["requires_ano"] is False
 
 
 class TestBuildUrl:
@@ -138,14 +145,14 @@ class TestBuildUrl:
         assert url == "https://api.example.com/arquivos/deputados/csv/deputados.csv"
 
     @patch("scripts.download_camara.settings")
-    def test_build_url_proposicoes_with_legislatura(self, mock_settings):
-        """Testa URL para proposições com legislatura."""
+    def test_build_url_proposicoes_with_ano(self, mock_settings):
+        """Testa URL para proposições com ano."""
         mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
-        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_settings.CAMARA_ANO = 2025
 
         url = build_url("proposicoes")
 
-        assert url == "https://api.example.com/arquivos/proposicoes/csv/proposicoes-57.csv"
+        assert url == "https://api.example.com/arquivos/proposicoes/csv/proposicoes-2025.csv"
 
     @patch("scripts.download_camara.settings")
     def test_build_url_votacoes_with_legislatura(self, mock_settings):
@@ -183,11 +190,11 @@ class TestGetDestPath:
     @patch("scripts.download_camara.settings")
     def test_get_dest_path_proposicoes(self, mock_settings, tmp_path):
         """Testa caminho de destino para proposições."""
-        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_settings.CAMARA_ANO = 2025
 
         path = get_dest_path("proposicoes", tmp_path)
 
-        assert path == tmp_path / "proposicoes-57.csv"
+        assert path == tmp_path / "proposicoes-2025.csv"
 
 
 class TestParseArgs:
@@ -728,21 +735,39 @@ class TestIntegrationWithConfig:
 
     @patch("scripts.download_camara.download_file")
     @patch("scripts.download_camara.settings")
-    def test_uses_config_legislatura(self, mock_settings, mock_download, tmp_path):
-        """Testa que usa legislatura do config."""
+    def test_uses_config_legislatura_for_votacoes(self, mock_settings, mock_download, tmp_path):
+        """Testa que usa legislatura do config para votações."""
         mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
         mock_settings.CAMARA_LEGISLATURA = 99  # Legislatura personalizada
         mock_download.return_value = DownloadResult(
-            success=True, path=tmp_path / "proposicoes-99.csv", skipped=False, error=None,
+            success=True, path=tmp_path / "votacoes-99.csv", skipped=False, error=None,
+            file_size=1024, etag='"test"', status_code=200, retry_attempts=0
+        )
+        stats = DownloadStats()
+
+        download_single_file("votacoes", tmp_path, stats)
+
+        # Verificar que URL contém legislatura correta
+        call_url = mock_download.call_args[1]["url"]
+        assert "-99.csv" in call_url
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_uses_config_ano_for_proposicoes(self, mock_settings, mock_download, tmp_path):
+        """Testa que usa ano do config para proposições."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_ANO = 2024  # Ano personalizado
+        mock_download.return_value = DownloadResult(
+            success=True, path=tmp_path / "proposicoes-2024.csv", skipped=False, error=None,
             file_size=1024, etag='"test"', status_code=200, retry_attempts=0
         )
         stats = DownloadStats()
 
         download_single_file("proposicoes", tmp_path, stats)
 
-        # Verificar que URL contém legislatura correta
+        # Verificar que URL contém ano correto
         call_url = mock_download.call_args[1]["url"]
-        assert "-99.csv" in call_url
+        assert "-2024.csv" in call_url
 
 
 class TestLoggingOutput:

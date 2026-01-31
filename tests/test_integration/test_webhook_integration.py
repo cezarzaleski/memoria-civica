@@ -106,7 +106,7 @@ class TestWebhookIntegration:
 
             send_webhook_notification(
                 stage="download_proposicoes",
-                message="Timeout ao baixar proposicoes-57.csv",
+                message="Timeout ao baixar proposicoes-2025.csv",
                 timestamp="2024-01-15T10:30:00Z",
             )
 
@@ -120,7 +120,7 @@ class TestWebhookIntegration:
         # Verifica body
         body = request["body"]
         assert body["etapa"] == "download_proposicoes"
-        assert body["mensagem"] == "Timeout ao baixar proposicoes-57.csv"
+        assert body["mensagem"] == "Timeout ao baixar proposicoes-2025.csv"
         assert body["timestamp"] == "2024-01-15T10:30:00Z"
 
     def test_sends_content_type_json_header(self, mock_webhook_server):

@@ -114,7 +114,7 @@ def send_webhook_notification(
         # Notificar erro de download
         result = send_webhook_notification(
             stage="download_proposicoes",
-            message="Timeout ao baixar proposicoes-57.csv após 3 tentativas"
+            message="Timeout ao baixar proposicoes-2025.csv após 3 tentativas"
         )
 
         # Com timestamp customizado

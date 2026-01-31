@@ -207,11 +207,12 @@ class TestAllCamaraEndpoints:
         """
         base_url = settings.CAMARA_API_BASE_URL
         legislatura = settings.CAMARA_LEGISLATURA
+        ano = settings.CAMARA_ANO
 
         # URLs dos 4 endpoints conforme TechSpec
         endpoints = {
             "deputados": f"{base_url}/deputados/csv/deputados.csv",
-            "proposicoes": f"{base_url}/proposicoes/csv/proposicoes-{legislatura}.csv",
+            "proposicoes": f"{base_url}/proposicoes/csv/proposicoes-{ano}.csv",
             "votacoes": f"{base_url}/votacoes/csv/votacoes-{legislatura}.csv",
             "votos": f"{base_url}/votacoesVotos/csv/votacoesVotos-{legislatura}.csv",
         }
@@ -286,8 +287,8 @@ class TestAllCamaraEndpoints:
     @pytest.mark.slow
     def test_proposicoes_endpoint_has_valid_csv_structure(self, tmp_path):
         """Testa que endpoint de proposições retorna CSV com estrutura válida."""
-        legislatura = settings.CAMARA_LEGISLATURA
-        url = f"{settings.CAMARA_API_BASE_URL}/proposicoes/csv/proposicoes-{legislatura}.csv"
+        ano = settings.CAMARA_ANO
+        url = f"{settings.CAMARA_API_BASE_URL}/proposicoes/csv/proposicoes-{ano}.csv"
         dest_path = tmp_path / "proposicoes.csv"
 
         result = download_file(url, dest_path, timeout=120)
