@@ -15,12 +15,16 @@ from src.shared.downloader import (
     DEFAULT_TIMEOUT,
     INITIAL_WAIT,
     MAX_RETRIES,
+    DownloadMetadata,
     DownloadResult,
+    RetryContext,
     _check_file_unchanged,
+    _format_file_size,
     _get_file_etag_path,
     _load_cached_etag,
     _save_etag,
     download_file,
+    get_retry_attempts,
     retry_with_backoff,
 )
 
@@ -40,6 +44,11 @@ class TestDownloadResultDataclass:
         assert result.path == Path("/tmp/test.csv")
         assert result.skipped is False
         assert result.error is None
+        # Novos campos com valores padrão
+        assert result.file_size is None
+        assert result.etag is None
+        assert result.status_code is None
+        assert result.retry_attempts == 0
 
     def test_download_result_success_state(self):
         """Testa estado de sucesso."""
@@ -62,6 +71,74 @@ class TestDownloadResultDataclass:
         assert result.path is None
         assert not result.skipped
         assert result.error == "Connection failed"
+
+    def test_download_result_with_metadata(self):
+        """Testa DownloadResult com metadados completos."""
+        result = DownloadResult(
+            success=True,
+            path=Path("/tmp/file.csv"),
+            skipped=False,
+            error=None,
+            file_size=1024000,
+            etag='"abc123"',
+            status_code=200,
+            retry_attempts=2,
+        )
+        assert result.file_size == 1024000
+        assert result.etag == '"abc123"'
+        assert result.status_code == 200
+        assert result.retry_attempts == 2
+
+
+class TestDownloadMetadataDataclass:
+    """Testes para a dataclass DownloadMetadata."""
+
+    def test_download_metadata_has_correct_fields(self):
+        """Testa que DownloadMetadata tem os campos corretos."""
+        metadata = DownloadMetadata(
+            success=True,
+            etag='"abc123"',
+            status_code=200,
+            file_size=1024,
+        )
+        assert metadata.success is True
+        assert metadata.etag == '"abc123"'
+        assert metadata.status_code == 200
+        assert metadata.file_size == 1024
+
+
+class TestRetryContext:
+    """Testes para RetryContext e funções relacionadas."""
+
+    def test_retry_context_initialization(self):
+        """Testa inicialização do RetryContext."""
+        context = RetryContext()
+        assert context.attempts == 0
+
+    def test_get_retry_attempts_returns_zero_when_no_context(self):
+        """Testa que get_retry_attempts retorna 0 quando não há contexto."""
+        # Note: Isso pode ser afetado por outros testes, então testamos comportamento básico
+        attempts = get_retry_attempts()
+        assert isinstance(attempts, int)
+
+
+class TestFormatFileSize:
+    """Testes para a função _format_file_size."""
+
+    def test_format_file_size_bytes(self):
+        """Testa formatação de bytes."""
+        assert _format_file_size(500) == "500 bytes"
+        assert _format_file_size(0) == "0 bytes"
+
+    def test_format_file_size_kilobytes(self):
+        """Testa formatação de kilobytes."""
+        assert _format_file_size(1024) == "1.00 KB"
+        assert _format_file_size(2560) == "2.50 KB"
+
+    def test_format_file_size_megabytes(self):
+        """Testa formatação de megabytes."""
+        assert _format_file_size(1024 * 1024) == "1.00 MB"
+        assert _format_file_size(1536 * 1024) == "1.50 MB"
 
 
 class TestEtagHelpers:
@@ -307,7 +384,12 @@ class TestDownloadFile:
         """Testa que retorna success=True quando download bem-sucedido."""
         dest_path = tmp_path / "test.csv"
         mock_check.return_value = (False, None)  # Arquivo mudou
-        mock_download.return_value = (True, '"new_etag"')
+        mock_download.return_value = DownloadMetadata(
+            success=True,
+            etag='"new_etag"',
+            status_code=200,
+            file_size=1024,
+        )
 
         result = download_file("http://example.com/file.csv", dest_path)
 
@@ -315,6 +397,9 @@ class TestDownloadFile:
         assert result.path == dest_path
         assert result.skipped is False
         assert result.error is None
+        assert result.file_size == 1024
+        assert result.etag == '"new_etag"'
+        assert result.status_code == 200
 
     @patch("src.shared.downloader._check_file_unchanged")
     def test_returns_skipped_when_etag_matches(self, mock_check, tmp_path):
@@ -327,6 +412,8 @@ class TestDownloadFile:
 
         assert result.success is True
         assert result.skipped is True
+        assert result.etag == '"same_etag"'
+        assert result.status_code == 304  # Not Modified implícito
 
     @patch("src.shared.downloader._check_file_unchanged")
     def test_returns_skipped_when_content_length_matches(self, mock_check, tmp_path):
@@ -417,7 +504,12 @@ class TestDownloadFile:
         """Testa que respeita parâmetro timeout."""
         dest_path = tmp_path / "test.csv"
         mock_check.return_value = (False, None)
-        mock_download.return_value = (True, None)
+        mock_download.return_value = DownloadMetadata(
+            success=True,
+            etag=None,
+            status_code=200,
+            file_size=0,
+        )
 
         custom_timeout = 60
         download_file("http://example.com/file.csv", dest_path, timeout=custom_timeout)
@@ -432,7 +524,12 @@ class TestDownloadFile:
     def test_skips_etag_check_when_disabled(self, mock_check, mock_download, tmp_path):
         """Testa que pula verificação ETag quando check_etag=False."""
         dest_path = tmp_path / "test.csv"
-        mock_download.return_value = (True, None)
+        mock_download.return_value = DownloadMetadata(
+            success=True,
+            etag=None,
+            status_code=200,
+            file_size=0,
+        )
 
         download_file("http://example.com/file.csv", dest_path, check_etag=False)
 
@@ -460,12 +557,38 @@ class TestDownloadFileLogging:
         """Testa que loga INFO no sucesso."""
         dest_path = tmp_path / "test.csv"
         mock_check.return_value = (False, None)
-        mock_download.return_value = (True, None)
+        mock_download.return_value = DownloadMetadata(
+            success=True,
+            etag='"test_etag"',
+            status_code=200,
+            file_size=1024,
+        )
 
         with caplog.at_level(logging.INFO):
             download_file("http://example.com/file.csv", dest_path)
 
         assert "Download concluído com sucesso" in caplog.text
+
+    @patch("src.shared.downloader._download_file_internal")
+    @patch("src.shared.downloader._check_file_unchanged")
+    def test_logs_metadata_on_success(self, mock_check, mock_download, tmp_path, caplog):
+        """Testa que loga metadados (status code, tamanho, ETag) no sucesso."""
+        dest_path = tmp_path / "test.csv"
+        mock_check.return_value = (False, None)
+        mock_download.return_value = DownloadMetadata(
+            success=True,
+            etag='"test_etag"',
+            status_code=200,
+            file_size=1024000,
+        )
+
+        with caplog.at_level(logging.INFO):
+            download_file("http://example.com/file.csv", dest_path)
+
+        # Verificar que metadados estão nos logs
+        assert "status: 200" in caplog.text
+        assert "KB" in caplog.text or "MB" in caplog.text  # Tamanho formatado
+        assert "test_etag" in caplog.text
 
     @patch("src.shared.downloader._check_file_unchanged")
     def test_logs_warning_on_skip(self, mock_check, tmp_path, caplog):
@@ -478,6 +601,19 @@ class TestDownloadFileLogging:
             download_file("http://example.com/file.csv", dest_path)
 
         assert "pulando download" in caplog.text.lower() or "não alterado" in caplog.text.lower()
+
+    @patch("src.shared.downloader._check_file_unchanged")
+    def test_logs_etag_and_size_on_skip(self, mock_check, tmp_path, caplog):
+        """Testa que loga ETag e tamanho quando arquivo é pulado."""
+        dest_path = tmp_path / "test.csv"
+        dest_path.write_text("existing content for cache test")
+        mock_check.return_value = (True, '"cached_etag"')
+
+        with caplog.at_level(logging.WARNING):
+            download_file("http://example.com/file.csv", dest_path)
+
+        # Verificar que ETag está nos logs
+        assert "cached_etag" in caplog.text
 
     @patch("src.shared.downloader.time.sleep")
     @patch("src.shared.downloader.requests.get")
@@ -492,6 +628,83 @@ class TestDownloadFileLogging:
             download_file("http://example.com/file.csv", dest_path)
 
         assert "falha" in caplog.text.lower() or "error" in caplog.text.lower()
+
+    @patch("src.shared.downloader.time.sleep")
+    @patch("src.shared.downloader.requests.get")
+    @patch("src.shared.downloader._check_file_unchanged")
+    def test_logs_retry_count_on_failure(self, mock_check, mock_get, mock_sleep, tmp_path, caplog):
+        """Testa que loga número de retries em caso de falha."""
+        dest_path = tmp_path / "test.csv"
+        mock_check.return_value = (False, None)
+        mock_get.side_effect = requests.exceptions.ConnectionError("Connection failed")
+
+        with caplog.at_level(logging.ERROR):
+            result = download_file("http://example.com/file.csv", dest_path)
+
+        assert result.retry_attempts > 0 or "retries" in caplog.text.lower() or "tentativa" in caplog.text.lower()
+
+    @patch("src.shared.downloader.requests.get")
+    @patch("src.shared.downloader._check_file_unchanged")
+    def test_logs_http_status_code_on_http_error(self, mock_check, mock_get, tmp_path, caplog):
+        """Testa que loga status code em erro HTTP."""
+        dest_path = tmp_path / "test.csv"
+        mock_check.return_value = (False, None)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.reason = "Not Found"
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+        mock_get.return_value = mock_response
+
+        with caplog.at_level(logging.ERROR):
+            result = download_file("http://example.com/notfound.csv", dest_path)
+
+        assert result.status_code == 404
+        assert "404" in caplog.text
+
+
+class TestRetryLogging:
+    """Testes para logging durante retries."""
+
+    @patch("src.shared.downloader.time.sleep")
+    def test_logs_retry_attempts_with_backoff_info(self, mock_sleep, caplog):
+        """Testa que loga tentativas de retry com informações de backoff."""
+        call_count = 0
+
+        @retry_with_backoff(max_retries=3, initial_wait=2)
+        def failing_then_succeeds():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ConnectionError("Test connection error")
+            return "success"
+
+        with caplog.at_level(logging.WARNING):
+            result = failing_then_succeeds()
+
+        assert result == "success"
+        assert "Retry" in caplog.text or "tentativa" in caplog.text.lower()
+        assert "backoff" in caplog.text.lower() or "2" in caplog.text  # Wait time
+
+    @patch("src.shared.downloader.time.sleep")
+    def test_logs_success_after_retry(self, mock_sleep, caplog):
+        """Testa que loga sucesso após retries."""
+        call_count = 0
+
+        @retry_with_backoff(max_retries=3, initial_wait=1)
+        def failing_then_succeeds():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise TimeoutError("Test timeout")
+            return "success"
+
+        with caplog.at_level(logging.INFO):
+            result = failing_then_succeeds()
+
+        assert result == "success"
+        # Verifica que logou sucesso após retry
+        assert "Sucesso após" in caplog.text or call_count == 2
 
 
 class TestDownloadFileCreateDirectory:

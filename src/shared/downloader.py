@@ -51,12 +51,45 @@ class DownloadResult:
         path: Caminho do arquivo baixado (None se falhou)
         skipped: True se o arquivo não foi alterado (cache hit)
         error: Mensagem de erro (None se sucesso ou skipped)
+        file_size: Tamanho do arquivo em bytes (None se falhou ou skipped)
+        etag: ETag do arquivo (None se não disponível)
+        status_code: Código HTTP da resposta (None se falhou antes da requisição)
+        retry_attempts: Número de tentativas de retry realizadas
     """
 
     success: bool
     path: Optional[Path]  # noqa: UP045
     skipped: bool
     error: Optional[str]  # noqa: UP045
+    file_size: Optional[int] = None  # noqa: UP045
+    etag: Optional[str] = None  # noqa: UP045
+    status_code: Optional[int] = None  # noqa: UP045
+    retry_attempts: int = 0
+
+
+class RetryContext:
+    """Contexto para rastrear informações de retry entre chamadas.
+
+    Attributes:
+        attempts: Número de tentativas realizadas (começa em 0)
+    """
+
+    def __init__(self) -> None:
+        """Inicializa contexto de retry."""
+        self.attempts: int = 0
+
+
+# Contexto global para rastrear tentativas de retry
+_retry_context: Optional[RetryContext] = None  # noqa: UP045
+
+
+def get_retry_attempts() -> int:
+    """Retorna o número de tentativas de retry da última operação.
+
+    Returns:
+        Número de tentativas (0 se nenhum retry ocorreu ou não há contexto)
+    """
+    return _retry_context.attempts if _retry_context else 0
 
 
 def retry_with_backoff(
@@ -85,13 +118,24 @@ def retry_with_backoff(
         @wraps(func)
         def wrapper(*args, **kwargs) -> T:
             """Wrapper que implementa lógica de retry."""
+            global _retry_context
+            _retry_context = RetryContext()
+
             wait_time = initial_wait
             last_exception: Optional[Exception] = None  # noqa: UP045
 
             for attempt in range(max_retries):
+                _retry_context.attempts = attempt
                 try:
                     logger.debug("Tentativa %d/%d de %s", attempt + 1, max_retries, func.__name__)
-                    return func(*args, **kwargs)
+                    result = func(*args, **kwargs)
+                    if attempt > 0:
+                        logger.info(
+                            "Sucesso após %d tentativa(s) de retry em %s",
+                            attempt,
+                            func.__name__,
+                        )
+                    return result
 
                 except (ConnectionError, TimeoutError, OSError, requests.exceptions.ConnectionError,
                         requests.exceptions.Timeout) as e:
@@ -104,7 +148,7 @@ def retry_with_backoff(
                     last_exception = e
                     if attempt < max_retries - 1:
                         logger.warning(
-                            "Erro transiente em %s: %s. Retry em %ds (tentativa %d/%d)",
+                            "Erro transiente em %s: %s. Retry em %ds com backoff exponencial (tentativa %d/%d)",
                             func.__name__,
                             e,
                             wait_time,
@@ -114,7 +158,12 @@ def retry_with_backoff(
                         time.sleep(wait_time)
                         wait_time *= 2  # Backoff exponencial
                     else:
-                        logger.error("Erro transiente após %d tentativas: %s", max_retries, e)
+                        logger.error(
+                            "Erro transiente após %d tentativas em %s: %s",
+                            max_retries,
+                            func.__name__,
+                            e,
+                        )
 
                 except Exception as e:
                     # Erros não-transientes - não retry
@@ -217,12 +266,29 @@ def _check_file_unchanged(
         return False, None
 
 
+@dataclass
+class DownloadMetadata:
+    """Metadados de uma operação de download.
+
+    Attributes:
+        success: Se o download foi bem-sucedido
+        etag: ETag do arquivo (None se não disponível)
+        status_code: Código HTTP da resposta
+        file_size: Tamanho do arquivo em bytes
+    """
+
+    success: bool
+    etag: Optional[str]  # noqa: UP045
+    status_code: int
+    file_size: int
+
+
 @retry_with_backoff(max_retries=MAX_RETRIES, initial_wait=INITIAL_WAIT)
 def _download_file_internal(
     url: str,
     dest_path: Path,
     timeout: int,
-) -> tuple[bool, Optional[str]]:  # noqa: UP045
+) -> DownloadMetadata:
     """Baixa um arquivo usando streaming.
 
     Args:
@@ -231,7 +297,7 @@ def _download_file_internal(
         timeout: Timeout da requisição
 
     Returns:
-        Tupla (sucesso, etag)
+        DownloadMetadata com informações do download
 
     Raises:
         requests.exceptions.HTTPError: Se o servidor retornar erro HTTP
@@ -243,13 +309,36 @@ def _download_file_internal(
     dest_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Baixar em chunks para evitar carregar arquivo inteiro em memória
+    file_size = 0
     with dest_path.open("wb") as f:
         for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
             if chunk:  # Filtrar keep-alive chunks vazios
                 f.write(chunk)
+                file_size += len(chunk)
 
     etag = response.headers.get("ETag")
-    return True, etag
+    return DownloadMetadata(
+        success=True,
+        etag=etag,
+        status_code=response.status_code,
+        file_size=file_size,
+    )
+
+
+def _format_file_size(size_bytes: int) -> str:
+    """Formata tamanho de arquivo em formato legível.
+
+    Args:
+        size_bytes: Tamanho em bytes
+
+    Returns:
+        String formatada (ex: "1.5 MB", "256 KB")
+    """
+    if size_bytes >= 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+    elif size_bytes >= 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    return f"{size_bytes} bytes"
 
 
 def download_file(
@@ -264,6 +353,7 @@ def download_file(
     - Verificação de cache via ETag ou Content-Length (se check_etag=True)
     - Streaming em chunks de 8KB para arquivos grandes
     - Retry com backoff exponencial (2s, 4s, 8s) para erros transientes
+    - Logging estruturado com metadados (file size, ETag, status code, retry attempts)
 
     Args:
         url: URL do arquivo para download
@@ -272,7 +362,7 @@ def download_file(
         timeout: Timeout em segundos para a requisição (padrão: 300)
 
     Returns:
-        DownloadResult com status do download
+        DownloadResult com status do download e metadados
 
     Example:
         result = download_file(
@@ -280,7 +370,7 @@ def download_file(
             dest_path=Path("/tmp/deputados.csv")
         )
         if result.success:
-            print(f"Baixado: {result.path}")
+            print(f"Baixado: {result.path} ({result.file_size} bytes)")
         elif result.skipped:
             print("Arquivo não mudou")
         else:
@@ -291,30 +381,52 @@ def download_file(
     try:
         # Verificar cache se habilitado
         if check_etag:
-            is_unchanged, _ = _check_file_unchanged(url, dest_path, timeout)
+            is_unchanged, cached_etag = _check_file_unchanged(url, dest_path, timeout)
             if is_unchanged:
-                logger.warning("Arquivo não alterado, pulando download: %s", dest_path)
+                file_size = dest_path.stat().st_size if dest_path.exists() else None
+                logger.warning(
+                    "Arquivo não alterado, pulando download: %s (ETag: %s, tamanho: %s)",
+                    dest_path,
+                    cached_etag or "N/A",
+                    _format_file_size(file_size) if file_size else "N/A",
+                )
                 return DownloadResult(
                     success=True,
                     path=dest_path,
                     skipped=True,
                     error=None,
+                    file_size=file_size,
+                    etag=cached_etag,
+                    status_code=304,  # Not Modified (implícito)
+                    retry_attempts=0,
                 )
 
         # Baixar arquivo
-        success, etag = _download_file_internal(url, dest_path, timeout)
+        metadata = _download_file_internal(url, dest_path, timeout)
+        retry_attempts = get_retry_attempts()
 
-        if success:
+        if metadata.success:
             # Salvar ETag para verificação futura
-            if etag:
-                _save_etag(dest_path, etag)
+            if metadata.etag:
+                _save_etag(dest_path, metadata.etag)
 
-            logger.info("Download concluído com sucesso: %s", dest_path)
+            logger.info(
+                "Download concluído com sucesso: %s (status: %d, tamanho: %s, ETag: %s, retries: %d)",
+                dest_path,
+                metadata.status_code,
+                _format_file_size(metadata.file_size),
+                metadata.etag or "N/A",
+                retry_attempts,
+            )
             return DownloadResult(
                 success=True,
                 path=dest_path,
                 skipped=False,
                 error=None,
+                file_size=metadata.file_size,
+                etag=metadata.etag,
+                status_code=metadata.status_code,
+                retry_attempts=retry_attempts,
             )
 
         # Não deveria chegar aqui, mas por segurança
@@ -323,35 +435,59 @@ def download_file(
             path=None,
             skipped=False,
             error="Download falhou sem erro específico",
+            retry_attempts=retry_attempts,
         )
 
     except requests.exceptions.HTTPError as e:
         error_msg = f"Erro HTTP: {e.response.status_code} - {e.response.reason}"
-        logger.error("Falha no download de %s: %s", url, error_msg)
+        retry_attempts = get_retry_attempts()
+        logger.error(
+            "Falha no download de %s: %s (status: %d, retries: %d)",
+            url,
+            error_msg,
+            e.response.status_code,
+            retry_attempts,
+        )
         return DownloadResult(
             success=False,
             path=None,
             skipped=False,
             error=error_msg,
+            status_code=e.response.status_code,
+            retry_attempts=retry_attempts,
         )
 
     except (ConnectionError, TimeoutError, OSError, requests.exceptions.ConnectionError,
             requests.exceptions.Timeout) as e:
-        error_msg = f"Erro de conexão após {MAX_RETRIES} tentativas: {e}"
-        logger.error("Falha no download de %s: %s", url, error_msg)
+        retry_attempts = get_retry_attempts()
+        error_msg = f"Erro de conexão após {retry_attempts + 1} tentativa(s): {e}"
+        logger.error(
+            "Falha no download de %s: %s (retries: %d)",
+            url,
+            error_msg,
+            retry_attempts,
+        )
         return DownloadResult(
             success=False,
             path=None,
             skipped=False,
             error=error_msg,
+            retry_attempts=retry_attempts,
         )
 
     except Exception as e:
+        retry_attempts = get_retry_attempts()
         error_msg = f"Erro inesperado: {e}"
-        logger.error("Falha no download de %s: %s", url, error_msg)
+        logger.error(
+            "Falha no download de %s: %s (retries: %d)",
+            url,
+            error_msg,
+            retry_attempts,
+        )
         return DownloadResult(
             success=False,
             path=None,
             skipped=False,
             error=error_msg,
+            retry_attempts=retry_attempts,
         )

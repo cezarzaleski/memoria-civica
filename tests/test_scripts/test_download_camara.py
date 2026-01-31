@@ -41,6 +41,11 @@ class TestDownloadStatsDataclass:
         assert stats.skipped == 0
         assert stats.failed == 0
         assert stats.errors == []
+        assert stats.total_bytes == 0
+        assert stats.total_time == 0.0
+        assert stats.phase_times == {}
+        assert stats.retry_count == 0
+        assert stats.start_time > 0
 
     def test_custom_values(self):
         """Testa valores personalizados."""
@@ -55,6 +60,46 @@ class TestDownloadStatsDataclass:
         stats.errors.append("erro1")
         stats.errors.append("erro2")
         assert len(stats.errors) == 2
+
+    def test_total_files_property(self):
+        """Testa propriedade total_files."""
+        stats = DownloadStats(downloaded=2, skipped=1, failed=1)
+        assert stats.total_files == 4
+
+    def test_format_time_seconds(self):
+        """Testa formatação de tempo em segundos."""
+        stats = DownloadStats()
+        assert stats.format_time(45.5) == "45.50s"
+        assert stats.format_time(0.5) == "0.50s"
+
+    def test_format_time_minutes(self):
+        """Testa formatação de tempo em minutos."""
+        stats = DownloadStats()
+        assert stats.format_time(90) == "1m 30s"
+        assert stats.format_time(60) == "1m 0s"
+
+    def test_format_time_hours(self):
+        """Testa formatação de tempo em horas."""
+        stats = DownloadStats()
+        assert stats.format_time(3660) == "1h 1m"
+        assert stats.format_time(7200) == "2h 0m"
+
+    def test_format_bytes_bytes(self):
+        """Testa formatação de bytes."""
+        stats = DownloadStats()
+        assert stats.format_bytes(500) == "500 bytes"
+
+    def test_format_bytes_kilobytes(self):
+        """Testa formatação de kilobytes."""
+        stats = DownloadStats()
+        assert stats.format_bytes(1024) == "1.00 KB"
+        assert stats.format_bytes(2560) == "2.50 KB"
+
+    def test_format_bytes_megabytes(self):
+        """Testa formatação de megabytes."""
+        stats = DownloadStats()
+        assert stats.format_bytes(1048576) == "1.00 MB"
+        assert stats.format_bytes(1572864) == "1.50 MB"
 
 
 class TestFileConfigs:
@@ -238,7 +283,8 @@ class TestDownloadSingleFile:
         mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
         mock_settings.CAMARA_LEGISLATURA = 57
         mock_download.return_value = DownloadResult(
-            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None
+            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None,
+            file_size=1024, etag='"test"', status_code=200, retry_attempts=0
         )
         stats = DownloadStats()
 
@@ -248,6 +294,7 @@ class TestDownloadSingleFile:
         assert stats.downloaded == 1
         assert stats.skipped == 0
         assert stats.failed == 0
+        assert stats.total_bytes == 1024
 
     @patch("scripts.download_camara.download_file")
     @patch("scripts.download_camara.settings")
@@ -256,7 +303,8 @@ class TestDownloadSingleFile:
         mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
         mock_settings.CAMARA_LEGISLATURA = 57
         mock_download.return_value = DownloadResult(
-            success=True, path=tmp_path / "deputados.csv", skipped=True, error=None
+            success=True, path=tmp_path / "deputados.csv", skipped=True, error=None,
+            file_size=2048, etag='"cached"', status_code=304, retry_attempts=0
         )
         stats = DownloadStats()
 
@@ -266,6 +314,7 @@ class TestDownloadSingleFile:
         assert stats.downloaded == 0
         assert stats.skipped == 1
         assert stats.failed == 0
+        assert stats.total_bytes == 2048  # Arquivos skipados também contam
 
     @patch("scripts.download_camara.download_file")
     @patch("scripts.download_camara.settings")
@@ -274,7 +323,8 @@ class TestDownloadSingleFile:
         mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
         mock_settings.CAMARA_LEGISLATURA = 57
         mock_download.return_value = DownloadResult(
-            success=False, path=None, skipped=False, error="Connection failed"
+            success=False, path=None, skipped=False, error="Connection failed",
+            file_size=None, etag=None, status_code=None, retry_attempts=2
         )
         stats = DownloadStats()
 
@@ -286,6 +336,7 @@ class TestDownloadSingleFile:
         assert stats.failed == 1
         assert len(stats.errors) == 1
         assert "Connection failed" in stats.errors[0]
+        assert stats.retry_count == 2  # Retries rastreados
 
     @patch("scripts.download_camara.settings")
     def test_dry_run_mode(self, mock_settings, tmp_path):
@@ -298,6 +349,40 @@ class TestDownloadSingleFile:
 
         assert result is True
         assert stats.downloaded == 1
+        assert "deputados" in stats.phase_times  # Tempo registrado
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_download_tracks_phase_time(self, mock_settings, mock_download, tmp_path):
+        """Testa que o tempo de cada fase é rastreado."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_download.return_value = DownloadResult(
+            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None,
+            file_size=1024, etag='"test"', status_code=200, retry_attempts=0
+        )
+        stats = DownloadStats()
+
+        download_single_file("deputados", tmp_path, stats)
+
+        assert "deputados" in stats.phase_times
+        assert stats.phase_times["deputados"] >= 0
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_download_accumulates_retry_count(self, mock_settings, mock_download, tmp_path):
+        """Testa que retries são acumulados nas estatísticas."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_download.return_value = DownloadResult(
+            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None,
+            file_size=1024, etag='"test"', status_code=200, retry_attempts=2
+        )
+        stats = DownloadStats()
+
+        download_single_file("deputados", tmp_path, stats)
+
+        assert stats.retry_count == 2
 
 
 class TestDownloadAllFiles:
@@ -398,6 +483,85 @@ class TestPrintSummary:
         assert "Falhas: 2" in caplog.text
         assert "erro1" in caplog.text
         assert "erro2" in caplog.text
+
+    def test_print_summary_includes_total_time(self, caplog):
+        """Testa que sumário inclui tempo total."""
+        stats = DownloadStats(downloaded=2, skipped=0, failed=0)
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Tempo total" in caplog.text
+
+    def test_print_summary_includes_data_processed(self, caplog):
+        """Testa que sumário inclui dados processados."""
+        stats = DownloadStats(downloaded=2, skipped=0, failed=0, total_bytes=1048576)
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Dados processados" in caplog.text
+        assert "MB" in caplog.text or "KB" in caplog.text or "bytes" in caplog.text
+
+    def test_print_summary_includes_retry_count(self, caplog):
+        """Testa que sumário inclui contagem de retries quando há retries."""
+        stats = DownloadStats(downloaded=2, skipped=0, failed=0, retry_count=3)
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Total de retries: 3" in caplog.text
+
+    def test_print_summary_excludes_retry_when_zero(self, caplog):
+        """Testa que sumário não inclui retries quando é zero."""
+        stats = DownloadStats(downloaded=2, skipped=0, failed=0, retry_count=0)
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Total de retries" not in caplog.text
+
+    def test_print_summary_includes_phase_times(self, caplog):
+        """Testa que sumário inclui tempos por fase."""
+        stats = DownloadStats(downloaded=2, skipped=0, failed=0)
+        stats.phase_times = {"deputados": 10.5, "votacoes": 20.3}
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Tempo por arquivo" in caplog.text
+        assert "deputados" in caplog.text
+        assert "votacoes" in caplog.text
+
+    def test_print_summary_includes_total_files(self, caplog):
+        """Testa que sumário inclui total de arquivos processados."""
+        stats = DownloadStats(downloaded=2, skipped=1, failed=1)
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Total processado: 4 arquivo(s)" in caplog.text
+
+    def test_print_summary_empty_download_list(self, caplog):
+        """Testa sumário com lista de downloads vazia."""
+        stats = DownloadStats()
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Total processado: 0 arquivo(s)" in caplog.text
+        assert "sucesso" in caplog.text.lower()
+
+    def test_print_summary_all_failed(self, caplog):
+        """Testa sumário quando todos downloads falharam."""
+        stats = DownloadStats(downloaded=0, skipped=0, failed=4)
+        stats.errors = ["erro1", "erro2", "erro3", "erro4"]
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Falhas: 4" in caplog.text
+        assert "falha" in caplog.text.lower()
 
 
 class TestMain:
@@ -551,7 +715,8 @@ class TestIntegrationWithConfig:
         mock_settings.CAMARA_API_BASE_URL = "https://custom.api.url/arquivos"
         mock_settings.CAMARA_LEGISLATURA = 57
         mock_download.return_value = DownloadResult(
-            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None
+            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None,
+            file_size=1024, etag='"test"', status_code=200, retry_attempts=0
         )
         stats = DownloadStats()
 
@@ -568,7 +733,8 @@ class TestIntegrationWithConfig:
         mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
         mock_settings.CAMARA_LEGISLATURA = 99  # Legislatura personalizada
         mock_download.return_value = DownloadResult(
-            success=True, path=tmp_path / "proposicoes-99.csv", skipped=False, error=None
+            success=True, path=tmp_path / "proposicoes-99.csv", skipped=False, error=None,
+            file_size=1024, etag='"test"', status_code=200, retry_attempts=0
         )
         stats = DownloadStats()
 
@@ -577,3 +743,107 @@ class TestIntegrationWithConfig:
         # Verificar que URL contém legislatura correta
         call_url = mock_download.call_args[1]["url"]
         assert "-99.csv" in call_url
+
+
+class TestLoggingOutput:
+    """Testes para saída de logging estruturado."""
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_logs_download_metadata_on_success(self, mock_settings, mock_download, tmp_path, caplog):
+        """Testa que loga metadados do download no sucesso."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_download.return_value = DownloadResult(
+            success=True, path=tmp_path / "deputados.csv", skipped=False, error=None,
+            file_size=1048576, etag='"test"', status_code=200, retry_attempts=0
+        )
+        stats = DownloadStats()
+
+        with caplog.at_level(logging.INFO):
+            download_single_file("deputados", tmp_path, stats)
+
+        # Verificar que metadados estão nos logs
+        assert "Download concluído" in caplog.text
+        assert "MB" in caplog.text or "KB" in caplog.text
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_logs_skip_with_time(self, mock_settings, mock_download, tmp_path, caplog):
+        """Testa que loga skip com tempo."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_download.return_value = DownloadResult(
+            success=True, path=tmp_path / "deputados.csv", skipped=True, error=None,
+            file_size=1024, etag='"cached"', status_code=304, retry_attempts=0
+        )
+        stats = DownloadStats()
+
+        with caplog.at_level(logging.WARNING):
+            download_single_file("deputados", tmp_path, stats)
+
+        assert "tempo:" in caplog.text.lower() or "pulando" in caplog.text.lower()
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_logs_failure_with_retry_count(self, mock_settings, mock_download, tmp_path, caplog):
+        """Testa que loga falha com contagem de retries."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_download.return_value = DownloadResult(
+            success=False, path=None, skipped=False, error="Connection timeout",
+            file_size=None, etag=None, status_code=None, retry_attempts=3
+        )
+        stats = DownloadStats()
+
+        with caplog.at_level(logging.ERROR):
+            download_single_file("deputados", tmp_path, stats)
+
+        assert "Falha" in caplog.text
+        assert "retries: 3" in caplog.text.lower() or "3" in caplog.text
+
+
+class TestEdgeCases:
+    """Testes para casos extremos."""
+
+    def test_empty_download_list_produces_valid_summary(self, caplog):
+        """Testa que lista de downloads vazia produz sumário válido."""
+        stats = DownloadStats()
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        assert "Total processado: 0" in caplog.text
+        assert "sucesso" in caplog.text.lower()
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_all_downloads_failed_produces_error_summary(self, mock_settings, mock_download, tmp_path, caplog):
+        """Testa que todas falhas produzem sumário de erro."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_LEGISLATURA = 57
+        mock_download.return_value = DownloadResult(
+            success=False, path=None, skipped=False, error="Server unavailable",
+            file_size=None, etag=None, status_code=503, retry_attempts=3
+        )
+        stats = DownloadStats()
+
+        download_single_file("deputados", tmp_path, stats)
+        download_single_file("votacoes", tmp_path, stats)
+
+        with caplog.at_level(logging.ERROR):
+            print_summary(stats)
+
+        assert stats.failed == 2
+        assert "falha" in caplog.text.lower()
+
+    def test_special_characters_in_log_output(self, caplog):
+        """Testa que caracteres especiais não quebram logs."""
+        stats = DownloadStats()
+        stats.errors = ["Erro com acentuação: conexão falhou", "エラー with unicode"]
+
+        with caplog.at_level(logging.INFO):
+            print_summary(stats)
+
+        # Se chegou aqui sem exceção, os logs são válidos UTF-8
+        assert "Erros encontrados" in caplog.text

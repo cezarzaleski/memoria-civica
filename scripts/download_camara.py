@@ -33,7 +33,8 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.shared.config import settings
@@ -52,17 +53,61 @@ class DownloadStats:
         skipped: Número de arquivos pulados (cache hit)
         failed: Número de arquivos que falharam
         errors: Lista de mensagens de erro
+        total_bytes: Total de bytes baixados
+        total_time: Tempo total de execução em segundos
+        phase_times: Dicionário com tempo de cada fase (arquivo)
+        retry_count: Número total de retries realizados
+        start_time: Timestamp de início da execução
     """
 
     downloaded: int = 0
     skipped: int = 0
     failed: int = 0
-    errors: list[str] = None  # type: ignore[assignment]
+    errors: list[str] = field(default_factory=list)
+    total_bytes: int = 0
+    total_time: float = 0.0
+    phase_times: dict[str, float] = field(default_factory=dict)
+    retry_count: int = 0
+    start_time: float = field(default_factory=time.time)
 
-    def __post_init__(self) -> None:
-        """Inicializa a lista de erros."""
-        if self.errors is None:
-            self.errors = []
+    @property
+    def total_files(self) -> int:
+        """Retorna o número total de arquivos processados."""
+        return self.downloaded + self.skipped + self.failed
+
+    def format_time(self, seconds: float) -> str:
+        """Formata tempo em formato legível.
+
+        Args:
+            seconds: Tempo em segundos
+
+        Returns:
+            String formatada (ex: "1m 30s", "45s", "2h 15m")
+        """
+        if seconds >= 3600:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            return f"{hours}h {minutes}m"
+        elif seconds >= 60:
+            minutes = int(seconds // 60)
+            secs = int(seconds % 60)
+            return f"{minutes}m {secs}s"
+        return f"{seconds:.2f}s"
+
+    def format_bytes(self, size_bytes: int) -> str:
+        """Formata tamanho em formato legível.
+
+        Args:
+            size_bytes: Tamanho em bytes
+
+        Returns:
+            String formatada (ex: "1.5 MB", "256 KB")
+        """
+        if size_bytes >= 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.2f} MB"
+        elif size_bytes >= 1024:
+            return f"{size_bytes / 1024:.2f} KB"
+        return f"{size_bytes} bytes"
 
 
 # Definição dos arquivos a serem baixados
@@ -173,26 +218,55 @@ def download_single_file(
     logger.info("  URL: %s", url)
     logger.info("  Destino: %s", dest_path)
 
+    phase_start = time.time()
+
     if dry_run:
         logger.info("  [DRY-RUN] Download simulado")
         stats.downloaded += 1
+        phase_time = time.time() - phase_start
+        stats.phase_times[file_key] = phase_time
         return True
 
     result: DownloadResult = download_file(url=url, dest_path=dest_path)
 
+    phase_time = time.time() - phase_start
+    stats.phase_times[file_key] = phase_time
+
     if result.success:
         if result.skipped:
-            logger.warning("  Arquivo não alterado, pulando: %s", dest_path.name)
+            logger.warning(
+                "  Arquivo não alterado, pulando: %s (tempo: %s)",
+                dest_path.name,
+                stats.format_time(phase_time),
+            )
             stats.skipped += 1
+            # Adicionar tamanho do arquivo existente para estatísticas
+            if result.file_size:
+                stats.total_bytes += result.file_size
         else:
-            logger.info("  Download concluído: %s", dest_path.name)
+            logger.info(
+                "  Download concluído: %s (tamanho: %s, tempo: %s, retries: %d)",
+                dest_path.name,
+                stats.format_bytes(result.file_size) if result.file_size else "N/A",
+                stats.format_time(phase_time),
+                result.retry_attempts,
+            )
             stats.downloaded += 1
+            if result.file_size:
+                stats.total_bytes += result.file_size
+            stats.retry_count += result.retry_attempts
         return True
     else:
         error_msg = f"{file_key}: {result.error}"
-        logger.error("  Falha no download: %s", result.error)
+        logger.error(
+            "  Falha no download: %s (tempo: %s, retries: %d)",
+            result.error,
+            stats.format_time(phase_time),
+            result.retry_attempts,
+        )
         stats.failed += 1
         stats.errors.append(error_msg)
+        stats.retry_count += result.retry_attempts
         return False
 
 
@@ -203,13 +277,16 @@ def download_all_files(
 ) -> DownloadStats:
     """Baixa todos os arquivos na ordem correta.
 
+    Orquestra o download de todos os arquivos CSV da API da Câmara,
+    respeitando a ordem de dependências e rastreando métricas detalhadas.
+
     Args:
         data_dir: Diretório de destino para os arquivos
         files: Lista de arquivos específicos para baixar (None = todos)
         dry_run: Se True, apenas simula os downloads
 
     Returns:
-        Estatísticas de download
+        Estatísticas de download com métricas de tempo e desempenho
     """
     stats = DownloadStats()
 
@@ -235,6 +312,8 @@ def download_all_files(
     logger.info("=" * 60)
     logger.info("Iniciando download de %d arquivo(s) da Câmara dos Deputados", len(ordered_files))
     logger.info("Legislatura: %d", settings.CAMARA_LEGISLATURA)
+    if dry_run:
+        logger.info("Modo: DRY-RUN (simulação)")
     logger.info("=" * 60)
 
     for i, file_key in enumerate(ordered_files, 1):
@@ -249,29 +328,57 @@ def download_all_files(
 def print_summary(stats: DownloadStats) -> None:
     """Imprime sumário final dos downloads.
 
+    Gera relatório completo com:
+    - Contagem de arquivos (baixados, pulados, falhas)
+    - Tempo total e tempo por fase
+    - Volume total de dados processados
+    - Lista de erros (se houver)
+
     Args:
         stats: Estatísticas de download
     """
+    # Calcular tempo total
+    stats.total_time = time.time() - stats.start_time
+
     logger.info("")
     logger.info("=" * 60)
     logger.info("SUMÁRIO DE DOWNLOADS")
     logger.info("=" * 60)
+    logger.info("")
+    logger.info("Estatísticas de arquivos:")
+    logger.info("  Total processado: %d arquivo(s)", stats.total_files)
     logger.info("  Baixados: %d", stats.downloaded)
     logger.info("  Pulados (cache): %d", stats.skipped)
     logger.info("  Falhas: %d", stats.failed)
+    logger.info("")
+    logger.info("Métricas de desempenho:")
+    logger.info("  Tempo total: %s", stats.format_time(stats.total_time))
+    logger.info("  Dados processados: %s", stats.format_bytes(stats.total_bytes))
+    if stats.retry_count > 0:
+        logger.info("  Total de retries: %d", stats.retry_count)
 
+    # Tempo por fase
+    if stats.phase_times:
+        logger.info("")
+        logger.info("Tempo por arquivo:")
+        for file_key, phase_time in stats.phase_times.items():
+            logger.info("  %s: %s", file_key, stats.format_time(phase_time))
+
+    # Erros
     if stats.errors:
         logger.info("")
         logger.info("Erros encontrados:")
         for error in stats.errors:
             logger.error("  - %s", error)
 
+    logger.info("")
     logger.info("=" * 60)
 
     if stats.failed == 0:
         logger.info("✓ Download concluído com sucesso!")
     else:
         logger.error("✗ Download concluído com %d falha(s)", stats.failed)
+    logger.info("=" * 60)
 
 
 def parse_args(args: list[str] | None = None) -> argparse.Namespace:
