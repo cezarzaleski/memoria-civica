@@ -31,13 +31,18 @@ O pipeline de CI/CD do Memória Cívica utiliza **GitHub Actions** com arquitetu
 ```
 .github/
 └── workflows/
-    ├── ci-frontend.yml      # CI do frontend (lint + testes)
-    ├── deploy-frontend.yml  # Deploy do frontend para Vercel
-    └── deploy-backend.yml   # Deploy do backend para VPS
+    ├── ci-frontend.yml       # CI do frontend (lint + testes)
+    ├── deploy-frontend.yml   # Deploy do frontend para Vercel
+    ├── deploy-backend.yml    # Deploy do backend para VPS
+    └── validate-secrets.yml  # Validação de secrets configurados
 
 docker/
 ├── docker-compose.prod.yml  # Orquestração de containers na VPS
 └── init-pgvector.sh         # Script de inicialização do PostgreSQL
+
+docs/
+├── CICD.md                  # Esta documentação
+└── SECRETS_SETUP.md         # Guia detalhado de configuração de secrets
 ```
 
 ### Visão Geral dos Componentes
@@ -47,6 +52,7 @@ docker/
 | `ci-frontend.yml` | Pull Requests para `main` | Lint e testes do frontend |
 | `deploy-frontend.yml` | Push para `main` (pasta frontend/) ou manual | Deploy do frontend para Vercel |
 | `deploy-backend.yml` | Push para `main` (pastas backend/) ou manual | Build Docker, push para Docker Hub, deploy via SSH |
+| `validate-secrets.yml` | Manual (workflow_dispatch) | Validação de secrets configurados |
 
 ---
 
@@ -221,6 +227,25 @@ curl -sf http://localhost:3000/health
 ---
 
 ## GitHub Secrets
+
+> **📖 Guia Completo**: Para instruções detalhadas de como obter e configurar cada secret, consulte o [Guia de Configuração de Secrets](./SECRETS_SETUP.md).
+
+### Workflow de Validação
+
+Após configurar os secrets, execute o workflow de validação para verificar se tudo está correto:
+
+1. Acesse **Actions** no repositório
+2. Selecione **Validate Secrets**
+3. Clique em **Run workflow**
+4. Escolha quais categorias validar (Docker Hub, VPS, Vercel)
+5. Verifique os resultados no summary
+
+O workflow testa:
+- ✅ Existência de cada secret
+- ✅ Formato válido da chave SSH
+- ✅ Autenticação no Docker Hub
+- ✅ Validação do token Vercel
+- ⚠️ Conexão SSH (pode falhar se VPS não é acessível do GitHub)
 
 ### Secrets Necessários
 
