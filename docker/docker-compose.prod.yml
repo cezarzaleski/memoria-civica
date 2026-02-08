@@ -29,6 +29,7 @@ services:
 
 networks:
   memoria-network:
+    name: memoria-network
     driver: bridge
 
 volumes:
