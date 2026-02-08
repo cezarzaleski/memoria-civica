@@ -13,9 +13,9 @@ RUN pip install --no-cache-dir poetry
 # Copiar arquivos de dependência
 COPY pyproject.toml poetry.lock* ./
 
-# Instalar dependências Python (sem dev dependencies)
+# Instalar dependências Python (sem dev dependencies, sem instalar o projeto)
 RUN poetry config virtualenvs.create false && \
-    poetry install --only main --no-interaction --no-ansi
+    poetry install --only main --no-interaction --no-ansi --no-root
 
 # Copiar código fonte
 COPY src/ ./src/
