@@ -12,7 +12,7 @@
 #   - VPS_USER: SSH username for VPS
 #
 # Required on VPS:
-#   - /projetos/memoria-civica/docker/.env with DATABASE_URL
+#   - ~/projetos/memoria-civica/docker/.env with POSTGRES_* variables
 #   - Docker network "memoria-network" with PostgreSQL running
 #
 # Trigger:
@@ -99,7 +99,7 @@ jobs:
             echo "Running ETL pipeline..."
             docker run --rm \
               --network memoria-network \
-              --env-file /projetos/memoria-civica/docker/.env \
+              --env-file ~/projetos/memoria-civica/docker/.env \
               ${{ secrets.DOCKERHUB_USERNAME }}/memoria-etl:latest
 
             echo "=========================================="
