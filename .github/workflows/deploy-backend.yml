@@ -1,48 +1,40 @@
-# Deploy Backend to VPS
+# Deploy ETL to VPS
 #
-# This workflow builds and deploys the Python backend (ETL components)
-# to the production VPS using Docker Hub and SSH deployment.
+# This workflow builds and runs the ETL pipeline that:
+# 1. Downloads CSV files from Câmara dos Deputados API
+# 2. Processes and loads data into PostgreSQL
 #
 # Required GitHub Secrets:
 #   - DOCKERHUB_USERNAME: Docker Hub username
 #   - DOCKERHUB_TOKEN: Docker Hub access token
 #   - VPS_HOST: VPS hostname or IP address
 #   - VPS_SSH_KEY: SSH private key for VPS access
-#   - VPS_USER: SSH username for VPS (required)
+#   - VPS_USER: SSH username for VPS
 #
-# Workflow Structure:
-#   1. build-push: Build Docker image and push to Docker Hub
-#   2. deploy: SSH to VPS, run migrations, update containers
+# Required on VPS:
+#   - /projetos/memoria-civica/docker/.env with DATABASE_URL
+#   - Docker network "memoria-network" with PostgreSQL running
 #
 # Trigger:
-#   - Automatic: On push to main branch (backend-related files)
+#   - Scheduled: Daily at 3:00 AM UTC (midnight Brasília)
 #   - Manual: Via GitHub Actions UI (workflow_dispatch)
-#
-# TODO: Ensure backend.Dockerfile exists before running this workflow
-# TODO: Ensure docker-compose.prod.yml includes backend service
-# TODO: Ensure health endpoint is implemented in backend
 
-name: Deploy Backend
+name: Deploy ETL
 
 on:
+  schedule:
+    - cron: '0 3 * * *'  # Todo dia às 3h UTC (0h Brasília)
+  workflow_dispatch:      # Permite execução manual
   push:
     branches: [main]
     paths:
-      - 'src/**'
       - 'etl/**'
-      - 'alembic/**'
-      - 'docker/backend.Dockerfile'
-      - 'docker/docker-compose.prod.yml'
-      - 'pyproject.toml'
-      - 'poetry.lock'
       - '.github/workflows/deploy-backend.yml'
-  workflow_dispatch:
 
 jobs:
   build-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    environment: staging
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     steps:
@@ -62,7 +54,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/memoria-backend
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/memoria-etl
           tags: |
             type=sha,prefix=
             type=raw,value=latest
@@ -70,20 +62,20 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: docker/backend.Dockerfile
+          context: ./etl
+          file: etl/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    name: Deploy to VPS
+  run-etl:
+    name: Run ETL on VPS
     needs: build-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Execute ETL via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -93,41 +85,21 @@ jobs:
           script: |
             set -e
 
-            # Navigate to application directory
-            cd /app
+            echo "=========================================="
+            echo "MEMÓRIA CÍVICA - ETL PIPELINE"
+            echo "=========================================="
 
-            # Pull latest Docker images
-            echo "Pulling latest Docker images..."
-            docker compose -f docker/docker-compose.prod.yml pull
+            # Pull latest image
+            echo "Pulling latest ETL image..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/memoria-etl:latest
 
-            # Run database migrations before container restart
-            # TODO: Adjust this command based on actual backend container setup
-            echo "Running database migrations..."
-            docker compose -f docker/docker-compose.prod.yml run --rm backend alembic upgrade head || echo "Migration step skipped - backend container may not be configured yet"
+            # Run ETL container
+            echo "Running ETL pipeline..."
+            docker run --rm \
+              --network memoria-network \
+              --env-file /projetos/memoria-civica/docker/.env \
+              ${{ secrets.DOCKERHUB_USERNAME }}/memoria-etl:latest
 
-            # Perform rolling update with minimal downtime
-            echo "Performing rolling update..."
-            docker compose -f docker/docker-compose.prod.yml up -d --remove-orphans
-
-            # Wait for containers to be healthy
-            echo "Waiting for containers to stabilize..."
-            sleep 10
-
-            # Validate deployment via health check with retries
-            # TODO: Update port and endpoint based on actual backend configuration
-            echo "Validating deployment..."
-            for i in 1 2 3 4 5; do
-              if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
-                echo "Health check passed on attempt $i"
-                break
-              fi
-              echo "Health check attempt $i failed, retrying in 5s..."
-              sleep 5
-              if [ $i -eq 5 ]; then
-                echo "WARNING: Health check failed after 5 attempts - endpoint may not be configured yet"
-              fi
-            done
-
-            # Show running containers
-            echo "Deployment completed. Running containers:"
-            docker compose -f docker/docker-compose.prod.yml ps
+            echo "=========================================="
+            echo "ETL pipeline completed successfully!"
+            echo "=========================================="
