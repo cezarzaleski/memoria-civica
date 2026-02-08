@@ -193,9 +193,9 @@ def run_etl(data_dir: Path) -> int:
         logger.info("-" * 60)
         phase_start = time.time()
 
-        # Nomes dos arquivos com legislatura
-        votacoes_csv = data_dir / f"votacoes-{settings.CAMARA_LEGISLATURA}.csv"
-        votos_csv = data_dir / f"votacoesVotos-{settings.CAMARA_LEGISLATURA}.csv"
+        # Nomes dos arquivos com ano
+        votacoes_csv = data_dir / f"votacoes-{settings.CAMARA_ANO}.csv"
+        votos_csv = data_dir / f"votacoesVotos-{settings.CAMARA_ANO}.csv"
 
         if not votacoes_csv.exists():
             logger.error(f"Arquivo não encontrado: {votacoes_csv}")

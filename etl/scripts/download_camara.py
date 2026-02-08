@@ -130,16 +130,16 @@ FILE_CONFIGS = {
         "requires_ano": True,
     },
     "votacoes": {
-        "url_path": "votacoes/csv/votacoes-{legislatura}.csv",
-        "filename": "votacoes-{legislatura}.csv",
-        "requires_legislatura": True,
-        "requires_ano": False,
+        "url_path": "votacoes/csv/votacoes-{ano}.csv",
+        "filename": "votacoes-{ano}.csv",
+        "requires_legislatura": False,
+        "requires_ano": True,
     },
     "votos": {
-        "url_path": "votacoesVotos/csv/votacoesVotos-{legislatura}.csv",
-        "filename": "votacoesVotos-{legislatura}.csv",
-        "requires_legislatura": True,
-        "requires_ano": False,
+        "url_path": "votacoesVotos/csv/votacoesVotos-{ano}.csv",
+        "filename": "votacoesVotos-{ano}.csv",
+        "requires_legislatura": False,
+        "requires_ano": True,
     },
 }
 
