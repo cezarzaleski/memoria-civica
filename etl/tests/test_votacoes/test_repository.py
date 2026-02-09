@@ -6,7 +6,7 @@ Validam operações CRUD, get_by_proposicao, get_by_votacao, e bulk operations.
 from datetime import datetime
 
 from src.votacoes.models import Votacao, Voto
-from src.votacoes.schemas import ResultadoVotacao, TipoVoto, VotacaoCreate, VotoCreate
+from src.votacoes.schemas import VotacaoCreate, VotoCreate
 
 
 class TestVotacaoRepository:
@@ -18,7 +18,7 @@ class TestVotacaoRepository:
             id=1,
             proposicao_id=123,
             data_hora=datetime(2024, 1, 15, 14, 30, 0),
-            resultado=ResultadoVotacao.APROVADO,
+            resultado="APROVADO",
         )
 
         resultado = votacao_repository.create(votacao_create)
@@ -26,7 +26,7 @@ class TestVotacaoRepository:
         assert resultado.id == 1
         assert resultado.proposicao_id == 123
         assert resultado.data_hora == datetime(2024, 1, 15, 14, 30, 0)
-        assert resultado.resultado == ResultadoVotacao.APROVADO
+        assert resultado.resultado == "APROVADO"
 
         # Verificar que foi persistida no banco
         from_db = db_session.query(Votacao).filter(Votacao.id == 1).first()
@@ -40,7 +40,7 @@ class TestVotacaoRepository:
             id=2,
             proposicao_id=456,
             data_hora=datetime(2024, 1, 16, 10, 15, 0),
-            resultado=ResultadoVotacao.REJEITADO,
+            resultado="REJEITADO",
         )
         votacao_repository.create(votacao_create)
 
@@ -50,7 +50,7 @@ class TestVotacaoRepository:
         assert resultado is not None
         assert resultado.id == 2
         assert resultado.proposicao_id == 456
-        assert resultado.resultado == ResultadoVotacao.REJEITADO
+        assert resultado.resultado == "REJEITADO"
 
     def test_get_by_id_returns_none_for_nonexistent(self, votacao_repository):
         """Test: get_by_id() retorna None para id inexistente."""
@@ -65,19 +65,19 @@ class TestVotacaoRepository:
                 id=100,
                 proposicao_id=111,
                 data_hora=datetime(2024, 1, 15, 14, 30, 0),
-                resultado=ResultadoVotacao.APROVADO,
+                resultado="APROVADO",
             ),
             VotacaoCreate(
                 id=101,
                 proposicao_id=111,
                 data_hora=datetime(2024, 1, 16, 10, 15, 0),
-                resultado=ResultadoVotacao.REJEITADO,
+                resultado="REJEITADO",
             ),
             VotacaoCreate(
                 id=102,
                 proposicao_id=222,
                 data_hora=datetime(2024, 1, 17, 16, 45, 0),
-                resultado=ResultadoVotacao.APROVADO,
+                resultado="APROVADO",
             ),
         ]
         for v in votacoes:
@@ -96,13 +96,13 @@ class TestVotacaoRepository:
                 id=200,
                 proposicao_id=100,
                 data_hora=datetime(2024, 1, 15, 14, 30, 0),
-                resultado=ResultadoVotacao.APROVADO,
+                resultado="APROVADO",
             ),
             VotacaoCreate(
                 id=201,
                 proposicao_id=101,
                 data_hora=datetime(2024, 1, 16, 10, 15, 0),
-                resultado=ResultadoVotacao.REJEITADO,
+                resultado="REJEITADO",
             ),
         ]
         for v in votacoes:
@@ -121,13 +121,13 @@ class TestVotacaoRepository:
                 id=300,
                 proposicao_id=1,
                 data_hora=datetime(2024, 1, 15, 14, 30, 0),
-                resultado=ResultadoVotacao.APROVADO,
+                resultado="APROVADO",
             ),
             VotacaoCreate(
                 id=301,
                 proposicao_id=2,
                 data_hora=datetime(2024, 1, 16, 10, 15, 0),
-                resultado=ResultadoVotacao.REJEITADO,
+                resultado="REJEITADO",
             ),
         ]
 
@@ -146,7 +146,7 @@ class TestVotacaoRepository:
                 id=400,
                 proposicao_id=1,
                 data_hora=datetime(2024, 1, 15, 14, 30, 0),
-                resultado=ResultadoVotacao.APROVADO,
+                resultado="APROVADO",
             ),
         ]
 
@@ -169,7 +169,7 @@ class TestVotacaoRepository:
             id=500,
             proposicao_id=1,
             data_hora=datetime(2024, 1, 15, 14, 30, 0),
-            resultado=ResultadoVotacao.APROVADO,
+            resultado="APROVADO",
         )
         votacao_repository.create(votacao_create)
 
@@ -197,7 +197,7 @@ class TestVotoRepository:
             id=1,
             votacao_id=123,
             deputado_id=456,
-            voto=TipoVoto.SIM,
+            voto="SIM",
         )
 
         resultado = voto_repository.create(voto_create)
@@ -205,7 +205,7 @@ class TestVotoRepository:
         assert resultado.id == 1
         assert resultado.votacao_id == 123
         assert resultado.deputado_id == 456
-        assert resultado.voto == TipoVoto.SIM
+        assert resultado.voto == "SIM"
 
         # Verificar que foi persistido no banco
         from_db = db_session.query(Voto).filter(Voto.id == 1).first()
@@ -219,7 +219,7 @@ class TestVotoRepository:
             id=2,
             votacao_id=456,
             deputado_id=789,
-            voto=TipoVoto.NAO,
+            voto="NAO",
         )
         voto_repository.create(voto_create)
 
@@ -229,7 +229,7 @@ class TestVotoRepository:
         assert resultado is not None
         assert resultado.id == 2
         assert resultado.votacao_id == 456
-        assert resultado.voto == TipoVoto.NAO
+        assert resultado.voto == "NAO"
 
     def test_get_by_id_returns_none_for_nonexistent(self, voto_repository):
         """Test: get_by_id() retorna None para id inexistente."""
@@ -240,9 +240,9 @@ class TestVotoRepository:
         """Test: get_by_votacao() retorna votos de uma votação."""
         # Criar votos para diferentes votações
         votos = [
-            VotoCreate(id=100, votacao_id=111, deputado_id=1, voto=TipoVoto.SIM),
-            VotoCreate(id=101, votacao_id=111, deputado_id=2, voto=TipoVoto.NAO),
-            VotoCreate(id=102, votacao_id=222, deputado_id=3, voto=TipoVoto.ABSTENCAO),
+            VotoCreate(id=100, votacao_id=111, deputado_id=1, voto="SIM"),
+            VotoCreate(id=101, votacao_id=111, deputado_id=2, voto="NAO"),
+            VotoCreate(id=102, votacao_id=222, deputado_id=3, voto="ABSTENCAO"),
         ]
         for v in votos:
             voto_repository.create(v)
@@ -257,9 +257,9 @@ class TestVotoRepository:
         """Test: get_by_deputado() retorna votos de um deputado."""
         # Criar votos de diferentes deputados
         votos = [
-            VotoCreate(id=200, votacao_id=1, deputado_id=555, voto=TipoVoto.SIM),
-            VotoCreate(id=201, votacao_id=2, deputado_id=555, voto=TipoVoto.NAO),
-            VotoCreate(id=202, votacao_id=3, deputado_id=666, voto=TipoVoto.ABSTENCAO),
+            VotoCreate(id=200, votacao_id=1, deputado_id=555, voto="SIM"),
+            VotoCreate(id=201, votacao_id=2, deputado_id=555, voto="NAO"),
+            VotoCreate(id=202, votacao_id=3, deputado_id=666, voto="ABSTENCAO"),
         ]
         for v in votos:
             voto_repository.create(v)
@@ -273,8 +273,8 @@ class TestVotoRepository:
     def test_get_all_returns_all_votos(self, voto_repository):
         """Test: get_all() retorna todos os votos."""
         votos = [
-            VotoCreate(id=300, votacao_id=1, deputado_id=1, voto=TipoVoto.SIM),
-            VotoCreate(id=301, votacao_id=2, deputado_id=2, voto=TipoVoto.NAO),
+            VotoCreate(id=300, votacao_id=1, deputado_id=1, voto="SIM"),
+            VotoCreate(id=301, votacao_id=2, deputado_id=2, voto="NAO"),
         ]
         for v in votos:
             voto_repository.create(v)
@@ -288,9 +288,9 @@ class TestVotoRepository:
     def test_bulk_insert_inserts_multiple(self, voto_repository):
         """Test: bulk_insert() insere múltiplos votos."""
         votos = [
-            VotoCreate(id=400, votacao_id=1, deputado_id=1, voto=TipoVoto.SIM),
-            VotoCreate(id=401, votacao_id=1, deputado_id=2, voto=TipoVoto.NAO),
-            VotoCreate(id=402, votacao_id=1, deputado_id=3, voto=TipoVoto.ABSTENCAO),
+            VotoCreate(id=400, votacao_id=1, deputado_id=1, voto="SIM"),
+            VotoCreate(id=401, votacao_id=1, deputado_id=2, voto="NAO"),
+            VotoCreate(id=402, votacao_id=1, deputado_id=3, voto="ABSTENCAO"),
         ]
 
         count = voto_repository.bulk_insert(votos)
@@ -308,7 +308,7 @@ class TestVotoRepository:
             id=500,
             votacao_id=1,
             deputado_id=1,
-            voto=TipoVoto.SIM,
+            voto="SIM",
         )
         voto_repository.create(voto_create)
 

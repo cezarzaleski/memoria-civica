@@ -280,13 +280,13 @@ def load_votacoes(
         Quantidade de votações inseridas/atualizadas
 
     Examples:
-        >>> from src.votacoes.schemas import VotacaoCreate, ResultadoVotacao
+        >>> from src.votacoes.schemas import VotacaoCreate
         >>> from datetime import datetime
         >>> votacoes = [
         ...     VotacaoCreate(
         ...         id=1, proposicao_id=123,
         ...         data_hora=datetime(2024, 1, 15, 14, 30, 0),
-        ...         resultado=ResultadoVotacao.APROVADO
+        ...         resultado="APROVADO"
         ...     ),
         ... ]
         >>> count = load_votacoes(votacoes)
@@ -326,11 +326,11 @@ def load_votos(
         Quantidade de votos inseridos
 
     Examples:
-        >>> from src.votacoes.schemas import VotoCreate, TipoVoto
+        >>> from src.votacoes.schemas import VotoCreate
         >>> votos = [
         ...     VotoCreate(
         ...         id=1, votacao_id=123, deputado_id=456,
-        ...         voto=TipoVoto.SIM
+        ...         voto="SIM"
         ...     ),
         ... ]
         >>> count = load_votos(votos)

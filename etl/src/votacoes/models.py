@@ -4,40 +4,10 @@ Define as tabelas votacoes e votos com campos essenciais para persistência
 e relacionamentos com Proposições e Deputados.
 """
 
-import enum
-
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from src.shared.database import Base
-
-
-class ResultadoVotacao(str, enum.Enum):
-    """Enum para os possíveis resultados de uma votação.
-
-    Attributes:
-        APROVADO: Votação foi aprovada
-        REJEITADO: Votação foi rejeitada
-    """
-
-    APROVADO = "APROVADO"
-    REJEITADO = "REJEITADO"
-
-
-class TipoVoto(str, enum.Enum):
-    """Enum para os possíveis tipos de voto.
-
-    Attributes:
-        SIM: Voto a favor
-        NAO: Voto contra
-        ABSTENCAO: Voto em abstenção
-        OBSTRUCAO: Voto de obstrução
-    """
-
-    SIM = "SIM"
-    NAO = "NAO"
-    ABSTENCAO = "ABSTENCAO"
-    OBSTRUCAO = "OBSTRUCAO"
 
 
 class Votacao(Base):
@@ -50,7 +20,7 @@ class Votacao(Base):
         id: Identificador único da votação (chave primária)
         proposicao_id: ID da proposição votada (FK para proposicoes.id, obrigatório)
         data_hora: Data e hora da votação (ISO 8601)
-        resultado: Resultado da votação (APROVADO ou REJEITADO)
+        resultado: Resultado da votação (ex: APROVADO, REJEITADO)
         proposicao: Relacionamento com Proposicao (lazy loading)
         votos: Relacionamento com Voto (lazy loading, one-to-many)
     """
@@ -65,7 +35,7 @@ class Votacao(Base):
         index=True,
     )
     data_hora = Column(DateTime, nullable=False, index=True)
-    resultado = Column(Enum(ResultadoVotacao), nullable=False)
+    resultado = Column(String(20), nullable=False)
 
     # Relacionamentos
     proposicao = relationship("Proposicao", foreign_keys=[proposicao_id])
@@ -75,7 +45,7 @@ class Votacao(Base):
         """Representação string do modelo."""
         return (
             f"<Votacao(id={self.id}, proposicao_id={self.proposicao_id}, "
-            f"data_hora={self.data_hora}, resultado='{self.resultado.value}')>"
+            f"data_hora={self.data_hora}, resultado='{self.resultado}')>"
         )
 
 
@@ -88,7 +58,7 @@ class Voto(Base):
         id: Identificador único do voto (chave primária)
         votacao_id: ID da votação em que o voto foi registrado (FK para votacoes.id, obrigatório)
         deputado_id: ID do deputado que votou (FK para deputados.id, obrigatório)
-        voto: Tipo de voto (SIM, NAO, ABSTENCAO, OBSTRUCAO)
+        voto: Tipo de voto (ex: SIM, NAO, ABSTENCAO, OBSTRUCAO)
         votacao: Relacionamento com Votacao (lazy loading)
         deputado: Relacionamento com Deputado (lazy loading)
     """
@@ -108,7 +78,7 @@ class Voto(Base):
         nullable=False,
         index=True,
     )
-    voto = Column(Enum(TipoVoto), nullable=False)
+    voto = Column(String(20), nullable=False)
 
     # Relacionamentos
     votacao = relationship("Votacao", back_populates="votos", foreign_keys=[votacao_id])
@@ -118,5 +88,5 @@ class Voto(Base):
         """Representação string do modelo."""
         return (
             f"<Voto(id={self.id}, votacao_id={self.votacao_id}, "
-            f"deputado_id={self.deputado_id}, voto='{self.voto.value}')>"
+            f"deputado_id={self.deputado_id}, voto='{self.voto}')>"
         )

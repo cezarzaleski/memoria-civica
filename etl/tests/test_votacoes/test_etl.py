@@ -23,7 +23,7 @@ from src.votacoes.etl import (
     transform_votos,
 )
 from src.votacoes.models import Votacao, Voto
-from src.votacoes.schemas import ResultadoVotacao, TipoVoto, VotacaoCreate, VotoCreate
+from src.votacoes.schemas import VotacaoCreate, VotoCreate
 
 
 class TestExtractVotacoesCsv:
@@ -98,7 +98,7 @@ class TestTransformVotacoes:
 
         assert len(result) > 0
         assert isinstance(result[0], VotacaoCreate)
-        assert result[0].resultado == ResultadoVotacao.APROVADO
+        assert result[0].resultado == "APROVADO"
 
     def test_transform_votacoes_skips_invalid_datetime(self, caplog):
         """Test: transform_votacoes() pula dados com datetime inválida."""
@@ -191,7 +191,7 @@ class TestTransformVotos:
 
         assert len(result) > 0
         assert isinstance(result[0], VotoCreate)
-        assert result[0].voto == TipoVoto.SIM
+        assert result[0].voto == "SIM"
 
     def test_transform_votos_validates_all_voto_types(self):
         """Test: transform_votos() valida todos os tipos de voto."""
@@ -205,10 +205,10 @@ class TestTransformVotos:
         result = transform_votos(raw_data)
 
         assert len(result) == 4
-        assert result[0].voto == TipoVoto.SIM
-        assert result[1].voto == TipoVoto.NAO
-        assert result[2].voto == TipoVoto.ABSTENCAO
-        assert result[3].voto == TipoVoto.OBSTRUCAO
+        assert result[0].voto == "SIM"
+        assert result[1].voto == "NAO"
+        assert result[2].voto == "ABSTENCAO"
+        assert result[3].voto == "OBSTRUCAO"
 
     def test_transform_votos_validates_fk_with_db(self, db_session):
         """Test: transform_votos() com db valida FKs votacao_id e deputado_id."""
@@ -217,7 +217,7 @@ class TestTransformVotos:
             id=789,
             proposicao_id=1,
             data_hora=datetime(2024, 1, 15, 14, 30, 0),
-            resultado=ResultadoVotacao.APROVADO,
+            resultado="APROVADO",
         )
         db_votacao = Votacao(**votacao_create.model_dump())
         db_session.add(db_votacao)
@@ -281,7 +281,7 @@ class TestLoadVotacoes:
                 id=500,
                 proposicao_id=1,
                 data_hora=datetime(2024, 1, 15, 14, 30, 0),
-                resultado=ResultadoVotacao.APROVADO,
+                resultado="APROVADO",
             )
         ]
 
@@ -310,13 +310,13 @@ class TestLoadVotos:
                 id=600,
                 votacao_id=1,
                 deputado_id=1,
-                voto=TipoVoto.SIM,
+                voto="SIM",
             ),
             VotoCreate(
                 id=601,
                 votacao_id=1,
                 deputado_id=2,
-                voto=TipoVoto.NAO,
+                voto="NAO",
             ),
         ]
 

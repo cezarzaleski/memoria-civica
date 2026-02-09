@@ -8,7 +8,6 @@ Create Date: 2026-01-23 19:46:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -18,21 +17,15 @@ down_revision: str | Sequence[str] | None = "003"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# Define enum type
-tipovoto_enum = postgresql.ENUM("SIM", "NAO", "ABSTENCAO", "OBSTRUCAO", name="tipovoto", create_type=False)
-
 
 def upgrade() -> None:
     """Upgrade schema - criar tabela votos com FKs para votacoes e deputados."""
-    # Create enum type if it doesn't exist
-    tipovoto_enum.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "votos",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("votacao_id", sa.Integer(), nullable=False),
         sa.Column("deputado_id", sa.Integer(), nullable=False),
-        sa.Column("voto", tipovoto_enum, nullable=False),
+        sa.Column("voto", sa.String(20), nullable=False),
         sa.ForeignKeyConstraint(["votacao_id"], ["votacoes.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["deputado_id"], ["deputados.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -48,5 +41,3 @@ def downgrade() -> None:
     op.drop_index("ix_votos_votacao_id", table_name="votos")
     op.drop_index("ix_votos_id", table_name="votos")
     op.drop_table("votos")
-    # Drop enum type
-    tipovoto_enum.drop(op.get_bind(), checkfirst=True)
