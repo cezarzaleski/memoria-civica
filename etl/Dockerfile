@@ -20,6 +20,8 @@ RUN poetry config virtualenvs.create false && \
 # Copiar código fonte
 COPY src/ ./src/
 COPY scripts/ ./scripts/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
 # Variáveis de ambiente padrão
 ENV PYTHONUNBUFFERED=1

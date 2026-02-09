@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Pipeline completo: Download + ETL.
+"""Pipeline completo: Migrations + Download + ETL.
 
 Este script é o ponto de entrada principal para o container Docker.
 Executa o pipeline completo:
-1. Download dos CSVs da Câmara dos Deputados
-2. ETL: deputados → proposições → votações
+1. Migrations do banco de dados (Alembic)
+2. Download dos CSVs da Câmara dos Deputados
+3. ETL: deputados → proposições → votações
 
 Example:
     python scripts/run_full_etl.py
 
 Exit codes:
     0: Sucesso - pipeline completo executado sem erros
-    1: Falha - erro em download ou ETL
+    1: Falha - erro em migrations, download ou ETL
 """
 
 import logging
+import subprocess
 import sys
 import time
 from functools import wraps
@@ -108,6 +110,41 @@ def run_votacoes_etl_with_retry(votacoes_csv: str, votos_csv: str) -> int:
     return run_votacoes_etl(votacoes_csv, votos_csv)
 
 
+def run_migrations() -> int:
+    """Executa migrations do banco de dados via Alembic.
+
+    Returns:
+        Exit code (0 sucesso, 1 falha)
+    """
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("FASE 0: Migrations do banco de dados")
+    logger.info("=" * 60)
+
+    try:
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            cwd=ETL_DIR,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.stdout:
+            for line in result.stdout.strip().split("\n"):
+                logger.info(f"  {line}")
+
+        if result.returncode != 0:
+            logger.error(f"Migrations falharam: {result.stderr}")
+            return 1
+
+        logger.info("✓ Migrations executadas com sucesso")
+        return 0
+
+    except Exception as e:
+        logger.error(f"Erro ao executar migrations: {e}")
+        return 1
+
+
 def run_download() -> int:
     """Executa download dos arquivos da Câmara.
 
@@ -116,7 +153,7 @@ def run_download() -> int:
     """
     logger.info("")
     logger.info("=" * 60)
-    logger.info("FASE 0: Download dos arquivos da Câmara")
+    logger.info("FASE 1: Download dos arquivos da Câmara")
     logger.info("=" * 60)
 
     stats = download_all_files(data_dir=settings.TEMP_DOWNLOAD_DIR)
@@ -146,9 +183,9 @@ def run_etl(data_dir: Path) -> int:
 
         start_time = time.time()
 
-        # Fase 1: Deputados
+        # Fase 2: Deputados
         logger.info("")
-        logger.info("FASE 1/3: Deputados (sem dependências)")
+        logger.info("FASE 2/4: Deputados (sem dependências)")
         logger.info("-" * 60)
         phase_start = time.time()
 
@@ -164,11 +201,11 @@ def run_etl(data_dir: Path) -> int:
             return 1
 
         phase_time = time.time() - phase_start
-        logger.info(f"✓ Fase 1 concluída em {phase_time:.2f}s")
+        logger.info(f"✓ Fase 2 concluída em {phase_time:.2f}s")
 
-        # Fase 2: Proposições
+        # Fase 3: Proposições
         logger.info("")
-        logger.info("FASE 2/3: Proposições (depende de deputados)")
+        logger.info("FASE 3/4: Proposições (depende de deputados)")
         logger.info("-" * 60)
         phase_start = time.time()
 
@@ -185,11 +222,11 @@ def run_etl(data_dir: Path) -> int:
             return 1
 
         phase_time = time.time() - phase_start
-        logger.info(f"✓ Fase 2 concluída em {phase_time:.2f}s")
+        logger.info(f"✓ Fase 3 concluída em {phase_time:.2f}s")
 
-        # Fase 3: Votações
+        # Fase 4: Votações
         logger.info("")
-        logger.info("FASE 3/3: Votações (depende de proposições e deputados)")
+        logger.info("FASE 4/4: Votações (depende de proposições e deputados)")
         logger.info("-" * 60)
         phase_start = time.time()
 
@@ -211,7 +248,7 @@ def run_etl(data_dir: Path) -> int:
             return 1
 
         phase_time = time.time() - phase_start
-        logger.info(f"✓ Fase 3 concluída em {phase_time:.2f}s")
+        logger.info(f"✓ Fase 4 concluída em {phase_time:.2f}s")
 
         # Resumo final
         total_time = time.time() - start_time
@@ -245,12 +282,17 @@ def main() -> int:
 
     start_time = time.time()
 
-    # Fase 0: Download
+    # Fase 0: Migrations
+    result = run_migrations()
+    if result != 0:
+        return 1
+
+    # Fase 1: Download
     result = run_download()
     if result != 0:
         return 1
 
-    # Fases 1-3: ETL
+    # Fases 2-4: ETL
     result = run_etl(settings.TEMP_DOWNLOAD_DIR)
     if result != 0:
         return 1
