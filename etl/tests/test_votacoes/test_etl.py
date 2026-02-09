@@ -38,14 +38,14 @@ class TestExtractVotacoesCsv:
         assert isinstance(data[0], dict)
 
     def test_extract_votacoes_has_expected_columns(self, votacoes_csv_path):
-        """Test: extract votacoes retorna dicts com colunas esperadas."""
+        """Test: extract votacoes retorna dicts com colunas do formato Câmara."""
         data = extract_votacoes_csv(votacoes_csv_path)
 
         first_record = data[0]
         assert "id" in first_record
-        assert "proposicao_id" in first_record
-        assert "data_hora" in first_record
-        assert "resultado" in first_record
+        assert "ultimaApresentacaoProposicao_idProposicao" in first_record
+        assert "dataHoraRegistro" in first_record
+        assert "aprovacao" in first_record
 
     def test_extract_votacoes_file_not_found(self):
         """Test: extract_votacoes_csv() lança FileNotFoundError se arquivo não existe."""
@@ -65,12 +65,11 @@ class TestExtractVotosCsv:
         assert isinstance(data[0], dict)
 
     def test_extract_votos_has_expected_columns(self, votos_csv_path):
-        """Test: extract votos retorna dicts com colunas esperadas."""
+        """Test: extract votos retorna dicts com colunas do formato Câmara."""
         data = extract_votos_csv(votos_csv_path)
 
         first_record = data[0]
-        assert "id" in first_record
-        assert "votacao_id" in first_record
+        assert "idVotacao" in first_record
         assert "deputado_id" in first_record
         assert "voto" in first_record
 
@@ -84,13 +83,14 @@ class TestTransformVotacoes:
     """Testes para transform_votacoes."""
 
     def test_transform_votacoes_validates_correct_data(self):
-        """Test: transform_votacoes() valida dados corretos."""
+        """Test: transform_votacoes() valida dados corretos com formato Câmara."""
         raw_data = [
             {
-                "id": "1",
-                "proposicao_id": "123",
-                "data_hora": "2024-01-15T14:30:00",
-                "resultado": "APROVADO",
+                "id": "123-1",
+                "ultimaApresentacaoProposicao_idProposicao": "123",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+                "descricao": "Aprovado o projeto",
             }
         ]
 
@@ -99,15 +99,16 @@ class TestTransformVotacoes:
         assert len(result) > 0
         assert isinstance(result[0], VotacaoCreate)
         assert result[0].resultado == "APROVADO"
+        assert result[0].id == 123  # Extraído do "123-1"
 
     def test_transform_votacoes_skips_invalid_datetime(self, caplog):
         """Test: transform_votacoes() pula dados com datetime inválida."""
         raw_data = [
             {
-                "id": "2",
-                "proposicao_id": "123",
-                "data_hora": "INVALIDO",  # datetime inválida
-                "resultado": "APROVADO",
+                "id": "2-1",
+                "ultimaApresentacaoProposicao_idProposicao": "123",
+                "dataHoraRegistro": "INVALIDO",  # datetime inválida
+                "aprovacao": "1",
             }
         ]
 
@@ -121,10 +122,10 @@ class TestTransformVotacoes:
         """Test: transform_votacoes() sem db não valida FK."""
         raw_data = [
             {
-                "id": "3",
-                "proposicao_id": "999999",  # ID que não existe
-                "data_hora": "2024-01-15T14:30:00",
-                "resultado": "APROVADO",
+                "id": "3-1",
+                "ultimaApresentacaoProposicao_idProposicao": "999999",  # ID que não existe
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
             }
         ]
 
@@ -149,10 +150,10 @@ class TestTransformVotacoes:
         # Testar com proposicao_id válida
         raw_data_valid = [
             {
-                "id": "4",
-                "proposicao_id": "456",
-                "data_hora": "2024-01-15T14:30:00",
-                "resultado": "APROVADO",
+                "id": "4-1",
+                "ultimaApresentacaoProposicao_idProposicao": "456",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
             }
         ]
 
@@ -162,10 +163,10 @@ class TestTransformVotacoes:
         # Testar com proposicao_id inválida
         raw_data_invalid = [
             {
-                "id": "5",
-                "proposicao_id": "999999",  # Não existe
-                "data_hora": "2024-01-15T14:30:00",
-                "resultado": "APROVADO",
+                "id": "5-1",
+                "ultimaApresentacaoProposicao_idProposicao": "999999",  # Não existe
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
             }
         ]
 
@@ -177,13 +178,12 @@ class TestTransformVotos:
     """Testes para transform_votos."""
 
     def test_transform_votos_validates_correct_data(self):
-        """Test: transform_votos() valida dados corretos."""
+        """Test: transform_votos() valida dados corretos com formato Câmara."""
         raw_data = [
             {
-                "id": "1",
-                "votacao_id": "123",
+                "idVotacao": "123-1",
                 "deputado_id": "456",
-                "voto": "SIM",
+                "voto": "Sim",
             }
         ]
 
@@ -191,15 +191,16 @@ class TestTransformVotos:
 
         assert len(result) > 0
         assert isinstance(result[0], VotoCreate)
-        assert result[0].voto == "SIM"
+        assert result[0].voto == "SIM"  # Normalizado para maiúsculas
+        assert result[0].votacao_id == 123  # Extraído do "123-1"
 
     def test_transform_votos_validates_all_voto_types(self):
-        """Test: transform_votos() valida todos os tipos de voto."""
+        """Test: transform_votos() valida todos os tipos de voto e normaliza."""
         raw_data = [
-            {"id": "1", "votacao_id": "1", "deputado_id": "1", "voto": "SIM"},
-            {"id": "2", "votacao_id": "1", "deputado_id": "2", "voto": "NAO"},
-            {"id": "3", "votacao_id": "1", "deputado_id": "3", "voto": "ABSTENCAO"},
-            {"id": "4", "votacao_id": "1", "deputado_id": "4", "voto": "OBSTRUCAO"},
+            {"idVotacao": "1-1", "deputado_id": "1", "voto": "Sim"},
+            {"idVotacao": "1-1", "deputado_id": "2", "voto": "Não"},
+            {"idVotacao": "1-1", "deputado_id": "3", "voto": "Abstenção"},
+            {"idVotacao": "1-1", "deputado_id": "4", "voto": "Obstrução"},
         ]
 
         result = transform_votos(raw_data)
@@ -231,13 +232,12 @@ class TestTransformVotos:
         dep_repo = DeputadoRepository(db_session)
         dep_repo.create(deputado_create)
 
-        # Testar com FKs válidas
+        # Testar com FKs válidas (formato Câmara)
         raw_data_valid = [
             {
-                "id": "5",
-                "votacao_id": "789",
+                "idVotacao": "789-1",
                 "deputado_id": "999",
-                "voto": "SIM",
+                "voto": "Sim",
             }
         ]
 
@@ -247,10 +247,9 @@ class TestTransformVotos:
         # Testar com votacao_id inválida
         raw_data_invalid_votacao = [
             {
-                "id": "6",
-                "votacao_id": "999999",  # Não existe
+                "idVotacao": "999999-1",  # Não existe
                 "deputado_id": "999",
-                "voto": "SIM",
+                "voto": "Sim",
             }
         ]
 
@@ -260,10 +259,9 @@ class TestTransformVotos:
         # Testar com deputado_id inválida
         raw_data_invalid_deputado = [
             {
-                "id": "7",
-                "votacao_id": "789",
+                "idVotacao": "789-1",
                 "deputado_id": "999999",  # Não existe
-                "voto": "SIM",
+                "voto": "Sim",
             }
         ]
 

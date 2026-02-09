@@ -111,6 +111,13 @@ def transform_votacoes(
     erros de validação e logando warnings para dados inválidos.
     Também valida que proposicao_id existe no banco (FK validation).
 
+    O CSV da Câmara usa os seguintes campos:
+    - id: ID da votação (string como "2458405-38", extraímos parte numérica)
+    - dataHoraRegistro: Data/hora no formato ISO 8601
+    - ultimaApresentacaoProposicao_idProposicao: ID da proposição votada
+    - aprovacao: 1 se aprovado, 0 se rejeitado
+    - descricao: Descrição textual do resultado
+
     Args:
         raw_data: Lista de dicionários com dados brutos do CSV
         db: Sessão de banco para validação de FK
@@ -121,10 +128,10 @@ def transform_votacoes(
     Examples:
         >>> raw = [
         ...     {
-        ...         "id": "1",
-        ...         "proposicao_id": "123",
-        ...         "data_hora": "2024-01-15T14:30:00",
-        ...         "resultado": "Aprovado"
+        ...         "id": "2458405-38",
+        ...         "ultimaApresentacaoProposicao_idProposicao": "123",
+        ...         "dataHoraRegistro": "2024-01-15T14:30:00",
+        ...         "aprovacao": "1"
         ...     }
         ... ]
         >>> transformed = transform_votacoes(raw)
@@ -136,10 +143,35 @@ def transform_votacoes(
 
     for idx, record in enumerate(raw_data, 1):
         try:
-            votacao_id = int(record.get("id", idx)) if record.get("id") else idx
-            proposicao_id = int(record.get("proposicao_id", 0)) if record.get("proposicao_id") else 0
-            data_hora_str = record.get("data_hora", "").strip()
-            resultado = record.get("resultado", "").strip()
+            # Extrair ID da votação (formato "2458405-38" → extrair número antes do hífen)
+            raw_id = record.get("id", "")
+            if raw_id and "-" in raw_id:
+                votacao_id = int(raw_id.split("-")[0])
+            elif raw_id:
+                votacao_id = int(raw_id)
+            else:
+                votacao_id = idx
+
+            # Extrair proposicao_id do campo correto
+            prop_id_str = record.get("ultimaApresentacaoProposicao_idProposicao", "")
+            proposicao_id = int(prop_id_str) if prop_id_str and prop_id_str != "0" else 0
+
+            # Data/hora do registro
+            data_hora_str = record.get("dataHoraRegistro", "").strip()
+
+            # Resultado: usar aprovacao (1/0) ou derivar da descrição
+            aprovacao = record.get("aprovacao", "")
+            descricao = record.get("descricao", "").strip()
+            if aprovacao == "1":
+                resultado = "APROVADO"
+            elif aprovacao == "0":
+                resultado = "REJEITADO"
+            elif "aprovad" in descricao.lower():
+                resultado = "APROVADO"
+            elif "rejeitad" in descricao.lower():
+                resultado = "REJEITADO"
+            else:
+                resultado = descricao[:20] if descricao else "INDEFINIDO"
 
             # Parse datetime
             if data_hora_str:
@@ -154,6 +186,12 @@ def transform_votacoes(
                 skipped += 1
                 continue
 
+            # Skip votações sem proposição associada
+            if proposicao_id == 0:
+                logger.debug(f"Votação {idx}: sem proposicao_id associada, pulando")
+                skipped += 1
+                continue
+
             # Validar FK proposicao_id se db foi fornecido
             if db is not None and proposicao_id > 0:
                 from src.proposicoes.models import Proposicao
@@ -161,7 +199,7 @@ def transform_votacoes(
                 stmt = select(Proposicao).where(Proposicao.id == proposicao_id)
                 prop_exists = db.execute(stmt).scalar_one_or_none()
                 if not prop_exists:
-                    logger.warning(f"Votação {idx}: proposicao_id {proposicao_id} não existe no banco")
+                    logger.debug(f"Votação {idx}: proposicao_id {proposicao_id} não existe no banco")
                     skipped += 1
                     continue
 
@@ -194,6 +232,11 @@ def transform_votos(
     erros de validação e logando warnings para dados inválidos.
     Também valida que votacao_id e deputado_id existem no banco (FK validation).
 
+    O CSV da Câmara usa os seguintes campos:
+    - idVotacao: ID da votação (string como "106701-223", extraímos parte numérica)
+    - deputado_id: ID do deputado
+    - voto: Tipo de voto (Sim, Não, Abstenção, etc.)
+
     Args:
         raw_data: Lista de dicionários com dados brutos do CSV
         db: Sessão de banco para validação de FK
@@ -204,8 +247,7 @@ def transform_votos(
     Examples:
         >>> raw = [
         ...     {
-        ...         "id": "1",
-        ...         "votacao_id": "123",
+        ...         "idVotacao": "106701-223",
         ...         "deputado_id": "456",
         ...         "voto": "Sim"
         ...     }
@@ -216,20 +258,55 @@ def transform_votos(
     """
     validated = []
     skipped = 0
+    skipped_votacao = 0
+    skipped_deputado = 0
 
     for idx, record in enumerate(raw_data, 1):
         try:
-            voto_id = int(record.get("id", idx)) if record.get("id") else idx
-            votacao_id = int(record.get("votacao_id", 0)) if record.get("votacao_id") else 0
-            deputado_id = int(record.get("deputado_id", 0)) if record.get("deputado_id") else 0
+            # ID do voto: usar índice já que não existe coluna específica
+            voto_id = idx
+
+            # Extrair votacao_id do campo idVotacao (formato "106701-223" → parte numérica antes do hífen)
+            raw_votacao_id = record.get("idVotacao", "") or record.get("votacao_id", "")
+            if raw_votacao_id and "-" in str(raw_votacao_id):
+                votacao_id = int(str(raw_votacao_id).split("-")[0])
+            elif raw_votacao_id:
+                votacao_id = int(raw_votacao_id)
+            else:
+                votacao_id = 0
+
+            # deputado_id - campo existe no CSV
+            deputado_id_str = record.get("deputado_id", "")
+            deputado_id = int(deputado_id_str) if deputado_id_str else 0
+
+            # Tipo de voto - normalizar para maiúsculas
             voto_tipo = record.get("voto", "").strip()
+            # Normalizar: "Sim" → "SIM", "Não" → "NAO", etc.
+            voto_mapping = {
+                "sim": "SIM",
+                "não": "NAO",
+                "nao": "NAO",
+                "abstenção": "ABSTENCAO",
+                "abstencao": "ABSTENCAO",
+                "obstrução": "OBSTRUCAO",
+                "obstrucao": "OBSTRUCAO",
+            }
+            voto_normalizado = voto_mapping.get(voto_tipo.lower(), voto_tipo.upper())
+
+            if votacao_id == 0:
+                skipped += 1
+                continue
+
+            if deputado_id == 0:
+                skipped += 1
+                continue
 
             # Validar votacao_id existe no banco se db foi fornecido
             if db is not None and votacao_id > 0:
                 stmt = select(Votacao).where(Votacao.id == votacao_id)
                 votacao_exists = db.execute(stmt).scalar_one_or_none()
                 if not votacao_exists:
-                    logger.warning(f"Voto {idx}: votacao_id {votacao_id} não existe no banco")
+                    skipped_votacao += 1
                     skipped += 1
                     continue
 
@@ -240,7 +317,7 @@ def transform_votos(
                 stmt = select(Deputado).where(Deputado.id == deputado_id)
                 deputado_exists = db.execute(stmt).scalar_one_or_none()
                 if not deputado_exists:
-                    logger.warning(f"Voto {idx}: deputado_id {deputado_id} não existe no banco")
+                    skipped_deputado += 1
                     skipped += 1
                     continue
 
@@ -248,7 +325,7 @@ def transform_votos(
                 id=voto_id,
                 votacao_id=votacao_id,
                 deputado_id=deputado_id,
-                voto=voto_tipo,
+                voto=voto_normalizado,
             )
             validated.append(schema)
 
@@ -259,7 +336,7 @@ def transform_votos(
             logger.warning(f"Erro ao transformar voto {idx}: {e}")
             skipped += 1
 
-    logger.info(f"Transformados {len(validated)} votos (skipped: {skipped})")
+    logger.info(f"Transformados {len(validated)} votos (skipped: {skipped}, votacao_not_found: {skipped_votacao}, deputado_not_found: {skipped_deputado})")
     return validated
 
 
@@ -363,6 +440,7 @@ def run_votacoes_etl(
 
     Orquestra extract → transform → load em uma única chamada.
     Persiste votações ANTES de votos para satisfazer FK constraints.
+    Transforma e carrega votacoes ANTES de transformar votos para permitir FK validation.
 
     Args:
         votacoes_csv: Caminho para o arquivo CSV de votações
@@ -391,18 +469,20 @@ def run_votacoes_etl(
             db_context = None
 
         try:
-            # Extract
+            # Extract ambos os CSVs
             raw_votacoes = extract_votacoes_csv(votacoes_csv)
             raw_votos = extract_votos_csv(votos_csv)
 
-            # Transform com FK validation
+            # Transform e Load votações PRIMEIRO
+            # (necessário para que votos possam validar FK votacao_id)
             validated_votacoes = transform_votacoes(raw_votacoes, db)
+            votacoes_count = load_votacoes(validated_votacoes, db)
+            logger.info(f"Carregadas {votacoes_count} votações")
+
+            # Agora transform votos (com FK validation para votacao_id e deputado_id)
             validated_votos = transform_votos(raw_votos, db)
 
-            # Load votações PRIMEIRO (FK constraint ordering)
-            votacoes_count = load_votacoes(validated_votacoes, db)
-
-            # Depois load votos
+            # Load votos
             votos_count = load_votos(validated_votos, db)
 
             logger.info(
