@@ -30,7 +30,7 @@ class Proposicao(Base):
     __tablename__ = "proposicoes"
 
     id = Column(Integer, primary_key=True, index=True)
-    tipo = Column(String(10), nullable=False, index=True)
+    tipo = Column(String(20), nullable=False, index=True)
     numero = Column(Integer, nullable=False)
     ano = Column(Integer, nullable=False)
     ementa = Column(Text, nullable=False)

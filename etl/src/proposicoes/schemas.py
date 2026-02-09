@@ -4,19 +4,7 @@ Definem os DTOs (Data Transfer Objects) para criar e ler proposições,
 com validação de tipos e constraints.
 """
 
-from enum import Enum
-
 from pydantic import BaseModel, Field
-
-
-class TipoProposicao(str, Enum):
-    """Enum dos tipos válidos de proposições legislativas."""
-
-    PL = "PL"  # Projeto de Lei
-    PEC = "PEC"  # Proposta de Emenda à Constituição
-    MP = "MP"  # Medida Provisória
-    PLP = "PLP"  # Projeto de Lei Complementar
-    PDC = "PDC"  # Projeto de Decreto Legislativo
 
 
 class ProposicaoCreate(BaseModel):
@@ -26,7 +14,7 @@ class ProposicaoCreate(BaseModel):
 
     Attributes:
         id: Identificador único (obrigatório do CSV)
-        tipo: Tipo da proposição (PL, PEC, MP, PLP, PDC)
+        tipo: Tipo da proposição (PL, PEC, MP, PLP, PDC, REQ, INC, MSC, etc.)
         numero: Número sequencial da proposição
         ano: Ano de apresentação
         ementa: Descrição da proposição
@@ -42,14 +30,14 @@ class ProposicaoCreate(BaseModel):
         ...     autor_id=123
         ... )
         >>> prop.tipo
-        <TipoProposicao.PL: 'PL'>
+        'PL'
     """
 
     id: int
-    tipo: TipoProposicao = Field(description="Tipo da proposição (enum: PL, PEC, MP, PLP, PDC)")
-    numero: int = Field(ge=1, description="Número da proposição")
-    ano: int = Field(ge=1900, le=2100, description="Ano de apresentação")
-    ementa: str = Field(min_length=1, max_length=2000, description="Descrição da proposição")
+    tipo: str = Field(max_length=20, description="Tipo da proposição (PL, PEC, MP, REQ, etc.)")
+    numero: int = Field(ge=0, description="Número da proposição")
+    ano: int = Field(ge=0, le=2100, description="Ano de apresentação")
+    ementa: str = Field(default="", max_length=5000, description="Descrição da proposição")
     autor_id: int | None = Field(None, description="ID do deputado autor (opcional)")
 
     model_config = {"from_attributes": True}
@@ -70,7 +58,7 @@ class ProposicaoRead(BaseModel):
     """
 
     id: int
-    tipo: TipoProposicao
+    tipo: str
     numero: int
     ano: int
     ementa: str
