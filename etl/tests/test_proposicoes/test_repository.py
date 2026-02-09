@@ -4,7 +4,7 @@ Validam operações CRUD, get_by_tipo e bulk_upsert, incluindo idempotência.
 """
 
 from src.proposicoes.models import Proposicao
-from src.proposicoes.schemas import ProposicaoCreate, TipoProposicao
+from src.proposicoes.schemas import ProposicaoCreate
 
 
 class TestProposicaoRepository:
@@ -14,7 +14,7 @@ class TestProposicaoRepository:
         """Test: create() persiste proposição e retorna com id."""
         proposicao_create = ProposicaoCreate(
             id=1,
-            tipo=TipoProposicao.PL,
+            tipo="PL",
             numero=123,
             ano=2024,
             ementa="Lei que trata de educação pública",
@@ -40,7 +40,7 @@ class TestProposicaoRepository:
         # Criar primeiro
         proposicao_create = ProposicaoCreate(
             id=2,
-            tipo=TipoProposicao.PEC,
+            tipo="PEC",
             numero=1,
             ano=2024,
             ementa="Emenda constitucional",
@@ -66,21 +66,21 @@ class TestProposicaoRepository:
         proposicoes = [
             ProposicaoCreate(
                 id=100,
-                tipo=TipoProposicao.PL,
+                tipo="PL",
                 numero=1,
                 ano=2024,
                 ementa="Lei 1",
             ),
             ProposicaoCreate(
                 id=101,
-                tipo=TipoProposicao.PL,
+                tipo="PL",
                 numero=2,
                 ano=2024,
                 ementa="Lei 2",
             ),
             ProposicaoCreate(
                 id=102,
-                tipo=TipoProposicao.PEC,
+                tipo="PEC",
                 numero=1,
                 ano=2024,
                 ementa="Emenda",
@@ -101,21 +101,21 @@ class TestProposicaoRepository:
         proposicoes = [
             ProposicaoCreate(
                 id=200,
-                tipo=TipoProposicao.PL,
+                tipo="PL",
                 numero=100,
                 ano=2024,
                 ementa="Lei 1",
             ),
             ProposicaoCreate(
                 id=201,
-                tipo=TipoProposicao.PEC,
+                tipo="PEC",
                 numero=1,
                 ano=2024,
                 ementa="Emenda",
             ),
             ProposicaoCreate(
                 id=202,
-                tipo=TipoProposicao.MP,
+                tipo="MP",
                 numero=1,
                 ano=2024,
                 ementa="Medida provisória",
@@ -135,21 +135,21 @@ class TestProposicaoRepository:
         proposicoes = [
             ProposicaoCreate(
                 id=300,
-                tipo=TipoProposicao.PL,
+                tipo="PL",
                 numero=1,
                 ano=2024,
                 ementa="Lei 1",
             ),
             ProposicaoCreate(
                 id=301,
-                tipo=TipoProposicao.PLP,
+                tipo="PLP",
                 numero=1,
                 ano=2024,
                 ementa="Lei complementar",
             ),
             ProposicaoCreate(
                 id=302,
-                tipo=TipoProposicao.PDC,
+                tipo="PDC",
                 numero=1,
                 ano=2024,
                 ementa="Decreto legislativo",
@@ -169,14 +169,14 @@ class TestProposicaoRepository:
         proposicoes = [
             ProposicaoCreate(
                 id=400,
-                tipo=TipoProposicao.PL,
+                tipo="PL",
                 numero=50,
                 ano=2024,
                 ementa="Lei 50",
             ),
             ProposicaoCreate(
                 id=401,
-                tipo=TipoProposicao.MP,
+                tipo="MP",
                 numero=1,
                 ano=2024,
                 ementa="Medida",
@@ -200,7 +200,7 @@ class TestProposicaoRepository:
         # Inserir primeiro
         proposicao1 = ProposicaoCreate(
             id=500,
-            tipo=TipoProposicao.PL,
+            tipo="PL",
             numero=100,
             ano=2024,
             ementa="Ementa original",
@@ -210,7 +210,7 @@ class TestProposicaoRepository:
         # Bulk upsert com mesmo ID mas dados diferentes
         proposicao_atualizada = ProposicaoCreate(
             id=500,
-            tipo=TipoProposicao.PEC,
+            tipo="PEC",
             numero=200,
             ano=2025,
             ementa="Ementa atualizada",
@@ -235,7 +235,7 @@ class TestProposicaoRepository:
         # Criar
         proposicao = ProposicaoCreate(
             id=600,
-            tipo=TipoProposicao.PL,
+            tipo="PL",
             numero=1,
             ano=2024,
             ementa="Lei 1",
@@ -259,7 +259,7 @@ class TestProposicaoRepository:
         """Test: proposição sem autor (autor_id=NULL) é aceita."""
         proposicao = ProposicaoCreate(
             id=700,
-            tipo=TipoProposicao.MP,
+            tipo="MP",
             numero=1,
             ano=2024,
             ementa="Medida provisória órfã",

@@ -147,10 +147,10 @@ def load_proposicoes(
         Quantidade de proposições inseridas/atualizadas
 
     Examples:
-        >>> from src.proposicoes.schemas import ProposicaoCreate, TipoProposicao
+        >>> from src.proposicoes.schemas import ProposicaoCreate
         >>> props = [
         ...     ProposicaoCreate(
-        ...         id=1, tipo=TipoProposicao.PL, numero=123,
+        ...         id=1, tipo="PL", numero=123,
         ...         ano=2024, ementa="Lei de educação"
         ...     ),
         ... ]

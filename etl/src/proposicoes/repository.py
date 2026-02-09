@@ -44,9 +44,9 @@ class ProposicaoRepository:
             Proposicao: Instância persistida com id do banco de dados
 
         Examples:
-            >>> from src.proposicoes.schemas import ProposicaoCreate, TipoProposicao
+            >>> from src.proposicoes.schemas import ProposicaoCreate
             >>> prop_create = ProposicaoCreate(
-            ...     id=1, tipo=TipoProposicao.PL, numero=123, ano=2024,
+            ...     id=1, tipo="PL", numero=123, ano=2024,
             ...     ementa="Lei de educação", autor_id=456
             ... )
             >>> created = repo.create(prop_create)
@@ -55,7 +55,7 @@ class ProposicaoRepository:
         """
         db_proposicao = Proposicao(
             id=proposicao.id,
-            tipo=proposicao.tipo.value,
+            tipo=proposicao.tipo,
             numero=proposicao.numero,
             ano=proposicao.ano,
             ementa=proposicao.ementa,
@@ -128,14 +128,14 @@ class ProposicaoRepository:
             Quantidade de proposições inseridas/atualizadas
 
         Examples:
-            >>> from src.proposicoes.schemas import ProposicaoCreate, TipoProposicao
+            >>> from src.proposicoes.schemas import ProposicaoCreate
             >>> props = [
             ...     ProposicaoCreate(
-            ...         id=1, tipo=TipoProposicao.PL, numero=123,
+            ...         id=1, tipo="PL", numero=123,
             ...         ano=2024, ementa="Lei 1", autor_id=None
             ...     ),
             ...     ProposicaoCreate(
-            ...         id=2, tipo=TipoProposicao.PEC, numero=1,
+            ...         id=2, tipo="PEC", numero=1,
             ...         ano=2024, ementa="Emenda 1", autor_id=456
             ...     ),
             ... ]
@@ -159,7 +159,7 @@ class ProposicaoRepository:
         db_proposicoes = [
             Proposicao(
                 id=p.id,
-                tipo=p.tipo.value,
+                tipo=p.tipo,
                 numero=p.numero,
                 ano=p.ano,
                 ementa=p.ementa,

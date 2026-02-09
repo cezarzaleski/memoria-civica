@@ -74,10 +74,10 @@ class TestTransformProposicoes:
 
         assert len(result) > 0
         assert isinstance(result[0], ProposicaoCreate)
-        assert result[0].tipo.value == "PL"
+        assert result[0].tipo == "PL"
 
-    def test_transform_skips_invalid_data(self, caplog):
-        """Test: transform_proposicoes() logga warning para dados inválidos."""
+    def test_transform_accepts_various_tipos(self):
+        """Test: transform_proposicoes() aceita qualquer tipo de proposição."""
         raw_data = [
             {
                 "id": "1",
@@ -89,19 +89,29 @@ class TestTransformProposicoes:
             },
             {
                 "id": "2",
-                "tipo": "INVALIDO",  # Tipo inválido
+                "tipo": "REQ",  # Tipo não tradicional, mas válido
                 "numero": "456",
                 "ano": "2024",
-                "ementa": "Lei inválida",
+                "ementa": "Requerimento",
+                "autor_id": "",
+            },
+            {
+                "id": "3",
+                "tipo": "INC",  # Indicação
+                "numero": "789",
+                "ano": "2024",
+                "ementa": "Indicação legislativa",
                 "autor_id": "",
             },
         ]
 
-        with caplog.at_level(logging.WARNING):
-            result = transform_proposicoes(raw_data)
+        result = transform_proposicoes(raw_data)
 
-        # Pelo menos um registro deve ter sido processado
-        assert len(result) >= 1
+        # Todos os registros devem ser processados
+        assert len(result) == 3
+        assert result[0].tipo == "PL"
+        assert result[1].tipo == "REQ"
+        assert result[2].tipo == "INC"
 
     def test_transform_handles_missing_fields(self):
         """Test: transform_proposicoes() com campos faltando."""

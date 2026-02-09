@@ -6,12 +6,11 @@ para o domínio de proposições legislativas.
 
 from .models import Proposicao
 from .repository import ProposicaoRepository
-from .schemas import ProposicaoCreate, ProposicaoRead, TipoProposicao
+from .schemas import ProposicaoCreate, ProposicaoRead
 
 __all__ = [
     "Proposicao",
     "ProposicaoCreate",
     "ProposicaoRead",
     "ProposicaoRepository",
-    "TipoProposicao",
 ]
