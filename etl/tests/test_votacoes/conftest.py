@@ -6,8 +6,12 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Importar models com FK cruzada para garantir que Base.metadata.create_all()
+# consiga criar todas as tabelas necessárias (proposicoes, deputados)
+import src.deputados.models
+import src.proposicoes.models  # noqa: F401
 from src.shared.database import Base
-from src.votacoes.repository import VotacaoRepository, VotoRepository
+from src.votacoes.repository import OrientacaoRepository, VotacaoProposicaoRepository, VotacaoRepository, VotoRepository
 
 
 @pytest.fixture
@@ -64,3 +68,15 @@ def votacoes_csv_path(fixtures_dir) -> str:
 def votos_csv_path(fixtures_dir) -> str:
     """Fixture que fornece o caminho para o CSV de votos."""
     return str(fixtures_dir / "votos.csv")
+
+
+@pytest.fixture
+def votacao_proposicao_repository(db_session) -> VotacaoProposicaoRepository:
+    """Fixture que fornece um VotacaoProposicaoRepository com banco in-memory."""
+    return VotacaoProposicaoRepository(db_session)
+
+
+@pytest.fixture
+def orientacao_repository(db_session) -> OrientacaoRepository:
+    """Fixture que fornece um OrientacaoRepository com banco in-memory."""
+    return OrientacaoRepository(db_session)
