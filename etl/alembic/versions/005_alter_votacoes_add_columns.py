@@ -29,7 +29,7 @@ def upgrade() -> None:
         )
 
     # Adicionar novas colunas
-    op.add_column("votacoes", sa.Column("eh_nominal", sa.Boolean(), server_default=sa.text("0"), nullable=False))
+    op.add_column("votacoes", sa.Column("eh_nominal", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False))
     op.add_column("votacoes", sa.Column("votos_sim", sa.Integer(), server_default=sa.text("0"), nullable=False))
     op.add_column("votacoes", sa.Column("votos_nao", sa.Integer(), server_default=sa.text("0"), nullable=False))
     op.add_column("votacoes", sa.Column("votos_outros", sa.Integer(), server_default=sa.text("0"), nullable=False))
