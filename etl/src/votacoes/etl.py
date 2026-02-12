@@ -156,8 +156,12 @@ def transform_votacoes(
             prop_id_str = record.get("ultimaApresentacaoProposicao_idProposicao", "")
             proposicao_id = int(prop_id_str) if prop_id_str and prop_id_str != "0" else 0
 
-            # Data/hora do registro
+            # Data/hora do registro (fallbacks para variacoes do CSV)
             data_hora_str = record.get("dataHoraRegistro", "").strip()
+            if not data_hora_str:
+                data_hora_str = record.get("ultimaAberturaVotacao_dataHoraRegistro", "").strip()
+            if not data_hora_str:
+                data_hora_str = record.get("data", "").strip()
 
             # Resultado: usar aprovacao (1/0) ou derivar da descrição
             aprovacao = record.get("aprovacao", "")
@@ -174,9 +178,9 @@ def transform_votacoes(
                 resultado = descricao_raw[:20] if descricao_raw else "INDEFINIDO"
 
             # Extrair novos campos do CSV
-            votos_sim_str = record.get("quantidadeVotosSim", "")
-            votos_nao_str = record.get("quantidadeVotosNao", "")
-            votos_outros_str = record.get("quantidadeVotosOutros", "")
+            votos_sim_str = record.get("quantidadeVotosSim", "") or record.get("votosSim", "")
+            votos_nao_str = record.get("quantidadeVotosNao", "") or record.get("votosNao", "")
+            votos_outros_str = record.get("quantidadeVotosOutros", "") or record.get("votosOutros", "")
             sigla_orgao_raw = record.get("siglaOrgao", "").strip()
 
             try:
@@ -201,6 +205,8 @@ def transform_votacoes(
             # Parse datetime
             if data_hora_str:
                 try:
+                    if len(data_hora_str) == 10:
+                        data_hora_str = f"{data_hora_str}T00:00:00"
                     data_hora = datetime.fromisoformat(data_hora_str)
                 except ValueError:
                     logger.warning(f"Votação {idx}: data_hora inválida '{data_hora_str}'")
