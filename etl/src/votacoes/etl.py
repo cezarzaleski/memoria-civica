@@ -403,6 +403,20 @@ def load_votacoes(
         logger.info("Nenhuma votação para carregar")
         return 0
 
+    # Deduplicar por ID para evitar violação de PK quando o CSV traz repetidos
+    unique_by_id: dict[int, VotacaoCreate] = {}
+    duplicates = 0
+    for votacao in votacoes:
+        if votacao.id in unique_by_id:
+            duplicates += 1
+        unique_by_id[votacao.id] = votacao
+    if duplicates:
+        logger.warning(
+            "Votações duplicadas no input: %s (mantendo último registro por id)",
+            duplicates,
+        )
+    votacoes = list(unique_by_id.values())
+
     # Se db não foi fornecido, usar get_db()
     if db is None:
         with get_db() as db:
