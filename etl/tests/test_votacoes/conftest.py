@@ -6,29 +6,26 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Importar models com FK cruzada para garantir que Base.metadata.create_all()
+# consiga criar todas as tabelas necessárias (proposicoes, deputados)
+import src.deputados.models
+import src.proposicoes.models  # noqa: F401
 from src.shared.database import Base
-from src.votacoes.repository import VotacaoRepository, VotoRepository
+from src.votacoes.repository import OrientacaoRepository, VotacaoProposicaoRepository, VotacaoRepository, VotoRepository
 
 
 @pytest.fixture
 def temp_db():
     """Fixture que fornece um banco de dados SQLite em memória para testes.
 
-    Cria o schema das tabelas (deputados, proposicoes, votacoes e votos) automaticamente.
-    Fornece um SessionLocal factory que pode criar sessões.
+    Cria o schema das tabelas automaticamente.
     """
-    # Criar engine SQLite in-memory
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-
-    # Criar todas as tabelas
     Base.metadata.create_all(bind=engine)
-
-    # Criar SessionLocal factory
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     yield SessionLocal
 
-    # Cleanup
     Base.metadata.drop_all(bind=engine)
 
 
@@ -71,3 +68,27 @@ def votacoes_csv_path(fixtures_dir) -> str:
 def votos_csv_path(fixtures_dir) -> str:
     """Fixture que fornece o caminho para o CSV de votos."""
     return str(fixtures_dir / "votos.csv")
+
+
+@pytest.fixture
+def votacao_proposicao_repository(db_session) -> VotacaoProposicaoRepository:
+    """Fixture que fornece um VotacaoProposicaoRepository com banco in-memory."""
+    return VotacaoProposicaoRepository(db_session)
+
+
+@pytest.fixture
+def orientacao_repository(db_session) -> OrientacaoRepository:
+    """Fixture que fornece um OrientacaoRepository com banco in-memory."""
+    return OrientacaoRepository(db_session)
+
+
+@pytest.fixture
+def votacoes_proposicoes_csv_path(fixtures_dir) -> str:
+    """Fixture que fornece o caminho para o CSV de votações-proposições."""
+    return str(fixtures_dir / "votacoes_proposicoes.csv")
+
+
+@pytest.fixture
+def orientacoes_csv_path(fixtures_dir) -> str:
+    """Fixture que fornece o caminho para o CSV de orientações de bancada."""
+    return str(fixtures_dir / "votacoesOrientacoes.csv")

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Pipeline completo: Migrations + Download + ETL.
+"""Pipeline completo: Migrations + Download + ETL (3 fases).
 
 Este script é o ponto de entrada principal para o container Docker.
 Executa o pipeline completo:
-1. Migrations do banco de dados (Alembic)
-2. Download dos CSVs da Câmara dos Deputados
-3. ETL: deputados → proposições → votações
+0. Migrations do banco de dados (Alembic)
+1. Download dos CSVs da Câmara dos Deputados
+2. ETL Fase 1: deputados → proposições → votações + votos
+3. ETL Fase 2: votacoes_proposicoes (CRÍTICO) → orientacoes (NÃO-CRÍTICO)
+4. ETL Fase 3: classificação cívica (NÃO-CRÍTICO)
 
 Example:
     python scripts/run_full_etl.py
 
 Exit codes:
-    0: Sucesso - pipeline completo executado sem erros
-    1: Falha - erro em migrations, download ou ETL
+    0: Sucesso - pipeline completo executado sem erros em steps críticos
+    1: Falha - erro em migrations, download ou ETL crítico
 """
 
 import logging
@@ -26,11 +28,12 @@ from pathlib import Path
 ETL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ETL_DIR))
 
-from src.shared.config import settings
+from scripts.download_camara import download_all_files, print_summary
+from src.classificacao.etl import run_classificacao_etl
 from src.deputados.etl import run_deputados_etl
 from src.proposicoes.etl import run_proposicoes_etl
-from src.votacoes.etl import run_votacoes_etl
-from scripts.download_camara import download_all_files, print_summary
+from src.shared.config import settings
+from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -167,14 +170,20 @@ def run_download() -> int:
 
 
 def run_etl(data_dir: Path) -> int:
-    """Executa ETL completo.
+    """Executa ETL completo em 3 fases.
+
+    Fase 1: Ingestão base (deputados → proposições → votações + votos)
+    Fase 2: Ingestão relacional (votacoes_proposicoes → orientacoes)
+    Fase 3: Enriquecimento (classificação cívica)
 
     Args:
         data_dir: Diretório com os arquivos CSV
 
     Returns:
-        Exit code (0 sucesso, 1 falha)
+        Exit code (0 sucesso, 1 falha em step crítico)
     """
+    warnings_count = 0
+
     try:
         logger.info("")
         logger.info("=" * 60)
@@ -183,69 +192,105 @@ def run_etl(data_dir: Path) -> int:
 
         start_time = time.time()
 
-        # Fase 2: Deputados
+        # ==================================================================
+        # FASE 1 (FASE 2 do pipeline completo): Ingestão base
+        # ==================================================================
         logger.info("")
-        logger.info("FASE 2/4: Deputados (sem dependências)")
+        logger.info("FASE 2/4: Ingestão base")
         logger.info("-" * 60)
         phase_start = time.time()
 
+        # Step: Deputados
+        logger.info("Step 2.1: Deputados (sem dependências)")
         deputados_csv = data_dir / "deputados.csv"
         if not deputados_csv.exists():
             logger.error(f"Arquivo não encontrado: {deputados_csv}")
             return 1
-
         result = run_deputados_etl_with_retry(str(deputados_csv))
-
         if result != 0:
             logger.error("ETL de deputados falhou")
             return 1
 
-        phase_time = time.time() - phase_start
-        logger.info(f"✓ Fase 2 concluída em {phase_time:.2f}s")
-
-        # Fase 3: Proposições
-        logger.info("")
-        logger.info("FASE 3/4: Proposições (depende de deputados)")
-        logger.info("-" * 60)
-        phase_start = time.time()
-
-        # Nome do arquivo com ano
+        # Step: Proposições
+        logger.info("Step 2.2: Proposições (depende de deputados)")
         proposicoes_csv = data_dir / f"proposicoes-{settings.CAMARA_ANO}.csv"
         if not proposicoes_csv.exists():
             logger.error(f"Arquivo não encontrado: {proposicoes_csv}")
             return 1
-
         result = run_proposicoes_etl_with_retry(str(proposicoes_csv))
-
         if result != 0:
             logger.error("ETL de proposições falhou")
             return 1
 
-        phase_time = time.time() - phase_start
-        logger.info(f"✓ Fase 3 concluída em {phase_time:.2f}s")
-
-        # Fase 4: Votações
-        logger.info("")
-        logger.info("FASE 4/4: Votações (depende de proposições e deputados)")
-        logger.info("-" * 60)
-        phase_start = time.time()
-
-        # Nomes dos arquivos com ano
+        # Step: Votações + Votos
+        logger.info("Step 2.3: Votações + Votos (depende de proposições e deputados)")
         votacoes_csv = data_dir / f"votacoes-{settings.CAMARA_ANO}.csv"
         votos_csv = data_dir / f"votacoesVotos-{settings.CAMARA_ANO}.csv"
-
         if not votacoes_csv.exists():
             logger.error(f"Arquivo não encontrado: {votacoes_csv}")
             return 1
         if not votos_csv.exists():
             logger.error(f"Arquivo não encontrado: {votos_csv}")
             return 1
-
         result = run_votacoes_etl_with_retry(str(votacoes_csv), str(votos_csv))
-
         if result != 0:
             logger.error("ETL de votações falhou")
             return 1
+
+        phase_time = time.time() - phase_start
+        logger.info(f"✓ Fase 2 concluída em {phase_time:.2f}s")
+
+        # ==================================================================
+        # FASE 2 (FASE 3 do pipeline completo): Ingestão relacional
+        # ==================================================================
+        logger.info("")
+        logger.info("FASE 3/4: Ingestão relacional")
+        logger.info("-" * 60)
+        phase_start = time.time()
+
+        # Step: Votações-Proposições (CRÍTICO)
+        logger.info("Step 3.1: Votações-Proposições (CRÍTICO)")
+        vp_csv = data_dir / f"votacoesProposicoes-{settings.CAMARA_ANO}.csv"
+        if not vp_csv.exists():
+            logger.error(f"Arquivo não encontrado: {vp_csv}")
+            return 1
+        try:
+            run_votacoes_proposicoes_etl(str(vp_csv))
+        except Exception as e:
+            logger.error(f"Step crítico falhou: votacoes_proposicoes — {e}")
+            raise
+
+        # Step: Orientações (NÃO-CRÍTICO)
+        logger.info("Step 3.2: Orientações de bancada (NÃO-CRÍTICO)")
+        orientacoes_csv = data_dir / f"votacoesOrientacoes-{settings.CAMARA_ANO}.csv"
+        if not orientacoes_csv.exists():
+            logger.warning(f"Arquivo não encontrado: {orientacoes_csv} — continuando sem orientações")
+            warnings_count += 1
+        else:
+            try:
+                run_orientacoes_etl(str(orientacoes_csv))
+            except Exception as e:
+                logger.warning(f"Step não-crítico falhou: orientacoes — {e}")
+                warnings_count += 1
+
+        phase_time = time.time() - phase_start
+        logger.info(f"✓ Fase 3 concluída em {phase_time:.2f}s")
+
+        # ==================================================================
+        # FASE 3 (FASE 4 do pipeline completo): Enriquecimento
+        # ==================================================================
+        logger.info("")
+        logger.info("FASE 4/4: Enriquecimento")
+        logger.info("-" * 60)
+        phase_start = time.time()
+
+        # Step: Classificação cívica (NÃO-CRÍTICO)
+        logger.info("Step 4.1: Classificação cívica (NÃO-CRÍTICO)")
+        try:
+            run_classificacao_etl()
+        except Exception as e:
+            logger.warning(f"Step não-crítico falhou: classificacao — {e}")
+            warnings_count += 1
 
         phase_time = time.time() - phase_start
         logger.info(f"✓ Fase 4 concluída em {phase_time:.2f}s")
@@ -254,7 +299,10 @@ def run_etl(data_dir: Path) -> int:
         total_time = time.time() - start_time
         logger.info("")
         logger.info("=" * 60)
-        logger.info("✓ ETL COMPLETO EXECUTADO COM SUCESSO!")
+        if warnings_count > 0:
+            logger.info(f"✓ ETL COMPLETO EXECUTADO COM {warnings_count} WARNING(S)")
+        else:
+            logger.info("✓ ETL COMPLETO EXECUTADO COM SUCESSO!")
         logger.info(f"Tempo total: {total_time:.2f}s ({total_time / 60:.2f}m)")
         logger.info("=" * 60)
 
@@ -266,7 +314,7 @@ def run_etl(data_dir: Path) -> int:
 
 
 def main() -> int:
-    """Função principal: Download + ETL.
+    """Função principal: Migrations + Download + ETL.
 
     Returns:
         Exit code (0 sucesso, 1 falha)

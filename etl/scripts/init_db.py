@@ -16,8 +16,9 @@ import logging
 import sys
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
+
+from alembic import command
 
 # Add parent (etl) to path so imports work
 ETL_DIR = Path(__file__).parent.parent

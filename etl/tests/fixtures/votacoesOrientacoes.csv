@@ -1,0 +1,13 @@
+idVotacao;uriVotacao;siglaOrgao;descricao;siglaBancada;uriBancada;orientacao
+1-1;https://api.camara.leg.br/v2/votacoes/1-1;PLEN;Aprovado o projeto;PT;https://api.camara.leg.br/v2/bancadas/PT;Sim
+1-1;https://api.camara.leg.br/v2/votacoes/1-1;PLEN;Aprovado o projeto;PL;https://api.camara.leg.br/v2/bancadas/PL;Não
+1-1;https://api.camara.leg.br/v2/votacoes/1-1;PLEN;Aprovado o projeto;Governo;https://api.camara.leg.br/v2/bancadas/Governo;Sim
+1-1;https://api.camara.leg.br/v2/votacoes/1-1;PLEN;Aprovado o projeto;Minoria;https://api.camara.leg.br/v2/bancadas/Minoria;Não
+2-1;https://api.camara.leg.br/v2/votacoes/2-1;PLEN;Rejeitada a emenda;PT;https://api.camara.leg.br/v2/bancadas/PT;Não
+2-1;https://api.camara.leg.br/v2/votacoes/2-1;PLEN;Rejeitada a emenda;MDB;https://api.camara.leg.br/v2/bancadas/MDB;Liberado
+3-1;https://api.camara.leg.br/v2/votacoes/3-1;PLEN;Aprovado;PSOL;https://api.camara.leg.br/v2/bancadas/PSOL;Obstrução
+3-1;https://api.camara.leg.br/v2/votacoes/3-1;PLEN;Aprovado;REPUBLICANOS;https://api.camara.leg.br/v2/bancadas/REPUBLICANOS;Sim
+999-1;https://api.camara.leg.br/v2/votacoes/999-1;PLEN;Votacao fantasma;PT;https://api.camara.leg.br/v2/bancadas/PT;Sim
+4-1;https://api.camara.leg.br/v2/votacoes/4-1;PLEN;Aprovado;PT;https://api.camara.leg.br/v2/bancadas/PT;Sim
+4-1;https://api.camara.leg.br/v2/votacoes/4-1;PLEN;Aprovado;PSDB;https://api.camara.leg.br/v2/bancadas/PSDB;
+5-1;https://api.camara.leg.br/v2/votacoes/5-1;PLEN;Rejeitado;Governo;https://api.camara.leg.br/v2/bancadas/Governo;Liberado

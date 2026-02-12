@@ -2,13 +2,18 @@
 
 Encapsula operações CRUD e operações em lote como bulk_upsert
 no banco de dados, isolando a lógica de acesso de dados.
+
+Novos repositórios (VotacaoProposicaoRepository, OrientacaoRepository)
+usam INSERT...ON CONFLICT DO UPDATE via sqlalchemy.dialects.postgresql
+para upsert idempotente sem CASCADE deletes.
 """
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from .models import Votacao, Voto
-from .schemas import VotacaoCreate, VotoCreate
+from .models import Orientacao, Votacao, VotacaoProposicao, Voto
+from .schemas import OrientacaoCreate, VotacaoCreate, VotacaoProposicaoCreate, VotoCreate
 
 
 class VotacaoRepository:
@@ -60,6 +65,12 @@ class VotacaoRepository:
             proposicao_id=votacao.proposicao_id,
             data_hora=votacao.data_hora,
             resultado=votacao.resultado,
+            eh_nominal=votacao.eh_nominal,
+            votos_sim=votacao.votos_sim,
+            votos_nao=votacao.votos_nao,
+            votos_outros=votacao.votos_outros,
+            descricao=votacao.descricao,
+            sigla_orgao=votacao.sigla_orgao,
         )
         self.db.add(db_votacao)
         self.db.commit()
@@ -160,6 +171,12 @@ class VotacaoRepository:
                 proposicao_id=v.proposicao_id,
                 data_hora=v.data_hora,
                 resultado=v.resultado,
+                eh_nominal=v.eh_nominal,
+                votos_sim=v.votos_sim,
+                votos_nao=v.votos_nao,
+                votos_outros=v.votos_outros,
+                descricao=v.descricao,
+                sigla_orgao=v.sigla_orgao,
             )
             for v in votacoes
         ]
@@ -369,3 +386,156 @@ class VotoRepository:
             self.db.commit()
             return True
         return False
+
+
+class VotacaoProposicaoRepository:
+    """Repository para operações com a junction table votacoes_proposicoes.
+
+    Usa INSERT...ON CONFLICT DO UPDATE (PostgreSQL) para bulk upsert
+    idempotente, evitando CASCADE deletes da estratégia delete-reinsert.
+
+    Attributes:
+        db: Sessão SQLAlchemy injetada via dependency injection
+    """
+
+    def __init__(self, db: Session) -> None:
+        """Inicializa o repository com uma sessão de banco de dados.
+
+        Args:
+            db: Sessão SQLAlchemy para executar queries
+        """
+        self.db = db
+
+    def bulk_upsert(self, records: list[VotacaoProposicaoCreate]) -> int:
+        """Insere ou atualiza vínculos votação-proposição em lote.
+
+        Usa INSERT...ON CONFLICT(votacao_id, proposicao_id) DO UPDATE
+        para garantir idempotência sem CASCADE deletes.
+
+        Args:
+            records: Lista de schemas VotacaoProposicaoCreate validados
+
+        Returns:
+            Quantidade de registros processados
+        """
+        if not records:
+            return 0
+
+        values = [record.model_dump() for record in records]
+        stmt = pg_insert(VotacaoProposicao).values(values)
+        update_columns = ["votacao_id_original", "titulo", "ementa", "sigla_tipo", "numero", "ano", "eh_principal"]
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["votacao_id", "proposicao_id"],
+            set_={col: stmt.excluded[col] for col in update_columns},
+        )
+        self.db.execute(stmt)
+        self.db.commit()
+        return len(values)
+
+    def get_by_votacao(self, votacao_id: int) -> list[VotacaoProposicao]:
+        """Retorna todas as proposições vinculadas a uma votação.
+
+        Args:
+            votacao_id: ID da votação
+
+        Returns:
+            Lista de VotacaoProposicao da votação especificada
+        """
+        stmt = select(VotacaoProposicao).where(VotacaoProposicao.votacao_id == votacao_id)
+        return self.db.execute(stmt).scalars().all()
+
+    def get_principal_by_votacao(self, votacao_id: int) -> VotacaoProposicao | None:
+        """Retorna a proposição principal (eh_principal=True) de uma votação.
+
+        Args:
+            votacao_id: ID da votação
+
+        Returns:
+            VotacaoProposicao principal se existir, None caso contrário
+        """
+        stmt = select(VotacaoProposicao).where(
+            VotacaoProposicao.votacao_id == votacao_id,
+            VotacaoProposicao.eh_principal.is_(True),
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def get_by_proposicao(self, proposicao_id: int) -> list[VotacaoProposicao]:
+        """Retorna todas as votações vinculadas a uma proposição.
+
+        Args:
+            proposicao_id: ID da proposição
+
+        Returns:
+            Lista de VotacaoProposicao da proposição especificada
+        """
+        stmt = select(VotacaoProposicao).where(VotacaoProposicao.proposicao_id == proposicao_id)
+        return self.db.execute(stmt).scalars().all()
+
+
+class OrientacaoRepository:
+    """Repository para operações com a tabela orientacoes.
+
+    Usa INSERT...ON CONFLICT DO UPDATE (PostgreSQL) para bulk upsert
+    idempotente de orientações de bancada em votações.
+
+    Attributes:
+        db: Sessão SQLAlchemy injetada via dependency injection
+    """
+
+    def __init__(self, db: Session) -> None:
+        """Inicializa o repository com uma sessão de banco de dados.
+
+        Args:
+            db: Sessão SQLAlchemy para executar queries
+        """
+        self.db = db
+
+    def bulk_upsert(self, records: list[OrientacaoCreate]) -> int:
+        """Insere ou atualiza orientações de bancada em lote.
+
+        Usa INSERT...ON CONFLICT(votacao_id, sigla_bancada) DO UPDATE
+        para garantir idempotência sem CASCADE deletes.
+
+        Args:
+            records: Lista de schemas OrientacaoCreate validados
+
+        Returns:
+            Quantidade de registros processados
+        """
+        if not records:
+            return 0
+
+        values = [record.model_dump() for record in records]
+        stmt = pg_insert(Orientacao).values(values)
+        update_columns = ["votacao_id_original", "orientacao"]
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["votacao_id", "sigla_bancada"],
+            set_={col: stmt.excluded[col] for col in update_columns},
+        )
+        self.db.execute(stmt)
+        self.db.commit()
+        return len(values)
+
+    def get_by_votacao(self, votacao_id: int) -> list[Orientacao]:
+        """Retorna orientações de todas as bancadas para uma votação.
+
+        Args:
+            votacao_id: ID da votação
+
+        Returns:
+            Lista de orientações da votação especificada
+        """
+        stmt = select(Orientacao).where(Orientacao.votacao_id == votacao_id)
+        return self.db.execute(stmt).scalars().all()
+
+    def get_by_bancada(self, sigla_bancada: str) -> list[Orientacao]:
+        """Retorna orientações de uma bancada em todas as votações.
+
+        Args:
+            sigla_bancada: Sigla da bancada (ex: "PT", "PL", "Governo")
+
+        Returns:
+            Lista de orientações da bancada especificada
+        """
+        stmt = select(Orientacao).where(Orientacao.sigla_bancada == sigla_bancada)
+        return self.db.execute(stmt).scalars().all()

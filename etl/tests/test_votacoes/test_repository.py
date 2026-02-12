@@ -1,11 +1,16 @@
 """Testes para Repositories do domínio de Votações.
 
 Validam operações CRUD, get_by_proposicao, get_by_votacao, e bulk operations.
+Testes de query para novos repos (VotacaoProposicaoRepository, OrientacaoRepository)
+usam inserção direta via ORM (SQLite-compatível).
+Testes de bulk_upsert requerem PostgreSQL (INSERT...ON CONFLICT).
 """
 
 from datetime import datetime
 
-from src.votacoes.models import Votacao, Voto
+import pytest
+
+from src.votacoes.models import Orientacao, Votacao, VotacaoProposicao, Voto
 from src.votacoes.schemas import VotacaoCreate, VotoCreate
 
 
@@ -187,6 +192,101 @@ class TestVotacaoRepository:
         deleted = votacao_repository.delete_by_id(99999)
         assert deleted is False
 
+    def test_create_persists_all_new_fields(self, votacao_repository, db_session):
+        """Test: create() persiste todos os 10 campos incluindo os novos."""
+        votacao_create = VotacaoCreate(
+            id=600,
+            proposicao_id=123,
+            data_hora=datetime(2024, 1, 15, 14, 30, 0),
+            resultado="APROVADO",
+            eh_nominal=True,
+            votos_sim=250,
+            votos_nao=100,
+            votos_outros=10,
+            descricao="Aprovado o projeto de lei",
+            sigla_orgao="PLEN",
+        )
+
+        resultado = votacao_repository.create(votacao_create)
+
+        assert resultado.id == 600
+        assert resultado.eh_nominal is True
+        assert resultado.votos_sim == 250
+        assert resultado.votos_nao == 100
+        assert resultado.votos_outros == 10
+        assert resultado.descricao == "Aprovado o projeto de lei"
+        assert resultado.sigla_orgao == "PLEN"
+
+        from_db = db_session.query(Votacao).filter(Votacao.id == 600).first()
+        assert from_db.eh_nominal is True
+        assert from_db.votos_sim == 250
+        assert from_db.sigla_orgao == "PLEN"
+
+    def test_create_with_proposicao_id_none(self, votacao_repository, db_session):
+        """Test: create() persiste votação com proposicao_id=None."""
+        votacao_create = VotacaoCreate(
+            id=601,
+            proposicao_id=None,
+            data_hora=datetime(2024, 1, 20, 11, 0, 0),
+            resultado="APROVADO",
+            eh_nominal=True,
+            votos_sim=200,
+            votos_nao=80,
+            votos_outros=5,
+        )
+
+        resultado = votacao_repository.create(votacao_create)
+
+        assert resultado.id == 601
+        assert resultado.proposicao_id is None
+
+        from_db = db_session.query(Votacao).filter(Votacao.id == 601).first()
+        assert from_db.proposicao_id is None
+
+    def test_bulk_upsert_persists_all_new_fields(self, votacao_repository, db_session):
+        """Test: bulk_upsert() persiste todos os novos campos."""
+        votacoes = [
+            VotacaoCreate(
+                id=700,
+                proposicao_id=1,
+                data_hora=datetime(2024, 1, 15, 14, 30, 0),
+                resultado="APROVADO",
+                eh_nominal=True,
+                votos_sim=250,
+                votos_nao=100,
+                votos_outros=10,
+                descricao="Aprovado em plenário",
+                sigla_orgao="PLEN",
+            ),
+            VotacaoCreate(
+                id=701,
+                proposicao_id=None,
+                data_hora=datetime(2024, 1, 16, 10, 0, 0),
+                resultado="REJEITADO",
+                eh_nominal=False,
+                votos_sim=0,
+                votos_nao=0,
+                votos_outros=0,
+                descricao=None,
+                sigla_orgao="CCJC",
+            ),
+        ]
+
+        count = votacao_repository.bulk_upsert(votacoes)
+        assert count == 2
+
+        from_db_700 = db_session.query(Votacao).filter(Votacao.id == 700).first()
+        assert from_db_700.eh_nominal is True
+        assert from_db_700.votos_sim == 250
+        assert from_db_700.descricao == "Aprovado em plenário"
+        assert from_db_700.sigla_orgao == "PLEN"
+
+        from_db_701 = db_session.query(Votacao).filter(Votacao.id == 701).first()
+        assert from_db_701.proposicao_id is None
+        assert from_db_701.eh_nominal is False
+        assert from_db_701.votos_sim == 0
+        assert from_db_701.sigla_orgao == "CCJC"
+
 
 class TestVotoRepository:
     """Testes para VotoRepository."""
@@ -325,3 +425,208 @@ class TestVotoRepository:
         """Test: delete_by_id() retorna False para id inexistente."""
         deleted = voto_repository.delete_by_id(99999)
         assert deleted is False
+
+
+class TestVotacaoProposicaoRepository:
+    """Testes para VotacaoProposicaoRepository.
+
+    Testes de query usam inserção direta via ORM (SQLite-compatível).
+    Testes de bulk_upsert requerem PostgreSQL (INSERT...ON CONFLICT).
+    """
+
+    def test_get_by_votacao_returns_proposicoes(self, votacao_proposicao_repository, db_session):
+        """Test: get_by_votacao() retorna proposições de uma votação."""
+        # Popular dados via ORM
+        vps = [
+            VotacaoProposicao(votacao_id=10, proposicao_id=100, titulo="PL 1/2024", eh_principal=True),
+            VotacaoProposicao(votacao_id=10, proposicao_id=200, titulo="PL 2/2024", eh_principal=False),
+            VotacaoProposicao(votacao_id=20, proposicao_id=300, titulo="PEC 3/2024", eh_principal=True),
+        ]
+        db_session.add_all(vps)
+        db_session.commit()
+
+        resultado = votacao_proposicao_repository.get_by_votacao(10)
+
+        assert len(resultado) == 2
+        assert all(vp.votacao_id == 10 for vp in resultado)
+
+    def test_get_by_votacao_returns_empty_for_nonexistent(self, votacao_proposicao_repository):
+        """Test: get_by_votacao() retorna lista vazia para votação inexistente."""
+        resultado = votacao_proposicao_repository.get_by_votacao(99999)
+        assert resultado == []
+
+    def test_get_principal_by_votacao_returns_principal(self, votacao_proposicao_repository, db_session):
+        """Test: get_principal_by_votacao() retorna proposição com eh_principal=True."""
+        vps = [
+            VotacaoProposicao(votacao_id=30, proposicao_id=100, titulo="PL 1/2024", eh_principal=False),
+            VotacaoProposicao(votacao_id=30, proposicao_id=200, titulo="PEC 2/2024", eh_principal=True),
+        ]
+        db_session.add_all(vps)
+        db_session.commit()
+
+        resultado = votacao_proposicao_repository.get_principal_by_votacao(30)
+
+        assert resultado is not None
+        assert resultado.proposicao_id == 200
+        assert resultado.eh_principal is True
+
+    def test_get_principal_by_votacao_returns_none_when_no_principal(
+        self, votacao_proposicao_repository, db_session
+    ):
+        """Test: get_principal_by_votacao() retorna None se nenhuma é principal."""
+        vp = VotacaoProposicao(votacao_id=40, proposicao_id=100, titulo="PL 1/2024", eh_principal=False)
+        db_session.add(vp)
+        db_session.commit()
+
+        resultado = votacao_proposicao_repository.get_principal_by_votacao(40)
+        assert resultado is None
+
+    def test_get_by_proposicao_returns_votacoes(self, votacao_proposicao_repository, db_session):
+        """Test: get_by_proposicao() retorna votações de uma proposição."""
+        vps = [
+            VotacaoProposicao(votacao_id=50, proposicao_id=500, titulo="PL 5/2024"),
+            VotacaoProposicao(votacao_id=60, proposicao_id=500, titulo="PL 5/2024"),
+            VotacaoProposicao(votacao_id=70, proposicao_id=600, titulo="PEC 6/2024"),
+        ]
+        db_session.add_all(vps)
+        db_session.commit()
+
+        resultado = votacao_proposicao_repository.get_by_proposicao(500)
+
+        assert len(resultado) == 2
+        assert all(vp.proposicao_id == 500 for vp in resultado)
+
+    def test_get_by_proposicao_returns_empty_for_nonexistent(self, votacao_proposicao_repository):
+        """Test: get_by_proposicao() retorna lista vazia para proposição inexistente."""
+        resultado = votacao_proposicao_repository.get_by_proposicao(99999)
+        assert resultado == []
+
+    def test_bulk_upsert_returns_zero_for_empty_list(self, votacao_proposicao_repository):
+        """Test: bulk_upsert() retorna 0 para lista vazia."""
+        count = votacao_proposicao_repository.bulk_upsert([])
+        assert count == 0
+
+    @pytest.mark.integration
+    def test_bulk_upsert_inserts_records(self, votacao_proposicao_repository, db_session):
+        """Test: bulk_upsert() insere registros (requer PostgreSQL)."""
+        if "sqlite" in str(db_session.bind.url):
+            pytest.skip("INSERT...ON CONFLICT requer PostgreSQL")
+
+        from src.votacoes.schemas import VotacaoProposicaoCreate
+
+        records = [
+            VotacaoProposicaoCreate(votacao_id=1, proposicao_id=1, titulo="PL 1/2024", eh_principal=True),
+            VotacaoProposicaoCreate(votacao_id=1, proposicao_id=2, titulo="PL 2/2024", eh_principal=False),
+        ]
+        count = votacao_proposicao_repository.bulk_upsert(records)
+
+        assert count == 2
+        resultado = votacao_proposicao_repository.get_by_votacao(1)
+        assert len(resultado) == 2
+
+    @pytest.mark.integration
+    def test_bulk_upsert_idempotent(self, votacao_proposicao_repository, db_session):
+        """Test: bulk_upsert() é idempotente — re-execução atualiza sem duplicar (requer PostgreSQL)."""
+        if "sqlite" in str(db_session.bind.url):
+            pytest.skip("INSERT...ON CONFLICT requer PostgreSQL")
+
+        from src.votacoes.schemas import VotacaoProposicaoCreate
+
+        records = [
+            VotacaoProposicaoCreate(votacao_id=1, proposicao_id=1, titulo="PL 1/2024", eh_principal=True),
+        ]
+
+        votacao_proposicao_repository.bulk_upsert(records)
+        votacao_proposicao_repository.bulk_upsert(records)
+
+        resultado = votacao_proposicao_repository.get_by_votacao(1)
+        assert len(resultado) == 1
+
+
+class TestOrientacaoRepository:
+    """Testes para OrientacaoRepository.
+
+    Testes de query usam inserção direta via ORM (SQLite-compatível).
+    Testes de bulk_upsert requerem PostgreSQL (INSERT...ON CONFLICT).
+    """
+
+    def test_get_by_votacao_returns_orientacoes(self, orientacao_repository, db_session):
+        """Test: get_by_votacao() retorna orientações de uma votação."""
+        orientacoes = [
+            Orientacao(votacao_id=10, sigla_bancada="PT", orientacao="Sim"),
+            Orientacao(votacao_id=10, sigla_bancada="PL", orientacao="Não"),
+            Orientacao(votacao_id=20, sigla_bancada="PSDB", orientacao="Liberado"),
+        ]
+        db_session.add_all(orientacoes)
+        db_session.commit()
+
+        resultado = orientacao_repository.get_by_votacao(10)
+
+        assert len(resultado) == 2
+        assert all(o.votacao_id == 10 for o in resultado)
+
+    def test_get_by_votacao_returns_empty_for_nonexistent(self, orientacao_repository):
+        """Test: get_by_votacao() retorna lista vazia para votação inexistente."""
+        resultado = orientacao_repository.get_by_votacao(99999)
+        assert resultado == []
+
+    def test_get_by_bancada_returns_orientacoes(self, orientacao_repository, db_session):
+        """Test: get_by_bancada() retorna orientações de uma bancada."""
+        orientacoes = [
+            Orientacao(votacao_id=10, sigla_bancada="PT", orientacao="Sim"),
+            Orientacao(votacao_id=20, sigla_bancada="PT", orientacao="Não"),
+            Orientacao(votacao_id=30, sigla_bancada="PL", orientacao="Sim"),
+        ]
+        db_session.add_all(orientacoes)
+        db_session.commit()
+
+        resultado = orientacao_repository.get_by_bancada("PT")
+
+        assert len(resultado) == 2
+        assert all(o.sigla_bancada == "PT" for o in resultado)
+
+    def test_get_by_bancada_returns_empty_for_nonexistent(self, orientacao_repository):
+        """Test: get_by_bancada() retorna lista vazia para bancada inexistente."""
+        resultado = orientacao_repository.get_by_bancada("INEXISTENTE")
+        assert resultado == []
+
+    def test_bulk_upsert_returns_zero_for_empty_list(self, orientacao_repository):
+        """Test: bulk_upsert() retorna 0 para lista vazia."""
+        count = orientacao_repository.bulk_upsert([])
+        assert count == 0
+
+    @pytest.mark.integration
+    def test_bulk_upsert_inserts_records(self, orientacao_repository, db_session):
+        """Test: bulk_upsert() insere registros (requer PostgreSQL)."""
+        if "sqlite" in str(db_session.bind.url):
+            pytest.skip("INSERT...ON CONFLICT requer PostgreSQL")
+
+        from src.votacoes.schemas import OrientacaoCreate
+
+        records = [
+            OrientacaoCreate(votacao_id=1, sigla_bancada="PT", orientacao="Sim"),
+            OrientacaoCreate(votacao_id=1, sigla_bancada="PL", orientacao="Não"),
+        ]
+        count = orientacao_repository.bulk_upsert(records)
+
+        assert count == 2
+        resultado = orientacao_repository.get_by_votacao(1)
+        assert len(resultado) == 2
+
+    @pytest.mark.integration
+    def test_bulk_upsert_idempotent(self, orientacao_repository, db_session):
+        """Test: bulk_upsert() é idempotente — re-execução atualiza sem duplicar (requer PostgreSQL)."""
+        if "sqlite" in str(db_session.bind.url):
+            pytest.skip("INSERT...ON CONFLICT requer PostgreSQL")
+
+        from src.votacoes.schemas import OrientacaoCreate
+
+        records = [
+            OrientacaoCreate(votacao_id=1, sigla_bancada="PT", orientacao="Sim"),
+        ]
+
+        orientacao_repository.bulk_upsert(records)
+        orientacao_repository.bulk_upsert(records)
+
+        resultado = orientacao_repository.get_by_votacao(1)
+        assert len(resultado) == 1
