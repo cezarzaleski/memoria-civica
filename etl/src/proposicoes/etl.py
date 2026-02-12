@@ -88,6 +88,7 @@ def transform_proposicoes(raw_data: list[dict]) -> list[ProposicaoCreate]:
     """
     validated = []
     skipped = 0
+    truncated = 0
 
     for idx, record in enumerate(raw_data, 1):
         try:
@@ -97,6 +98,9 @@ def transform_proposicoes(raw_data: list[dict]) -> list[ProposicaoCreate]:
             numero = int(record.get("numero", 0)) if record.get("numero") else 0
             ano = int(record.get("ano", 2024)) if record.get("ano") else 2024
             ementa = record.get("ementa", "").strip()
+            if len(ementa) > 5000:
+                ementa = ementa[:5000]
+                truncated += 1
             autor_id_str = record.get("autor_id", "").strip()
 
             # Se autor_id não é válido, logar warning mas aceitar a proposição
@@ -126,7 +130,9 @@ def transform_proposicoes(raw_data: list[dict]) -> list[ProposicaoCreate]:
             logger.warning(f"Erro ao transformar proposição {idx}: {e}")
             skipped += 1
 
-    logger.info(f"Transformadas {len(validated)} proposições (skipped: {skipped})")
+    logger.info(
+        f"Transformadas {len(validated)} proposições (skipped: {skipped}, ementas_truncadas: {truncated})"
+    )
     return validated
 
 
