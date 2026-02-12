@@ -102,6 +102,10 @@ class TestTransformVotacoes:
                 "dataHoraRegistro": "2024-01-15T14:30:00",
                 "aprovacao": "1",
                 "descricao": "Aprovado o projeto",
+                "quantidadeVotosSim": "250",
+                "quantidadeVotosNao": "100",
+                "quantidadeVotosOutros": "10",
+                "siglaOrgao": "PLEN",
             }
         ]
 
@@ -111,6 +115,12 @@ class TestTransformVotacoes:
         assert isinstance(result[0], VotacaoCreate)
         assert result[0].resultado == "APROVADO"
         assert result[0].id == 123  # Extraído do "123-1"
+        assert result[0].votos_sim == 250
+        assert result[0].votos_nao == 100
+        assert result[0].votos_outros == 10
+        assert result[0].sigla_orgao == "PLEN"
+        assert result[0].descricao == "Aprovado o projeto"
+        assert result[0].eh_nominal is True
 
     def test_transform_votacoes_skips_invalid_datetime(self, caplog):
         """Test: transform_votacoes() pula dados com datetime inválida."""
@@ -183,6 +193,159 @@ class TestTransformVotacoes:
 
         result = transform_votacoes(raw_data_invalid, db=db_session)
         assert len(result) == 0  # Deve ser pulado
+
+    def test_transform_votacoes_nullable_proposicao_id_zero(self):
+        """Test: transform_votacoes() aceita votações com proposicao_id=0 (nullable)."""
+        raw_data = [
+            {
+                "id": "10-1",
+                "ultimaApresentacaoProposicao_idProposicao": "0",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+                "descricao": "Votação sem proposição",
+                "quantidadeVotosSim": "200",
+                "quantidadeVotosNao": "80",
+                "quantidadeVotosOutros": "5",
+                "siglaOrgao": "PLEN",
+            }
+        ]
+
+        result = transform_votacoes(raw_data)
+
+        assert len(result) == 1
+        assert result[0].proposicao_id is None
+        assert result[0].votos_sim == 200
+
+    def test_transform_votacoes_nullable_proposicao_id_empty(self):
+        """Test: transform_votacoes() aceita votações com proposicao_id vazio (nullable)."""
+        raw_data = [
+            {
+                "id": "11-1",
+                "ultimaApresentacaoProposicao_idProposicao": "",
+                "dataHoraRegistro": "2024-01-20T11:00:00",
+                "aprovacao": "0",
+                "descricao": "Outra votação sem proposição",
+            }
+        ]
+
+        result = transform_votacoes(raw_data)
+
+        assert len(result) == 1
+        assert result[0].proposicao_id is None
+
+    def test_transform_votacoes_eh_nominal_true(self):
+        """Test: transform_votacoes() calcula eh_nominal=True quando votos_sim > 0."""
+        raw_data = [
+            {
+                "id": "12-1",
+                "ultimaApresentacaoProposicao_idProposicao": "1",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+                "quantidadeVotosSim": "250",
+                "quantidadeVotosNao": "100",
+                "quantidadeVotosOutros": "10",
+            }
+        ]
+
+        result = transform_votacoes(raw_data)
+
+        assert len(result) == 1
+        assert result[0].eh_nominal is True
+
+    def test_transform_votacoes_eh_nominal_false(self):
+        """Test: transform_votacoes() calcula eh_nominal=False quando votos_sim == 0."""
+        raw_data = [
+            {
+                "id": "13-1",
+                "ultimaApresentacaoProposicao_idProposicao": "1",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+                "quantidadeVotosSim": "0",
+                "quantidadeVotosNao": "0",
+                "quantidadeVotosOutros": "0",
+            }
+        ]
+
+        result = transform_votacoes(raw_data)
+
+        assert len(result) == 1
+        assert result[0].eh_nominal is False
+
+    def test_transform_votacoes_maps_new_csv_fields(self):
+        """Test: transform_votacoes() mapeia votos_sim, votos_nao, votos_outros, sigla_orgao, descricao."""
+        raw_data = [
+            {
+                "id": "14-1",
+                "ultimaApresentacaoProposicao_idProposicao": "1",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+                "descricao": "Aprovado em plenário",
+                "quantidadeVotosSim": "300",
+                "quantidadeVotosNao": "50",
+                "quantidadeVotosOutros": "3",
+                "siglaOrgao": "CCJC",
+            }
+        ]
+
+        result = transform_votacoes(raw_data)
+
+        assert len(result) == 1
+        assert result[0].votos_sim == 300
+        assert result[0].votos_nao == 50
+        assert result[0].votos_outros == 3
+        assert result[0].sigla_orgao == "CCJC"
+        assert result[0].descricao == "Aprovado em plenário"
+
+    def test_transform_votacoes_handles_missing_new_columns(self):
+        """Test: transform_votacoes() trata CSV sem novos campos (defaults a 0/None)."""
+        raw_data = [
+            {
+                "id": "15-1",
+                "ultimaApresentacaoProposicao_idProposicao": "1",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+                "descricao": "Aprovado",
+            }
+        ]
+
+        result = transform_votacoes(raw_data)
+
+        assert len(result) == 1
+        assert result[0].votos_sim == 0
+        assert result[0].votos_nao == 0
+        assert result[0].votos_outros == 0
+        assert result[0].eh_nominal is False
+        assert result[0].sigla_orgao is None
+
+    def test_transform_votacoes_fk_validation_with_nullable_proposicao_id(self, db_session):
+        """Test: transform_votacoes() valida FK quando proposicao_id é válido, aceita None."""
+        prop_repo = ProposicaoRepository(db_session)
+        prop_repo.create(ProposicaoCreate(
+            id=789, tipo="PL", numero=100, ano=2024, ementa="Lei teste",
+        ))
+
+        raw_data = [
+            # Com proposicao_id válido
+            {
+                "id": "16-1",
+                "ultimaApresentacaoProposicao_idProposicao": "789",
+                "dataHoraRegistro": "2024-01-15T14:30:00",
+                "aprovacao": "1",
+            },
+            # Sem proposicao_id (nullable)
+            {
+                "id": "17-1",
+                "ultimaApresentacaoProposicao_idProposicao": "0",
+                "dataHoraRegistro": "2024-01-16T10:00:00",
+                "aprovacao": "0",
+            },
+        ]
+
+        result = transform_votacoes(raw_data, db=db_session)
+
+        assert len(result) == 2
+        assert result[0].proposicao_id == 789
+        assert result[1].proposicao_id is None
 
 
 class TestTransformVotos:
@@ -284,13 +447,19 @@ class TestLoadVotacoes:
     """Testes para load_votacoes."""
 
     def test_load_votacoes_persists_data(self, db_session):
-        """Test: load_votacoes() persiste votações no banco."""
+        """Test: load_votacoes() persiste votações no banco com todos os campos."""
         votacoes = [
             VotacaoCreate(
                 id=500,
                 proposicao_id=1,
                 data_hora=datetime(2024, 1, 15, 14, 30, 0),
                 resultado="APROVADO",
+                eh_nominal=True,
+                votos_sim=250,
+                votos_nao=100,
+                votos_outros=10,
+                descricao="Aprovado o projeto",
+                sigla_orgao="PLEN",
             )
         ]
 
@@ -298,10 +467,43 @@ class TestLoadVotacoes:
 
         assert count == 1
 
-        # Verificar persistência
+        # Verificar persistência de todos os campos
         from_db = db_session.query(Votacao).filter(Votacao.id == 500).first()
         assert from_db is not None
         assert from_db.proposicao_id == 1
+        assert from_db.eh_nominal is True
+        assert from_db.votos_sim == 250
+        assert from_db.votos_nao == 100
+        assert from_db.votos_outros == 10
+        assert from_db.descricao == "Aprovado o projeto"
+        assert from_db.sigla_orgao == "PLEN"
+
+    def test_load_votacoes_persists_with_nullable_proposicao_id(self, db_session):
+        """Test: load_votacoes() persiste votação com proposicao_id=None."""
+        votacoes = [
+            VotacaoCreate(
+                id=501,
+                proposicao_id=None,
+                data_hora=datetime(2024, 1, 20, 11, 0, 0),
+                resultado="APROVADO",
+                eh_nominal=True,
+                votos_sim=200,
+                votos_nao=80,
+                votos_outros=5,
+                descricao="Votação sem proposição",
+                sigla_orgao="PLEN",
+            )
+        ]
+
+        count = load_votacoes(votacoes, db_session)
+
+        assert count == 1
+
+        from_db = db_session.query(Votacao).filter(Votacao.id == 501).first()
+        assert from_db is not None
+        assert from_db.proposicao_id is None
+        assert from_db.eh_nominal is True
+        assert from_db.votos_sim == 200
 
     def test_load_votacoes_returns_zero_for_empty(self, db_session):
         """Test: load_votacoes() retorna 0 para lista vazia."""
@@ -380,11 +582,20 @@ class TestRunVotacoesEtl:
         # Garantir que os dados estão persistidos antes do ETL
         db_session.commit()
 
-        # Executar ETL (sem db para não validar FKs - FKs já foram criados acima)
-        result = run_votacoes_etl(votacoes_csv_path, votos_csv_path, db=None)
+        # Executar ETL com db_session para validação de FKs e persistência
+        # (votações sem proposicao_id são aceitas com proposicao_id=None)
+        result = run_votacoes_etl(votacoes_csv_path, votos_csv_path, db=db_session)
 
         # Deve retornar sucesso
         assert result == 0
+
+        # Verificar que votações foram persistidas, incluindo as sem proposicao_id
+        all_votacoes = db_session.query(Votacao).all()
+        assert len(all_votacoes) > 0
+
+        # Verificar que votações com proposicao_id=None estão presentes
+        votacoes_sem_prop = [v for v in all_votacoes if v.proposicao_id is None]
+        assert len(votacoes_sem_prop) >= 1  # Pelo menos uma votação sem proposição
 
 
 # ==============================================================================

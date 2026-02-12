@@ -65,6 +65,12 @@ class VotacaoRepository:
             proposicao_id=votacao.proposicao_id,
             data_hora=votacao.data_hora,
             resultado=votacao.resultado,
+            eh_nominal=votacao.eh_nominal,
+            votos_sim=votacao.votos_sim,
+            votos_nao=votacao.votos_nao,
+            votos_outros=votacao.votos_outros,
+            descricao=votacao.descricao,
+            sigla_orgao=votacao.sigla_orgao,
         )
         self.db.add(db_votacao)
         self.db.commit()
@@ -165,6 +171,12 @@ class VotacaoRepository:
                 proposicao_id=v.proposicao_id,
                 data_hora=v.data_hora,
                 resultado=v.resultado,
+                eh_nominal=v.eh_nominal,
+                votos_sim=v.votos_sim,
+                votos_nao=v.votos_nao,
+                votos_outros=v.votos_outros,
+                descricao=v.descricao,
+                sigla_orgao=v.sigla_orgao,
             )
             for v in votacoes
         ]

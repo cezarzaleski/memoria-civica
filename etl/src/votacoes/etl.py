@@ -161,17 +161,42 @@ def transform_votacoes(
 
             # Resultado: usar aprovacao (1/0) ou derivar da descrição
             aprovacao = record.get("aprovacao", "")
-            descricao = record.get("descricao", "").strip()
+            descricao_raw = record.get("descricao", "").strip()
             if aprovacao == "1":
                 resultado = "APROVADO"
             elif aprovacao == "0":
                 resultado = "REJEITADO"
-            elif "aprovad" in descricao.lower():
+            elif "aprovad" in descricao_raw.lower():
                 resultado = "APROVADO"
-            elif "rejeitad" in descricao.lower():
+            elif "rejeitad" in descricao_raw.lower():
                 resultado = "REJEITADO"
             else:
-                resultado = descricao[:20] if descricao else "INDEFINIDO"
+                resultado = descricao_raw[:20] if descricao_raw else "INDEFINIDO"
+
+            # Extrair novos campos do CSV
+            votos_sim_str = record.get("quantidadeVotosSim", "")
+            votos_nao_str = record.get("quantidadeVotosNao", "")
+            votos_outros_str = record.get("quantidadeVotosOutros", "")
+            sigla_orgao_raw = record.get("siglaOrgao", "").strip()
+
+            try:
+                votos_sim = int(votos_sim_str) if votos_sim_str else 0
+            except (ValueError, TypeError):
+                votos_sim = 0
+
+            try:
+                votos_nao = int(votos_nao_str) if votos_nao_str else 0
+            except (ValueError, TypeError):
+                votos_nao = 0
+
+            try:
+                votos_outros = int(votos_outros_str) if votos_outros_str else 0
+            except (ValueError, TypeError):
+                votos_outros = 0
+
+            eh_nominal = votos_sim > 0
+            descricao = descricao_raw if descricao_raw else None
+            sigla_orgao = sigla_orgao_raw if sigla_orgao_raw else None
 
             # Parse datetime
             if data_hora_str:
@@ -186,14 +211,12 @@ def transform_votacoes(
                 skipped += 1
                 continue
 
-            # Skip votações sem proposição associada
+            # Tratar proposicao_id nullable: votações sem proposição são aceitas com None
             if proposicao_id == 0:
-                logger.debug(f"Votação {idx}: sem proposicao_id associada, pulando")
-                skipped += 1
-                continue
+                proposicao_id = None
 
-            # Validar FK proposicao_id se db foi fornecido
-            if db is not None and proposicao_id > 0:
+            # Validar FK proposicao_id se db foi fornecido e proposicao_id não é None
+            if db is not None and proposicao_id is not None and proposicao_id > 0:
                 from src.proposicoes.models import Proposicao
 
                 stmt = select(Proposicao).where(Proposicao.id == proposicao_id)
@@ -208,6 +231,12 @@ def transform_votacoes(
                 proposicao_id=proposicao_id,
                 data_hora=data_hora,
                 resultado=resultado,
+                eh_nominal=eh_nominal,
+                votos_sim=votos_sim,
+                votos_nao=votos_nao,
+                votos_outros=votos_outros,
+                descricao=descricao,
+                sigla_orgao=sigla_orgao,
             )
             validated.append(schema)
 

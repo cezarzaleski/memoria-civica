@@ -192,6 +192,101 @@ class TestVotacaoRepository:
         deleted = votacao_repository.delete_by_id(99999)
         assert deleted is False
 
+    def test_create_persists_all_new_fields(self, votacao_repository, db_session):
+        """Test: create() persiste todos os 10 campos incluindo os novos."""
+        votacao_create = VotacaoCreate(
+            id=600,
+            proposicao_id=123,
+            data_hora=datetime(2024, 1, 15, 14, 30, 0),
+            resultado="APROVADO",
+            eh_nominal=True,
+            votos_sim=250,
+            votos_nao=100,
+            votos_outros=10,
+            descricao="Aprovado o projeto de lei",
+            sigla_orgao="PLEN",
+        )
+
+        resultado = votacao_repository.create(votacao_create)
+
+        assert resultado.id == 600
+        assert resultado.eh_nominal is True
+        assert resultado.votos_sim == 250
+        assert resultado.votos_nao == 100
+        assert resultado.votos_outros == 10
+        assert resultado.descricao == "Aprovado o projeto de lei"
+        assert resultado.sigla_orgao == "PLEN"
+
+        from_db = db_session.query(Votacao).filter(Votacao.id == 600).first()
+        assert from_db.eh_nominal is True
+        assert from_db.votos_sim == 250
+        assert from_db.sigla_orgao == "PLEN"
+
+    def test_create_with_proposicao_id_none(self, votacao_repository, db_session):
+        """Test: create() persiste votação com proposicao_id=None."""
+        votacao_create = VotacaoCreate(
+            id=601,
+            proposicao_id=None,
+            data_hora=datetime(2024, 1, 20, 11, 0, 0),
+            resultado="APROVADO",
+            eh_nominal=True,
+            votos_sim=200,
+            votos_nao=80,
+            votos_outros=5,
+        )
+
+        resultado = votacao_repository.create(votacao_create)
+
+        assert resultado.id == 601
+        assert resultado.proposicao_id is None
+
+        from_db = db_session.query(Votacao).filter(Votacao.id == 601).first()
+        assert from_db.proposicao_id is None
+
+    def test_bulk_upsert_persists_all_new_fields(self, votacao_repository, db_session):
+        """Test: bulk_upsert() persiste todos os novos campos."""
+        votacoes = [
+            VotacaoCreate(
+                id=700,
+                proposicao_id=1,
+                data_hora=datetime(2024, 1, 15, 14, 30, 0),
+                resultado="APROVADO",
+                eh_nominal=True,
+                votos_sim=250,
+                votos_nao=100,
+                votos_outros=10,
+                descricao="Aprovado em plenário",
+                sigla_orgao="PLEN",
+            ),
+            VotacaoCreate(
+                id=701,
+                proposicao_id=None,
+                data_hora=datetime(2024, 1, 16, 10, 0, 0),
+                resultado="REJEITADO",
+                eh_nominal=False,
+                votos_sim=0,
+                votos_nao=0,
+                votos_outros=0,
+                descricao=None,
+                sigla_orgao="CCJC",
+            ),
+        ]
+
+        count = votacao_repository.bulk_upsert(votacoes)
+        assert count == 2
+
+        from_db_700 = db_session.query(Votacao).filter(Votacao.id == 700).first()
+        assert from_db_700.eh_nominal is True
+        assert from_db_700.votos_sim == 250
+        assert from_db_700.descricao == "Aprovado em plenário"
+        assert from_db_700.sigla_orgao == "PLEN"
+
+        from_db_701 = db_session.query(Votacao).filter(Votacao.id == 701).first()
+        assert from_db_701.proposicao_id is None
+        assert from_db_701.eh_nominal is False
+        assert from_db_701.votos_sim == 0
+        assert from_db_701.sigla_orgao == "CCJC"
+
 
 class TestVotoRepository:
     """Testes para VotoRepository."""
