@@ -52,7 +52,7 @@ def extract_votacoes_csv(csv_path: str) -> list[dict]:
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f, delimiter=";")
             data = list(reader)
             logger.info(f"Extraído {len(data)} registros do CSV: {csv_path}")
@@ -91,7 +91,7 @@ def extract_votos_csv(csv_path: str) -> list[dict]:
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f, delimiter=";")
             data = list(reader)
             logger.info(f"Extraído {len(data)} registros do CSV: {csv_path}")
@@ -564,7 +564,7 @@ def extract_votacoes_proposicoes_csv(csv_path: str) -> list[dict]:
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f, delimiter=";")
             data = list(reader)
             logger.info(f"Extraídos {len(data)} registros do CSV: {csv_path}")
@@ -965,7 +965,7 @@ def extract_orientacoes_csv(csv_path: str) -> list[dict]:
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f, delimiter=";")
             data = list(reader)
             logger.info(f"Extraídos {len(data)} registros do CSV: {csv_path}")
