@@ -888,6 +888,21 @@ def load_votacoes_proposicoes(
         logger.info("Nenhum vínculo votação-proposição para carregar")
         return 0
 
+    # Deduplicar por (votacao_id, proposicao_id) para evitar conflito no upsert
+    unique_by_key: dict[tuple[int, int], VotacaoProposicaoCreate] = {}
+    duplicates = 0
+    for record in records:
+        key = (record.votacao_id, record.proposicao_id)
+        if key in unique_by_key:
+            duplicates += 1
+        unique_by_key[key] = record
+    if duplicates:
+        logger.warning(
+            "Vínculos votacao-proposicao duplicados no input: %s (mantendo último por chave)",
+            duplicates,
+        )
+    records = list(unique_by_key.values())
+
     repo = VotacaoProposicaoRepository(db)
     count = repo.bulk_upsert(records)
 
