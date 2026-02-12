@@ -49,7 +49,7 @@ class ProposicaoCreate(BaseModel):
     tipo: TipoProposicao = Field(description="Tipo da proposição (enum: PL, PEC, MP, PLP, PDC)")
     numero: int = Field(ge=1, description="Número da proposição")
     ano: int = Field(ge=1900, le=2100, description="Ano de apresentação")
-    ementa: str = Field(min_length=1, max_length=2000, description="Descrição da proposição")
+    ementa: str = Field(min_length=1, description="Descrição da proposição")
     autor_id: int | None = Field(None, description="ID do deputado autor (opcional)")
 
     model_config = {"from_attributes": True}
