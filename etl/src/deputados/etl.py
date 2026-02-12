@@ -48,7 +48,7 @@ def extract_deputados_csv(csv_path: str) -> list[dict]:
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f, delimiter=";")
             data = list(reader)
             logger.info(f"Extraído {len(data)} registros do CSV: {csv_path}")
