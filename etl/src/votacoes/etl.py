@@ -1076,10 +1076,9 @@ def transform_orientacoes(
             if not orientacao_raw:
                 logger.warning(
                     f"Orientação {idx}: orientacao vazia para bancada "
-                    f"'{sigla_bancada}', skipado"
+                    f"'{sigla_bancada}', usando 'Não informado'"
                 )
-                skipped += 1
-                continue
+                orientacao_raw = "Não informado"
 
             orientacao = _ORIENTACAO_NORMALIZADA.get(
                 orientacao_raw.lower(), orientacao_raw
@@ -1125,6 +1124,21 @@ def load_orientacoes(
     if not records:
         logger.info("Nenhuma orientação para carregar")
         return 0
+
+    # Deduplicar por (votacao_id, sigla_bancada) para evitar conflito no upsert
+    unique_by_key: dict[tuple[int, str], OrientacaoCreate] = {}
+    duplicates = 0
+    for record in records:
+        key = (record.votacao_id, record.sigla_bancada)
+        if key in unique_by_key:
+            duplicates += 1
+        unique_by_key[key] = record
+    if duplicates:
+        logger.warning(
+            "Orientações duplicadas no input: %s (mantendo último por chave)",
+            duplicates,
+        )
+    records = list(unique_by_key.values())
 
     repo = OrientacaoRepository(db)
     count = repo.bulk_upsert(records)
