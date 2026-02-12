@@ -9,13 +9,11 @@ These tests verify that the docs/CICD.md documentation:
 - Is written in Portuguese (pt-BR)
 """
 
-import os
 import re
 from pathlib import Path
 
 import pytest
 import yaml
-
 
 # Get project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.parent

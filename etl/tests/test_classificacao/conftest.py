@@ -1,6 +1,4 @@
-"""Fixtures pytest compartilhadas para testes de integração."""
-
-from pathlib import Path
+"""Fixtures pytest compartilhadas para testes de Classificação."""
 
 import pytest
 from sqlalchemy import create_engine
@@ -10,14 +8,11 @@ from src.shared.database import Base
 
 
 @pytest.fixture
-def fixtures_dir() -> Path:
-    """Fixture que fornece o caminho para o diretório de fixtures."""
-    return Path(__file__).parent.parent / "fixtures"
-
-
-@pytest.fixture
 def temp_db():
-    """Fixture que fornece um banco de dados SQLite em memória para testes."""
+    """Fixture que fornece um banco de dados SQLite em memória para testes.
+
+    Cria o schema das tabelas automaticamente.
+    """
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

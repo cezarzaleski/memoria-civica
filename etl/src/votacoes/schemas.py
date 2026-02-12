@@ -1,7 +1,7 @@
 """Schemas Pydantic para validação de dados do domínio de Votações.
 
-Definem os DTOs (Data Transfer Objects) para criar e ler votações e votos,
-com validação de tipos e constraints.
+Definem os DTOs (Data Transfer Objects) para criar e ler votações, votos,
+vínculos votação-proposição e orientações de bancada.
 """
 
 from datetime import datetime
@@ -16,25 +16,27 @@ class VotacaoCreate(BaseModel):
 
     Attributes:
         id: Identificador único (obrigatório do CSV)
-        proposicao_id: ID da proposição votada (obrigatório)
+        proposicao_id: ID da proposição votada (opcional, nullable)
         data_hora: Data e hora da votação (ISO 8601)
         resultado: Resultado da votação (ex: APROVADO, REJEITADO)
-
-    Examples:
-        >>> votacao = VotacaoCreate(
-        ...     id=1,
-        ...     proposicao_id=123,
-        ...     data_hora="2024-01-15T14:30:00",
-        ...     resultado="APROVADO"
-        ... )
-        >>> votacao.resultado
-        'APROVADO'
+        eh_nominal: Se a votação é nominal
+        votos_sim: Contagem de votos "Sim"
+        votos_nao: Contagem de votos "Não"
+        votos_outros: Contagem de outros votos
+        descricao: Descrição textual da votação
+        sigla_orgao: Sigla do órgão
     """
 
     id: int
-    proposicao_id: int = Field(ge=1, description="ID da proposição votada")
+    proposicao_id: int | None = Field(default=None, description="ID da proposição votada (opcional)")
     data_hora: datetime = Field(description="Data e hora da votação (ISO 8601)")
     resultado: str = Field(max_length=20, description="Resultado da votação (ex: APROVADO, REJEITADO)")
+    eh_nominal: bool = Field(default=False, description="Se a votação é nominal")
+    votos_sim: int = Field(default=0, ge=0, description="Contagem de votos Sim")
+    votos_nao: int = Field(default=0, ge=0, description="Contagem de votos Não")
+    votos_outros: int = Field(default=0, ge=0, description="Contagem de outros votos")
+    descricao: str | None = Field(default=None, description="Descrição textual da votação")
+    sigla_orgao: str | None = Field(default=None, max_length=50, description="Sigla do órgão")
 
     model_config = {"from_attributes": True}
 
@@ -43,18 +45,18 @@ class VotacaoRead(BaseModel):
     """Schema para leitura de uma votação (resposta de API).
 
     Representa a votação tal como está persistida no banco.
-
-    Attributes:
-        id: Identificador único
-        proposicao_id: ID da proposição
-        data_hora: Data e hora da votação
-        resultado: Resultado da votação
     """
 
     id: int
-    proposicao_id: int
+    proposicao_id: int | None
     data_hora: datetime
     resultado: str
+    eh_nominal: bool
+    votos_sim: int
+    votos_nao: int
+    votos_outros: int
+    descricao: str | None
+    sigla_orgao: str | None
 
     model_config = {"from_attributes": True}
 
@@ -63,22 +65,6 @@ class VotoCreate(BaseModel):
     """Schema para criar um voto.
 
     Valida os dados que vêm do CSV ou da API antes de persistir.
-
-    Attributes:
-        id: Identificador único (obrigatório do CSV)
-        votacao_id: ID da votação (obrigatório)
-        deputado_id: ID do deputado que votou (obrigatório)
-        voto: Tipo de voto (ex: SIM, NAO, ABSTENCAO, OBSTRUCAO)
-
-    Examples:
-        >>> voto = VotoCreate(
-        ...     id=1,
-        ...     votacao_id=123,
-        ...     deputado_id=456,
-        ...     voto="SIM"
-        ... )
-        >>> voto.voto
-        'SIM'
     """
 
     id: int
@@ -93,17 +79,44 @@ class VotoRead(BaseModel):
     """Schema para leitura de um voto (resposta de API).
 
     Representa o voto tal como está persistido no banco.
-
-    Attributes:
-        id: Identificador único
-        votacao_id: ID da votação
-        deputado_id: ID do deputado
-        voto: Tipo de voto
     """
 
     id: int
     votacao_id: int
     deputado_id: int
     voto: str
+
+    model_config = {"from_attributes": True}
+
+
+class VotacaoProposicaoCreate(BaseModel):
+    """Schema para criar um vínculo votação-proposição.
+
+    Registra a relação N:N entre votações e proposições.
+    """
+
+    votacao_id: int
+    votacao_id_original: str | None = None
+    proposicao_id: int
+    titulo: str | None = None
+    ementa: str | None = None
+    sigla_tipo: str | None = None
+    numero: int | None = None
+    ano: int | None = None
+    eh_principal: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class OrientacaoCreate(BaseModel):
+    """Schema para criar uma orientação de bancada.
+
+    Registra como uma bancada orientou seus membros em uma votação.
+    """
+
+    votacao_id: int
+    votacao_id_original: str | None = None
+    sigla_bancada: str
+    orientacao: str
 
     model_config = {"from_attributes": True}

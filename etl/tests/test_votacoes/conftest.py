@@ -14,21 +14,14 @@ from src.votacoes.repository import VotacaoRepository, VotoRepository
 def temp_db():
     """Fixture que fornece um banco de dados SQLite em memória para testes.
 
-    Cria o schema das tabelas (deputados, proposicoes, votacoes e votos) automaticamente.
-    Fornece um SessionLocal factory que pode criar sessões.
+    Cria o schema das tabelas automaticamente.
     """
-    # Criar engine SQLite in-memory
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-
-    # Criar todas as tabelas
     Base.metadata.create_all(bind=engine)
-
-    # Criar SessionLocal factory
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     yield SessionLocal
 
-    # Cleanup
     Base.metadata.drop_all(bind=engine)
 
 

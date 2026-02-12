@@ -26,11 +26,11 @@ from pathlib import Path
 ETL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ETL_DIR))
 
-from src.shared.config import settings
+from scripts.download_camara import download_all_files, print_summary
 from src.deputados.etl import run_deputados_etl
 from src.proposicoes.etl import run_proposicoes_etl
+from src.shared.config import settings
 from src.votacoes.etl import run_votacoes_etl
-from scripts.download_camara import download_all_files, print_summary
 
 # Configurar logger
 logger = logging.getLogger(__name__)
