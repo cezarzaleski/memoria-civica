@@ -16,8 +16,8 @@ from sqlalchemy.orm import Session
 from src.shared.database import get_db
 
 from .models import Votacao
-from .repository import VotacaoProposicaoRepository, VotacaoRepository, VotoRepository
-from .schemas import VotacaoCreate, VotacaoProposicaoCreate, VotoCreate
+from .repository import OrientacaoRepository, VotacaoProposicaoRepository, VotacaoRepository, VotoRepository
+from .schemas import OrientacaoCreate, VotacaoCreate, VotacaoProposicaoCreate, VotoCreate
 
 # Configurar logger para este módulo
 logger = logging.getLogger(__name__)
@@ -894,4 +894,224 @@ def _run_votacoes_proposicoes_etl_impl(csv_path: str, db: Session) -> int:
     count = load_votacoes_proposicoes(validated, db)
 
     logger.info(f"ETL votacoes_proposicoes concluído: {count} registros carregados")
+    return count
+
+
+# ==============================================================================
+# ETL Orientações de Bancada (Fase 2, step 2.2)
+# ==============================================================================
+
+# Mapeamento de normalização de orientações
+_ORIENTACAO_NORMALIZADA = {
+    "sim": "Sim",
+    "não": "Não",
+    "nao": "Não",
+    "liberado": "Liberado",
+    "liberada": "Liberado",
+    "obstrução": "Obstrução",
+    "obstrucao": "Obstrução",
+    "não informado": "Não informado",
+    "nao informado": "Não informado",
+}
+
+
+def extract_orientacoes_csv(csv_path: str) -> list[dict]:
+    """Extrai dados de orientações de bancada do arquivo CSV.
+
+    Lê o CSV de orientações usando encoding UTF-8 e separador ';'
+    (padrão Dados Abertos da Câmara).
+
+    Args:
+        csv_path: Caminho para o arquivo CSV
+
+    Returns:
+        Lista de dicionários com os dados brutos do CSV
+
+    Raises:
+        FileNotFoundError: Se o arquivo CSV não existir
+    """
+    path = Path(csv_path)
+    if not path.exists():
+        logger.error(f"Arquivo CSV não encontrado: {csv_path}")
+        raise FileNotFoundError(f"CSV not found: {csv_path}")
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            data = list(reader)
+            logger.info(f"Extraídos {len(data)} registros do CSV: {csv_path}")
+            return data
+    except Exception as e:
+        logger.error(f"Erro ao ler CSV {csv_path}: {e}")
+        raise
+
+
+def transform_orientacoes(
+    raw_data: list[dict],
+    db: Session,
+) -> list[OrientacaoCreate]:
+    """Transforma dados brutos de orientações em schemas validados.
+
+    Realiza:
+    1. Parse de idVotacao (split no hífen para obter votacao_id numérico)
+    2. Validação de FK votacao_id contra tabela votacoes (skip se não existe)
+    3. Normalização do campo orientacao ("Sim", "Não", "Liberado", "Obstrução")
+    4. Filtragem de registros com orientacao ou siglaBancada vazia
+
+    Args:
+        raw_data: Lista de dicionários com dados brutos do CSV
+        db: Sessão de banco para validação de FK
+
+    Returns:
+        Lista de schemas OrientacaoCreate validados
+    """
+    validated = []
+    skipped = 0
+
+    # Cache de IDs existentes para evitar queries repetidas
+    votacao_ids_cache: dict[int, bool] = {}
+
+    for idx, record in enumerate(raw_data, 1):
+        try:
+            # 1. Parse idVotacao
+            raw_id = record.get("idVotacao", "")
+            try:
+                votacao_id, votacao_id_original = _parse_votacao_id(raw_id)
+            except (ValueError, TypeError):
+                logger.warning(
+                    f"Orientação {idx}: idVotacao inválido '{raw_id}', skipado"
+                )
+                skipped += 1
+                continue
+
+            # 2. Validar FK votacao_id
+            if votacao_id not in votacao_ids_cache:
+                stmt = select(Votacao).where(Votacao.id == votacao_id)
+                exists = db.execute(stmt).scalar_one_or_none() is not None
+                votacao_ids_cache[votacao_id] = exists
+
+            if not votacao_ids_cache[votacao_id]:
+                logger.warning(
+                    f"Orientação {idx}: votacao_id {votacao_id} não encontrada "
+                    f"em votacoes — registro skipado"
+                )
+                skipped += 1
+                continue
+
+            # 3. Extrair e validar siglaBancada
+            sigla_bancada = (record.get("siglaBancada") or "").strip()
+            if not sigla_bancada:
+                logger.warning(
+                    f"Orientação {idx}: siglaBancada vazia, skipado"
+                )
+                skipped += 1
+                continue
+
+            # 4. Normalizar orientacao
+            orientacao_raw = (record.get("orientacao") or "").strip()
+            if not orientacao_raw:
+                logger.warning(
+                    f"Orientação {idx}: orientacao vazia para bancada "
+                    f"'{sigla_bancada}', skipado"
+                )
+                skipped += 1
+                continue
+
+            orientacao = _ORIENTACAO_NORMALIZADA.get(
+                orientacao_raw.lower(), orientacao_raw
+            )
+
+            schema = OrientacaoCreate(
+                votacao_id=votacao_id,
+                votacao_id_original=votacao_id_original,
+                sigla_bancada=sigla_bancada,
+                orientacao=orientacao,
+            )
+            validated.append(schema)
+
+        except ValidationError as e:
+            logger.warning(f"Validação falhou para orientação {idx}: {e}")
+            skipped += 1
+        except Exception as e:
+            logger.warning(f"Erro ao transformar orientação {idx}: {e}")
+            skipped += 1
+
+    logger.info(
+        f"Transform orientacoes: {len(validated)} válidos, {skipped} skipados"
+    )
+    return validated
+
+
+def load_orientacoes(
+    records: list[OrientacaoCreate],
+    db: Session,
+) -> int:
+    """Carrega orientações de bancada no banco de dados.
+
+    Usa OrientacaoRepository.bulk_upsert para inserção/atualização
+    idempotente via INSERT...ON CONFLICT.
+
+    Args:
+        records: Lista de schemas validados
+        db: Sessão de banco de dados
+
+    Returns:
+        Quantidade de registros carregados
+    """
+    if not records:
+        logger.info("Nenhuma orientação para carregar")
+        return 0
+
+    repo = OrientacaoRepository(db)
+    count = repo.bulk_upsert(records)
+
+    logger.info(f"Carregadas {count} orientações no banco")
+    return count
+
+
+def run_orientacoes_etl(
+    csv_path: str,
+    db: Session | None = None,
+) -> int:
+    """Executa o pipeline ETL para orientações de bancada.
+
+    Orquestra extract → transform → load para o CSV votacoesOrientacoes.
+    Step NÃO-CRÍTICO: falha gera warning mas não interrompe o pipeline.
+
+    Args:
+        csv_path: Caminho para o arquivo CSV de orientações
+        db: Sessão opcional (se None, usa get_db())
+
+    Returns:
+        Quantidade de registros carregados
+    """
+    logger.info(f"Iniciando ETL orientacoes: {csv_path}")
+
+    if db is None:
+        with get_db() as db:
+            return _run_orientacoes_etl_impl(csv_path, db)
+    else:
+        return _run_orientacoes_etl_impl(csv_path, db)
+
+
+def _run_orientacoes_etl_impl(csv_path: str, db: Session) -> int:
+    """Implementação interna do ETL orientacoes.
+
+    Args:
+        csv_path: Caminho para o arquivo CSV
+        db: Sessão de banco de dados
+
+    Returns:
+        Quantidade de registros carregados
+    """
+    # Extract
+    raw_data = extract_orientacoes_csv(csv_path)
+
+    # Transform
+    validated = transform_orientacoes(raw_data, db)
+
+    # Load
+    count = load_orientacoes(validated, db)
+
+    logger.info(f"ETL orientacoes concluído: {count} registros carregados")
     return count

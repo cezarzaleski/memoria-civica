@@ -17,20 +17,24 @@ from src.votacoes.etl import (
     _criar_proposicao_parcial,
     _eleger_principal,
     _parse_votacao_id,
+    extract_orientacoes_csv,
     extract_votacoes_csv,
     extract_votacoes_proposicoes_csv,
     extract_votos_csv,
+    load_orientacoes,
     load_votacoes,
     load_votacoes_proposicoes,
     load_votos,
+    run_orientacoes_etl,
     run_votacoes_etl,
     run_votacoes_proposicoes_etl,
+    transform_orientacoes,
     transform_votacoes,
     transform_votacoes_proposicoes,
     transform_votos,
 )
-from src.votacoes.models import Votacao, VotacaoProposicao, Voto
-from src.votacoes.schemas import VotacaoCreate, VotacaoProposicaoCreate, VotoCreate
+from src.votacoes.models import Orientacao, Votacao, VotacaoProposicao, Voto
+from src.votacoes.schemas import OrientacaoCreate, VotacaoCreate, VotacaoProposicaoCreate, VotoCreate
 
 
 class TestExtractVotacoesCsv:
@@ -954,3 +958,341 @@ class TestRunVotacoesProposicoesEtl:
 
         all_vps = db_session.query(VotacaoProposicao).all()
         assert len(all_vps) == count1
+
+
+# ==============================================================================
+# Testes para ETL orientacoes de bancada
+# ==============================================================================
+
+
+class TestExtractOrientacoesCsv:
+    """Testes para extract_orientacoes_csv."""
+
+    def test_extract_returns_dict_list(self, orientacoes_csv_path):
+        """Test: extract lê CSV e retorna lista de dicts."""
+        data = extract_orientacoes_csv(orientacoes_csv_path)
+        assert isinstance(data, list)
+        assert len(data) > 0
+        assert isinstance(data[0], dict)
+
+    def test_extract_has_expected_columns(self, orientacoes_csv_path):
+        """Test: extract retorna dicts com colunas esperadas do formato Câmara."""
+        data = extract_orientacoes_csv(orientacoes_csv_path)
+        first = data[0]
+        assert "idVotacao" in first
+        assert "siglaBancada" in first
+        assert "orientacao" in first
+        assert "siglaOrgao" in first
+
+    def test_extract_file_not_found(self):
+        """Test: extract lança FileNotFoundError se arquivo não existe."""
+        with pytest.raises(FileNotFoundError):
+            extract_orientacoes_csv("/path/inexistente/orientacoes.csv")
+
+    def test_extract_empty_csv(self, tmp_path):
+        """Test: extract retorna lista vazia para CSV com apenas headers."""
+        csv_file = tmp_path / "empty.csv"
+        csv_file.write_text(
+            "idVotacao;uriVotacao;siglaOrgao;descricao;siglaBancada;uriBancada;orientacao\n",
+            encoding="utf-8",
+        )
+        data = extract_orientacoes_csv(str(csv_file))
+        assert data == []
+
+
+class TestTransformOrientacoes:
+    """Testes para transform_orientacoes."""
+
+    def test_transform_com_dados_validos(self, db_session):
+        """Test: transform com votação existente retorna registros válidos."""
+        _setup_base_data(db_session)
+
+        raw_data = [
+            {
+                "idVotacao": "1-1",
+                "siglaBancada": "PT",
+                "orientacao": "Sim",
+            }
+        ]
+        result = transform_orientacoes(raw_data, db_session)
+        assert len(result) == 1
+        assert isinstance(result[0], OrientacaoCreate)
+        assert result[0].votacao_id == 1
+        assert result[0].votacao_id_original == "1-1"
+        assert result[0].sigla_bancada == "PT"
+        assert result[0].orientacao == "Sim"
+
+    def test_transform_normaliza_orientacao_sim(self, db_session):
+        """Test: transform normaliza 'Sim' corretamente."""
+        _setup_base_data(db_session)
+        raw_data = [{"idVotacao": "1-1", "siglaBancada": "PT", "orientacao": "Sim"}]
+        result = transform_orientacoes(raw_data, db_session)
+        assert result[0].orientacao == "Sim"
+
+    def test_transform_normaliza_orientacao_nao(self, db_session):
+        """Test: transform normaliza 'Não' corretamente."""
+        _setup_base_data(db_session)
+        raw_data = [{"idVotacao": "1-1", "siglaBancada": "PT", "orientacao": "Não"}]
+        result = transform_orientacoes(raw_data, db_session)
+        assert result[0].orientacao == "Não"
+
+    def test_transform_normaliza_orientacao_liberado(self, db_session):
+        """Test: transform normaliza 'Liberado' corretamente."""
+        _setup_base_data(db_session)
+        raw_data = [{"idVotacao": "1-1", "siglaBancada": "MDB", "orientacao": "Liberado"}]
+        result = transform_orientacoes(raw_data, db_session)
+        assert result[0].orientacao == "Liberado"
+
+    def test_transform_normaliza_orientacao_obstrucao(self, db_session):
+        """Test: transform normaliza 'Obstrução' corretamente."""
+        _setup_base_data(db_session)
+        raw_data = [{"idVotacao": "1-1", "siglaBancada": "PSOL", "orientacao": "Obstrução"}]
+        result = transform_orientacoes(raw_data, db_session)
+        assert result[0].orientacao == "Obstrução"
+
+    def test_transform_normaliza_case_insensitive(self, db_session):
+        """Test: normalização funciona independente de casing."""
+        _setup_base_data(db_session)
+        raw_data = [
+            {"idVotacao": "1-1", "siglaBancada": "PT", "orientacao": "sim"},
+            {"idVotacao": "1-1", "siglaBancada": "PL", "orientacao": "NÃO"},
+            {"idVotacao": "1-1", "siglaBancada": "MDB", "orientacao": "liberado"},
+            {"idVotacao": "1-1", "siglaBancada": "PSOL", "orientacao": "obstrução"},
+        ]
+        result = transform_orientacoes(raw_data, db_session)
+        assert len(result) == 4
+        assert result[0].orientacao == "Sim"
+        assert result[1].orientacao == "Não"
+        assert result[2].orientacao == "Liberado"
+        assert result[3].orientacao == "Obstrução"
+
+    def test_transform_skipa_votacao_inexistente(self, db_session, caplog):
+        """Test: transform skipa registro quando votacao_id não existe."""
+        _setup_base_data(db_session)
+
+        raw_data = [
+            {
+                "idVotacao": "999-1",
+                "siglaBancada": "PT",
+                "orientacao": "Sim",
+            }
+        ]
+        with caplog.at_level(logging.WARNING):
+            result = transform_orientacoes(raw_data, db_session)
+
+        assert len(result) == 0
+        assert "votacao_id 999" in caplog.text
+
+    def test_transform_skipa_orientacao_vazia(self, db_session, caplog):
+        """Test: transform skipa registro com orientacao vazia."""
+        _setup_base_data(db_session)
+
+        raw_data = [
+            {
+                "idVotacao": "1-1",
+                "siglaBancada": "PT",
+                "orientacao": "",
+            }
+        ]
+        with caplog.at_level(logging.WARNING):
+            result = transform_orientacoes(raw_data, db_session)
+
+        assert len(result) == 0
+        assert "orientacao vazia" in caplog.text
+
+    def test_transform_skipa_sigla_bancada_vazia(self, db_session, caplog):
+        """Test: transform skipa registro com siglaBancada vazia."""
+        _setup_base_data(db_session)
+
+        raw_data = [
+            {
+                "idVotacao": "1-1",
+                "siglaBancada": "",
+                "orientacao": "Sim",
+            }
+        ]
+        with caplog.at_level(logging.WARNING):
+            result = transform_orientacoes(raw_data, db_session)
+
+        assert len(result) == 0
+        assert "siglaBancada vazia" in caplog.text
+
+    def test_transform_skipa_id_votacao_invalido(self, db_session, caplog):
+        """Test: transform skipa registros com idVotacao inválido."""
+        _setup_base_data(db_session)
+
+        raw_data = [
+            {
+                "idVotacao": "",
+                "siglaBancada": "PT",
+                "orientacao": "Sim",
+            }
+        ]
+        with caplog.at_level(logging.WARNING):
+            result = transform_orientacoes(raw_data, db_session)
+
+        assert len(result) == 0
+
+    def test_transform_cache_evita_queries_repetidas(self, db_session):
+        """Test: transform usa cache para evitar queries repetidas."""
+        _setup_base_data(db_session)
+
+        raw_data = [
+            {"idVotacao": "1-1", "siglaBancada": "PT", "orientacao": "Sim"},
+            {"idVotacao": "1-1", "siglaBancada": "PL", "orientacao": "Não"},
+            {"idVotacao": "2-1", "siglaBancada": "PT", "orientacao": "Liberado"},
+        ]
+        result = transform_orientacoes(raw_data, db_session)
+        assert len(result) == 3
+
+    def test_transform_lista_vazia(self, db_session):
+        """Test: transform com lista vazia retorna lista vazia."""
+        result = transform_orientacoes([], db_session)
+        assert result == []
+
+    def test_transform_preserva_orientacao_desconhecida(self, db_session):
+        """Test: orientação não reconhecida é preservada como está."""
+        _setup_base_data(db_session)
+        raw_data = [
+            {"idVotacao": "1-1", "siglaBancada": "PT", "orientacao": "Artigo 17"},
+        ]
+        result = transform_orientacoes(raw_data, db_session)
+        assert len(result) == 1
+        assert result[0].orientacao == "Artigo 17"
+
+    def test_transform_com_csv_fixture(self, db_session, orientacoes_csv_path):
+        """Test: transform usando fixture CSV completa."""
+        _setup_base_data(db_session)
+
+        raw_data = extract_orientacoes_csv(orientacoes_csv_path)
+        result = transform_orientacoes(raw_data, db_session)
+
+        # O CSV tem 12 linhas:
+        # - 1 com votacao_id=999 (skipada - não existe)
+        # - 1 com orientacao vazia para PSDB (skipada)
+        # - 10 restantes com votacao_id=1,2,3,4,5 válidas
+        assert len(result) > 0
+        # Todas devem ter votacao_id válido
+        for r in result:
+            assert r.votacao_id in [1, 2, 3, 4, 5]
+
+    def test_transform_multiplas_bancadas_mesma_votacao(self, db_session):
+        """Test: múltiplas bancadas na mesma votação são aceitas."""
+        _setup_base_data(db_session)
+        raw_data = [
+            {"idVotacao": "1-1", "siglaBancada": "PT", "orientacao": "Sim"},
+            {"idVotacao": "1-1", "siglaBancada": "PL", "orientacao": "Não"},
+            {"idVotacao": "1-1", "siglaBancada": "MDB", "orientacao": "Liberado"},
+            {"idVotacao": "1-1", "siglaBancada": "Governo", "orientacao": "Sim"},
+        ]
+        result = transform_orientacoes(raw_data, db_session)
+        assert len(result) == 4
+        bancadas = {r.sigla_bancada for r in result}
+        assert bancadas == {"PT", "PL", "MDB", "Governo"}
+
+
+class TestLoadOrientacoes:
+    """Testes para load_orientacoes."""
+
+    def test_load_persists_data(self, db_session):
+        """Test: load persiste orientações no banco via repository."""
+        _setup_base_data(db_session)
+
+        records = [
+            OrientacaoCreate(
+                votacao_id=1,
+                votacao_id_original="1-1",
+                sigla_bancada="PT",
+                orientacao="Sim",
+            ),
+        ]
+        count = load_orientacoes(records, db_session)
+        assert count == 1
+
+        # Verificar persistência
+        from_db = db_session.query(Orientacao).filter(
+            Orientacao.votacao_id == 1,
+            Orientacao.sigla_bancada == "PT",
+        ).first()
+        assert from_db is not None
+        assert from_db.orientacao == "Sim"
+
+    def test_load_returns_zero_for_empty(self, db_session):
+        """Test: load retorna 0 para lista vazia."""
+        count = load_orientacoes([], db_session)
+        assert count == 0
+
+    def test_load_multiple_records(self, db_session):
+        """Test: load persiste múltiplos registros."""
+        _setup_base_data(db_session)
+
+        records = [
+            OrientacaoCreate(
+                votacao_id=1, sigla_bancada="PT", orientacao="Sim"
+            ),
+            OrientacaoCreate(
+                votacao_id=1, sigla_bancada="PL", orientacao="Não"
+            ),
+            OrientacaoCreate(
+                votacao_id=2, sigla_bancada="PT", orientacao="Liberado"
+            ),
+        ]
+        count = load_orientacoes(records, db_session)
+        assert count == 3
+
+
+class TestRunOrientacoesEtl:
+    """Testes de integração para run_orientacoes_etl."""
+
+    def test_run_etl_end_to_end(self, db_session, orientacoes_csv_path):
+        """Test: ETL completo extract→transform→load funciona."""
+        _setup_base_data(db_session)
+
+        count = run_orientacoes_etl(orientacoes_csv_path, db_session)
+        assert count > 0
+
+        # Verificar que registros foram persistidos
+        all_orientacoes = db_session.query(Orientacao).all()
+        assert len(all_orientacoes) > 0
+
+    def test_run_etl_file_not_found_raises(self, db_session):
+        """Test: ETL lança exceção se arquivo CSV não existe."""
+        with pytest.raises(FileNotFoundError):
+            run_orientacoes_etl("/path/inexistente.csv", db_session)
+
+    def test_run_etl_idempotent(self, db_session, orientacoes_csv_path):
+        """Test: executar ETL 2x não duplica registros (idempotência)."""
+        _setup_base_data(db_session)
+
+        count1 = run_orientacoes_etl(orientacoes_csv_path, db_session)
+        count2 = run_orientacoes_etl(orientacoes_csv_path, db_session)
+
+        assert count1 == count2
+
+        all_orientacoes = db_session.query(Orientacao).all()
+        assert len(all_orientacoes) == count1
+
+    def test_run_etl_skips_invalid_votacao(self, db_session, orientacoes_csv_path):
+        """Test: ETL skipa orientações para votações inexistentes."""
+        _setup_base_data(db_session)
+
+        run_orientacoes_etl(orientacoes_csv_path, db_session)
+
+        # O CSV tem 12 linhas: 1 com votacao_id=999 e 1 com orientacao vazia
+        # devem ser skipadas
+        all_orientacoes = db_session.query(Orientacao).all()
+        for o in all_orientacoes:
+            assert o.votacao_id != 999
+
+    def test_run_etl_normalizes_orientacao(self, db_session, orientacoes_csv_path):
+        """Test: ETL normaliza corretamente os valores de orientação."""
+        _setup_base_data(db_session)
+
+        run_orientacoes_etl(orientacoes_csv_path, db_session)
+
+        all_orientacoes = db_session.query(Orientacao).all()
+        valid_orientacoes = {"Sim", "Não", "Liberado", "Obstrução", "Não informado"}
+        for o in all_orientacoes:
+            assert o.orientacao in valid_orientacoes, (
+                f"Orientação '{o.orientacao}' não é um valor normalizado válido"
+            )

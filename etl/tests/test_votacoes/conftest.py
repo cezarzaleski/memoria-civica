@@ -86,3 +86,9 @@ def orientacao_repository(db_session) -> OrientacaoRepository:
 def votacoes_proposicoes_csv_path(fixtures_dir) -> str:
     """Fixture que fornece o caminho para o CSV de votações-proposições."""
     return str(fixtures_dir / "votacoes_proposicoes.csv")
+
+
+@pytest.fixture
+def orientacoes_csv_path(fixtures_dir) -> str:
+    """Fixture que fornece o caminho para o CSV de orientações de bancada."""
+    return str(fixtures_dir / "votacoesOrientacoes.csv")
