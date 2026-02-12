@@ -1,0 +1,9 @@
+idVotacao;uriVotacao;data;descricao;proposicao_id;proposicao_uri;proposicao_titulo;proposicao_ementa;proposicao_codTipo;proposicao_siglaTipo;proposicao_numero;proposicao_ano
+1-1;https://api.camara.leg.br/v2/votacoes/1-1;2024-01-15;Aprovado o projeto;1;https://api.camara.leg.br/v2/proposicoes/1;PL 100/2024;Ementa da proposição 1;PL;PL;100;2024
+1-1;https://api.camara.leg.br/v2/votacoes/1-1;2024-01-15;Aprovado o projeto;2;https://api.camara.leg.br/v2/proposicoes/2;PEC 10/2024;Ementa da PEC;PEC;PEC;10;2024
+2-1;https://api.camara.leg.br/v2/votacoes/2-1;2024-01-16;Rejeitada a emenda;3;https://api.camara.leg.br/v2/proposicoes/3;PLP 50/2024;Ementa da PLP;PLP;PLP;50;2024
+3-1;https://api.camara.leg.br/v2/votacoes/3-1;2024-01-17;Aprovado;1;https://api.camara.leg.br/v2/proposicoes/1;PL 100/2024;Ementa da proposição 1;PL;PL;100;2024
+4-1;https://api.camara.leg.br/v2/votacoes/4-1;2024-01-18;Aprovado;99999;https://api.camara.leg.br/v2/proposicoes/99999;MPV 200/2024;Ementa da MPV parcial;MPV;MPV;200;2024
+5-1;https://api.camara.leg.br/v2/votacoes/5-1;2024-01-19;Rejeitado;5;https://api.camara.leg.br/v2/proposicoes/5;REQ 300/2024;Ementa do requerimento;REQ;REQ;300;2024
+999-1;https://api.camara.leg.br/v2/votacoes/999-1;2024-01-20;Votacao fantasma;1;https://api.camara.leg.br/v2/proposicoes/1;PL 100/2024;Ementa da proposição 1;PL;PL;100;2024
+4-1;https://api.camara.leg.br/v2/votacoes/4-1;2024-01-18;Aprovado;4;https://api.camara.leg.br/v2/proposicoes/4;PEC 5/2024;Ementa da PEC especial;PEC;PEC;5;2024

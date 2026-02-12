@@ -80,3 +80,9 @@ def votacao_proposicao_repository(db_session) -> VotacaoProposicaoRepository:
 def orientacao_repository(db_session) -> OrientacaoRepository:
     """Fixture que fornece um OrientacaoRepository com banco in-memory."""
     return OrientacaoRepository(db_session)
+
+
+@pytest.fixture
+def votacoes_proposicoes_csv_path(fixtures_dir) -> str:
+    """Fixture que fornece o caminho para o CSV de votações-proposições."""
+    return str(fixtures_dir / "votacoes_proposicoes.csv")
