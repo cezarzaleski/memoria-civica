@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("sigla_tipo", sa.String(20), nullable=True),
         sa.Column("numero", sa.Integer(), nullable=True),
         sa.Column("ano", sa.Integer(), nullable=True),
-        sa.Column("eh_principal", sa.Boolean(), server_default=sa.text("0"), nullable=False),
+        sa.Column("eh_principal", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
         sa.ForeignKeyConstraint(["votacao_id"], ["votacoes.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["proposicao_id"], ["proposicoes.id"], ondelete="CASCADE"),
