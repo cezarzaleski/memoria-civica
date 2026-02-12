@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""Orquestra ETL completo: deputados → proposições → votações.
+"""Orquestra ETL completo em 3 fases sequenciais.
 
-Este script é o ponto de entrada principal para executar o pipeline ETL
-de todos os domínios na ordem correta respeitando as dependências.
+Fase 1 — Ingestão base:
+    deputados → proposições → votações + votos
 
-Ordem de execução:
-    1. Deputados (sem dependências)
-    2. Proposições (depende de deputados para autores)
-    3. Votações (depende de proposições e deputados)
+Fase 2 — Ingestão relacional:
+    votacoes_proposicoes (CRÍTICO) → orientacoes (NÃO-CRÍTICO)
 
-Exemplo:
-    python scripts/run_etl.py
+Fase 3 — Enriquecimento:
+    classificação cívica (NÃO-CRÍTICO)
+
+Política de erros:
+    - Steps de ingestão base (Fase 1) são bloqueantes.
+    - votacoes_proposicoes (Fase 2) é bloqueante — pipeline para se falhar.
+    - orientacoes (Fase 2) e classificacao (Fase 3) são NÃO-CRÍTICOS — pipeline
+      continua com warning se falharem.
 
 Exit codes:
-    0: Sucesso - ETL completo executado sem erros
-    1: Falha - erro em qualquer fase do ETL
+    0: Sucesso — ETL completo executado (steps não-críticos podem ter falhado)
+    1: Falha — erro em step crítico
 """
 
 import logging
@@ -23,9 +27,10 @@ import time
 from functools import wraps
 from pathlib import Path
 
+from src.classificacao.etl import run_classificacao_etl
 from src.deputados.etl import run_deputados_etl
 from src.proposicoes.etl import run_proposicoes_etl
-from src.votacoes.etl import run_votacoes_etl
+from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl
 
 # Add src to path so imports work when script is run from anywhere
 ETL_DIR = Path(__file__).parent.parent
@@ -163,13 +168,14 @@ def run_votacoes_etl_with_retry(votacoes_csv: str, votos_csv: str) -> int:
 
 
 def main() -> int:
-    """Orquestra ETL completo para todos domínios.
+    """Orquestra ETL completo em 3 fases sequenciais.
 
-    Executa na ordem: deputados → proposições → votações,
-    respeitando dependências entre domínios.
+    Fase 1: Ingestão base (deputados → proposições → votações + votos)
+    Fase 2: Ingestão relacional (votacoes_proposicoes → orientacoes)
+    Fase 3: Enriquecimento (classificação cívica)
 
     Returns:
-        Exit code (0 sucesso, 1 falha)
+        Exit code (0 sucesso, 1 falha em step crítico)
     """
     data_dir = Path("data/dados_camara")
 
@@ -177,6 +183,8 @@ def main() -> int:
     if not data_dir.exists():
         logger.error(f"Diretório de dados não encontrado: {data_dir}")
         return 1
+
+    warnings_count = 0
 
     try:
         logger.info("=" * 60)
@@ -186,51 +194,87 @@ def main() -> int:
         # Registrar timestamps para medir performance
         start_time = time.time()
 
-        # Fase 1: Deputados (sem dependências)
+        # ======================================================================
+        # FASE 1: Ingestão base (existente — todas são CRÍTICAS)
+        # ======================================================================
+
+        # Fase 1.1: Deputados (sem dependências)
         logger.info("")
-        logger.info("FASE 1/3: Deputados (sem dependências)")
+        logger.info("FASE 1/3: Ingestão base")
         logger.info("-" * 60)
         phase_start = time.time()
 
+        logger.info("Step 1.1: Deputados (sem dependências)")
         deputados_csv = data_dir / "deputados.csv"
         result = run_deputados_etl_with_retry(str(deputados_csv))
-
         if result != 0:
             logger.error("ETL de deputados falhou")
+            return 1
+
+        # Step 1.2: Proposições (depende de deputados)
+        logger.info("Step 1.2: Proposições (depende de deputados)")
+        proposicoes_csv = data_dir / "proposicoes.csv"
+        result = run_proposicoes_etl_with_retry(str(proposicoes_csv))
+        if result != 0:
+            logger.error("ETL de proposições falhou")
+            return 1
+
+        # Step 1.3: Votações + Votos (depende de proposições e deputados)
+        logger.info("Step 1.3: Votações + Votos (depende de proposições e deputados)")
+        votacoes_csv = data_dir / "votacoes.csv"
+        votos_csv = data_dir / "votos.csv"
+        result = run_votacoes_etl_with_retry(str(votacoes_csv), str(votos_csv))
+        if result != 0:
+            logger.error("ETL de votações falhou")
             return 1
 
         phase_time = time.time() - phase_start
         logger.info(f"✓ Fase 1 concluída em {phase_time:.2f}s")
 
-        # Fase 2: Proposições (depende de deputados)
+        # ======================================================================
+        # FASE 2: Ingestão relacional
+        # ======================================================================
         logger.info("")
-        logger.info("FASE 2/3: Proposições (depende de deputados)")
+        logger.info("FASE 2/3: Ingestão relacional")
         logger.info("-" * 60)
         phase_start = time.time()
 
-        proposicoes_csv = data_dir / "proposicoes.csv"
-        result = run_proposicoes_etl_with_retry(str(proposicoes_csv))
+        # Step 2.1: Votações-Proposições (CRÍTICO — pipeline para se falhar)
+        logger.info("Step 2.1: Votações-Proposições (CRÍTICO)")
+        vp_csv = data_dir / "votacoes_proposicoes.csv"
+        try:
+            run_votacoes_proposicoes_etl(str(vp_csv))
+        except Exception as e:
+            logger.error(f"Step crítico falhou: votacoes_proposicoes — {e}")
+            raise
 
-        if result != 0:
-            logger.error("ETL de proposições falhou")
-            return 1
+        # Step 2.2: Orientações (NÃO-CRÍTICO — pipeline continua com warning)
+        logger.info("Step 2.2: Orientações de bancada (NÃO-CRÍTICO)")
+        orientacoes_csv = data_dir / "orientacoes.csv"
+        try:
+            run_orientacoes_etl(str(orientacoes_csv))
+        except Exception as e:
+            logger.warning(f"Step não-crítico falhou: orientacoes — {e}")
+            warnings_count += 1
 
         phase_time = time.time() - phase_start
         logger.info(f"✓ Fase 2 concluída em {phase_time:.2f}s")
 
-        # Fase 3: Votações (depende de proposições e deputados)
+        # ======================================================================
+        # FASE 3: Enriquecimento
+        # ======================================================================
         logger.info("")
-        logger.info("FASE 3/3: Votações (depende de proposições e deputados)")
+        logger.info("FASE 3/3: Enriquecimento")
         logger.info("-" * 60)
         phase_start = time.time()
 
-        votacoes_csv = data_dir / "votacoes.csv"
-        votos_csv = data_dir / "votos.csv"
-        result = run_votacoes_etl_with_retry(str(votacoes_csv), str(votos_csv))
-
-        if result != 0:
-            logger.error("ETL de votações falhou")
-            return 1
+        # Step 3.1: Classificação cívica (NÃO-CRÍTICO)
+        logger.info("Step 3.1: Classificação cívica (NÃO-CRÍTICO)")
+        try:
+            run_classificacao_etl()
+        except Exception as e:
+            logger.warning(f"Step não-crítico falhou: classificacao — {e}")
+            warnings_count += 1
 
         phase_time = time.time() - phase_start
         logger.info(f"✓ Fase 3 concluída em {phase_time:.2f}s")
@@ -239,7 +283,10 @@ def main() -> int:
         total_time = time.time() - start_time
         logger.info("")
         logger.info("=" * 60)
-        logger.info("✓ ETL COMPLETO EXECUTADO COM SUCESSO!")
+        if warnings_count > 0:
+            logger.info(f"✓ ETL COMPLETO EXECUTADO COM {warnings_count} WARNING(S)")
+        else:
+            logger.info("✓ ETL COMPLETO EXECUTADO COM SUCESSO!")
         logger.info(f"Tempo total: {total_time:.2f}s ({total_time / 60:.2f}m)")
         logger.info("=" * 60)
 

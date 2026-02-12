@@ -6,6 +6,12 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Importar models de todos os domínios para garantir que Base.metadata.create_all()
+# consiga criar todas as tabelas necessárias
+import src.classificacao.models
+import src.deputados.models
+import src.proposicoes.models
+import src.votacoes.models  # noqa: F401
 from src.shared.database import Base
 
 

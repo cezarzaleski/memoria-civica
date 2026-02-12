@@ -141,10 +141,22 @@ FILE_CONFIGS = {
         "requires_legislatura": False,
         "requires_ano": True,
     },
+    "votacoes_proposicoes": {
+        "url_path": "votacoesProposicoes/csv/votacoesProposicoes-{ano}.csv",
+        "filename": "votacoesProposicoes-{ano}.csv",
+        "requires_legislatura": False,
+        "requires_ano": True,
+    },
+    "votacoes_orientacoes": {
+        "url_path": "votacoesOrientacoes/csv/votacoesOrientacoes-{ano}.csv",
+        "filename": "votacoesOrientacoes-{ano}.csv",
+        "requires_legislatura": False,
+        "requires_ano": True,
+    },
 }
 
 # Ordem de download (respeita dependências)
-DOWNLOAD_ORDER = ["deputados", "proposicoes", "votacoes", "votos"]
+DOWNLOAD_ORDER = ["deputados", "proposicoes", "votacoes", "votos", "votacoes_proposicoes", "votacoes_orientacoes"]
 
 
 def setup_logging(verbose: bool = False) -> None:
