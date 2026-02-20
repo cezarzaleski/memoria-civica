@@ -13,17 +13,13 @@ import { useEffect } from 'react';
  */
 export function MSWInitializer() {
   useEffect(() => {
-    // Only initialize MSW in development mode
-    if (process.env.NODE_ENV === 'development') {
-      // Dynamically import MSW worker to avoid bundling it in production
-      import('@/mocks/browser').then(({ worker }) => {
-        // Start the MSW worker
-        // This will begin intercepting all fetch requests matching our handlers
-        worker.start({
-          onUnhandledRequest: 'warn', // Log warnings for unhandled requests
-        });
+    // Initialize MSW to mock API responses
+    // TODO: Remove this when real backend API is available
+    import('@/mocks/browser').then(({ worker }) => {
+      worker.start({
+        onUnhandledRequest: 'bypass',
       });
-    }
+    });
   }, []);
 
   // This component doesn't render anything
