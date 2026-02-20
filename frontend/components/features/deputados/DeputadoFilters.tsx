@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 interface DeputadoFiltersProps {
   onFilterChange: (filters: { partido?: string; uf?: string }) => void
