@@ -1,26 +1,36 @@
-import { useState, useEffect } from 'react'
-import { Voto } from '@/lib/types/voto'
+import { useState, useEffect, useCallback } from 'react'
+import type { PaginationMeta, Voto } from '@/lib/types'
+import { buildEndpoint, parsePaginatedPayload, readErrorMessage } from './shared'
 
-interface UseVotosReturn {
+export interface UseVotosParams {
+  page?: number
+  per_page?: number
+}
+
+export interface UseVotosReturn {
   data: Voto[]
+  pagination: PaginationMeta | null
   loading: boolean
   error: string | null
   refetch: () => void
 }
 
 /**
- * Fetches votos for a specific votacao
- * @param votacaoId - ID of the votacao to fetch votes for
- * @returns Object with data, loading, error states
+ * Fetches votos for a specific votacao with optional pagination
  */
-export function useVotos(votacaoId: string | null): UseVotosReturn {
+export function useVotos(votacaoId: number | string | null, params: UseVotosParams = {}): UseVotosReturn {
   const [data, setData] = useState<Voto[]>([])
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchVotos = async () => {
+  const { page, per_page: perPage } = params
+
+  const fetchVotos = useCallback(async () => {
     if (!votacaoId) {
       setData([])
+      setPagination(null)
+      setError(null)
       setLoading(false)
       return
     }
@@ -29,29 +39,38 @@ export function useVotos(votacaoId: string | null): UseVotosReturn {
       setLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/v1/votacoes/${votacaoId}/votos`)
+      const endpoint = buildEndpoint(`/api/v1/votacoes/${votacaoId}/votos`, {
+        page,
+        per_page: perPage,
+      })
+
+      const response = await fetch(endpoint)
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch votos: ${response.status}`)
+        throw new Error(await readErrorMessage(response, 'Failed to fetch votos'))
       }
 
-      const votos = await response.json()
-      setData(Array.isArray(votos) ? votos : [])
+      const payload = (await response.json()) as unknown
+      const parsedResponse = parsePaginatedPayload<Voto>(payload)
+      setData(parsedResponse.data)
+      setPagination(parsedResponse.pagination)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
       setData([])
+      setPagination(null)
     } finally {
       setLoading(false)
     }
-  }
+  }, [votacaoId, page, perPage])
 
   useEffect(() => {
-    fetchVotos()
-  }, [votacaoId])
+    void fetchVotos()
+  }, [fetchVotos])
 
   return {
     data,
+    pagination,
     loading,
     error,
     refetch: fetchVotos,

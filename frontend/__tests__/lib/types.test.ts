@@ -1,517 +1,271 @@
-import { describe, it, expect } from 'vitest';
-import {
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type {
+  CategoriaCivica,
   Deputado,
-  TipoProposicao,
-  Proposicao,
-  ResultadoVotacao,
-  Votacao,
+  Orientacao,
+  OrigemClassificacao,
+  PaginatedResponse,
+  PaginationMeta,
   Placar,
+  Proposicao,
+  ProposicaoCategoria,
+  ResultadoVotacao,
+  SingleResponse,
+  TipoProposicao,
   TipoVoto,
+  Votacao,
+  VotacaoProposicao,
   Voto,
 } from '@/lib/types';
+import type { Deputado as DeputadoFromModule } from '@/lib/types/deputado';
+import type { PaginatedResponse as PaginatedResponseFromModule } from '@/lib/types/pagination';
+import type { Proposicao as ProposicaoFromModule } from '@/lib/types/proposicao';
+import type { Votacao as VotacaoFromModule } from '@/lib/types/votacao';
+import type { Voto as VotoFromModule } from '@/lib/types/voto';
 
-describe('TypeScript Types and Enums', () => {
-  describe('TipoProposicao Enum', () => {
-    it('should have all expected values', () => {
-      expect(TipoProposicao.PL).toBe('PL');
-      expect(TipoProposicao.PEC).toBe('PEC');
-      expect(TipoProposicao.MP).toBe('MP');
-      expect(TipoProposicao.PLP).toBe('PLP');
-      expect(TipoProposicao.PDC).toBe('PDC');
-    });
-
-    it('should have exactly 5 enum values', () => {
-      const values = Object.values(TipoProposicao);
-      expect(values).toHaveLength(5);
-    });
-
-    it('should match expected string literals', () => {
-      const expectedValues = ['PL', 'PEC', 'MP', 'PLP', 'PDC'];
-      const actualValues = Object.values(TipoProposicao);
-      expect(actualValues).toEqual(expect.arrayContaining(expectedValues));
-    });
-  });
-
-  describe('ResultadoVotacao Enum', () => {
-    it('should have all expected values', () => {
-      expect(ResultadoVotacao.APROVADO).toBe('APROVADO');
-      expect(ResultadoVotacao.REJEITADO).toBe('REJEITADO');
-    });
-
-    it('should have exactly 2 enum values', () => {
-      const values = Object.values(ResultadoVotacao);
-      expect(values).toHaveLength(2);
-    });
-
-    it('should match expected string literals', () => {
-      const expectedValues = ['APROVADO', 'REJEITADO'];
-      const actualValues = Object.values(ResultadoVotacao);
-      expect(actualValues).toEqual(expect.arrayContaining(expectedValues));
-    });
-  });
-
-  describe('TipoVoto Enum', () => {
-    it('should have all expected values', () => {
-      expect(TipoVoto.SIM).toBe('SIM');
-      expect(TipoVoto.NAO).toBe('NAO');
-      expect(TipoVoto.ABSTENCAO).toBe('ABSTENCAO');
-      expect(TipoVoto.OBSTRUCAO).toBe('OBSTRUCAO');
-    });
-
-    it('should have exactly 4 enum values', () => {
-      const values = Object.values(TipoVoto);
-      expect(values).toHaveLength(4);
-    });
-
-    it('should match expected string literals', () => {
-      const expectedValues = ['SIM', 'NAO', 'ABSTENCAO', 'OBSTRUCAO'];
-      const actualValues = Object.values(TipoVoto);
-      expect(actualValues).toEqual(expect.arrayContaining(expectedValues));
-    });
-  });
-
-  describe('Deputado Interface', () => {
-    it('should create a valid Deputado with required fields only', () => {
+describe('Contratos TypeScript alinhados com ETL', () => {
+  describe('Deputado', () => {
+    it('deve seguir o contrato canônico com campos obrigatórios', () => {
       const deputado: Deputado = {
+        id: 10,
+        nome: 'Ana Martins',
+        sigla_partido: 'PSB',
+        uf: 'PE',
+        foto_url: 'https://example.com/ana-martins.jpg',
+        email: 'ana.martins@camara.leg.br',
+      };
+
+      expect(deputado.sigla_partido).toBe('PSB');
+      expect(deputado.foto_url).toContain('https://');
+      expect(deputado.email).toContain('@');
+      expectTypeOf<Deputado['id']>().toEqualTypeOf<number>();
+    });
+  });
+
+  describe('Proposicao', () => {
+    it('deve aceitar tipos previstos e fallback string', () => {
+      const tipos: TipoProposicao[] = ['PL', 'PEC', 'MP', 'PLP', 'PDC', 'REQ', 'RIC', 'PFC', 'OUTRO'];
+
+      expect(tipos).toContain('REQ');
+      expect(tipos).toContain('OUTRO');
+    });
+
+    it('deve incluir data_apresentacao e nullability correta', () => {
+      const proposicao: Proposicao = {
+        id: 101,
+        tipo: 'PL',
+        numero: 1234,
+        ano: 2025,
+        ementa: 'Altera regras de transparência pública',
+        ementa_simplificada: 'Transparência pública',
+        autor_id: 42,
+        data_apresentacao: '2025-04-01T12:30:00Z',
+      };
+
+      expect(proposicao.data_apresentacao).toBe('2025-04-01T12:30:00Z');
+      expectTypeOf<Proposicao['autor_id']>().toEqualTypeOf<number | undefined>();
+    });
+  });
+
+  describe('Votacao e Placar', () => {
+    it('deve usar estrutura de placar canônica com 3 campos', () => {
+      const placar: Placar = {
+        votos_sim: 280,
+        votos_nao: 180,
+        votos_outros: 53,
+      };
+
+      expect(placar.votos_sim + placar.votos_nao + placar.votos_outros).toBe(513);
+      expectTypeOf<Placar['votos_sim']>().toEqualTypeOf<number>();
+    });
+
+    it('deve seguir contrato de votação com campos novos e opcionais', () => {
+      const votacao: Votacao = {
+        id: 9001,
+        proposicao_id: 101,
+        data_hora: '2025-06-10T19:00:00Z',
+        resultado: 'Aprovado',
+        placar: {
+          votos_sim: 300,
+          votos_nao: 140,
+          votos_outros: 73,
+        },
+        eh_nominal: true,
+        descricao: 'Votação em turno único',
+        sigla_orgao: 'PLEN',
+      };
+
+      expect(votacao.id).toBe(9001);
+      expect(votacao.data_hora).toContain('T');
+      expect(votacao.eh_nominal).toBe(true);
+      expectTypeOf<Votacao['resultado']>().toEqualTypeOf<ResultadoVotacao>();
+      expectTypeOf<Votacao['proposicao_id']>().toEqualTypeOf<number | undefined>();
+    });
+
+    it('deve aceitar valores de resultado previstos e fallback string', () => {
+      const resultados: ResultadoVotacao[] = [
+        'Aprovado',
+        'Rejeitado',
+        'Aprovado com substitutivo',
+        'Aguardando apuração',
+      ];
+
+      expect(resultados).toContain('Aprovado com substitutivo');
+      expect(resultados).toContain('Aguardando apuração');
+    });
+  });
+
+  describe('Voto', () => {
+    it('deve usar campo canônico voto e IDs numéricos', () => {
+      const voto: Voto = {
+        id: 70001,
+        votacao_id: 9001,
+        deputado_id: 10,
+        voto: 'Sim',
+      };
+
+      expect(voto.voto).toBe('Sim');
+      expect(voto.votacao_id).toBe(9001);
+      expectTypeOf<Voto['id']>().toEqualTypeOf<number>();
+      expectTypeOf<Voto['votacao_id']>().toEqualTypeOf<number>();
+    });
+
+    it('deve aceitar votos previstos e fallback string', () => {
+      const tipos: TipoVoto[] = ['Sim', 'Não', 'Abstenção', 'Obstrução', 'Art. 17', 'Liberado'];
+
+      expect(tipos).toContain('Art. 17');
+      expect(tipos).toContain('Liberado');
+    });
+  });
+
+  describe('Novas entidades de domínio', () => {
+    it('deve validar CategoriaCivica e Orientacao', () => {
+      const categoria: CategoriaCivica = {
         id: 1,
-        nome: 'João da Silva',
-        partido: 'PT',
-        uf: 'SP',
+        codigo: 'saude',
+        nome: 'Saúde',
+        descricao: 'Políticas públicas de saúde',
+        icone: 'heart-pulse',
       };
 
-      expect(deputado.id).toBe(1);
-      expect(deputado.nome).toBe('João da Silva');
-      expect(deputado.partido).toBe('PT');
-      expect(deputado.uf).toBe('SP');
-      expect(deputado.foto_url).toBeUndefined();
-      expect(deputado.email).toBeUndefined();
-    });
-
-    it('should create a valid Deputado with optional fields', () => {
-      const deputado: Deputado = {
+      const orientacao: Orientacao = {
         id: 2,
-        nome: 'Maria Santos',
-        partido: 'PSDB',
-        uf: 'RJ',
-        foto_url: 'https://example.com/photo.jpg',
-        email: 'maria@example.com',
+        votacao_id: 9001,
+        sigla_bancada: 'GOV',
+        orientacao: 'Sim',
+        created_at: '2025-06-10T18:00:00Z',
       };
 
-      expect(deputado.foto_url).toBe('https://example.com/photo.jpg');
-      expect(deputado.email).toBe('maria@example.com');
+      expect(categoria.codigo).toBe('saude');
+      expect(orientacao.sigla_bancada).toBe('GOV');
     });
 
-    it('should have optional fields correctly typed', () => {
-      const deputado: Deputado = {
+    it('deve validar ProposicaoCategoria e VotacaoProposicao', () => {
+      const origem: OrigemClassificacao = 'manual';
+
+      const proposicaoCategoria: ProposicaoCategoria = {
         id: 3,
-        nome: 'Pedro Costa',
-        partido: 'PL',
-        uf: 'MG',
+        proposicao_id: 101,
+        categoria_id: 1,
+        origem,
+        confianca: 0.98,
+        created_at: '2025-06-10T17:00:00Z',
       };
 
-      // These should not throw type errors
-      const url: string | undefined = deputado.foto_url;
-      const email: string | undefined = deputado.email;
-
-      expect(url).toBeUndefined();
-      expect(email).toBeUndefined();
-    });
-  });
-
-  describe('Proposicao Interface', () => {
-    it('should create a valid Proposicao with required fields only', () => {
-      const proposicao: Proposicao = {
-        id: 1,
-        tipo: TipoProposicao.PL,
+      const votacaoProposicao: VotacaoProposicao = {
+        id: 4,
+        votacao_id: 9001,
+        proposicao_id: 101,
+        titulo: 'PL 1234/2025',
+        ementa: 'Transparência pública',
+        sigla_tipo: 'PL',
         numero: 1234,
-        ano: 2024,
-        ementa: 'Dispõe sobre a reforma tributária',
+        ano: 2025,
+        eh_principal: true,
+        created_at: '2025-06-10T17:05:00Z',
       };
 
-      expect(proposicao.id).toBe(1);
-      expect(proposicao.tipo).toBe(TipoProposicao.PL);
-      expect(proposicao.numero).toBe(1234);
-      expect(proposicao.ano).toBe(2024);
-      expect(proposicao.ementa).toBe('Dispõe sobre a reforma tributária');
-      expect(proposicao.ementa_simplificada).toBeUndefined();
-      expect(proposicao.autor_id).toBeUndefined();
-    });
-
-    it('should create a valid Proposicao with optional fields', () => {
-      const proposicao: Proposicao = {
-        id: 2,
-        tipo: TipoProposicao.PEC,
-        numero: 123,
-        ano: 2023,
-        ementa: 'Emenda constitucional',
-        ementa_simplificada: 'Reforma constitucional',
-        autor_id: 5,
-      };
-
-      expect(proposicao.ementa_simplificada).toBe('Reforma constitucional');
-      expect(proposicao.autor_id).toBe(5);
-    });
-
-    it('should accept all TipoProposicao enum values', () => {
-      const tipos = [
-        TipoProposicao.PL,
-        TipoProposicao.PEC,
-        TipoProposicao.MP,
-        TipoProposicao.PLP,
-        TipoProposicao.PDC,
-      ];
-
-      tipos.forEach((tipo) => {
-        const proposicao: Proposicao = {
-          id: 1,
-          tipo,
-          numero: 1,
-          ano: 2024,
-          ementa: 'Test',
-        };
-        expect(proposicao.tipo).toBe(tipo);
-      });
+      expect(proposicaoCategoria.origem).toBe('manual');
+      expect(votacaoProposicao.eh_principal).toBe(true);
     });
   });
 
-  describe('Placar Interface', () => {
-    it('should create a valid Placar with all fields', () => {
-      const placar: Placar = {
-        sim: 300,
-        nao: 150,
-        abstencao: 50,
-        obstrucao: 13,
+  describe('Paginação e resposta de recurso único', () => {
+    it('deve validar envelope paginado', () => {
+      const response: PaginatedResponse<Voto> = {
+        data: [
+          {
+            id: 70001,
+            votacao_id: 9001,
+            deputado_id: 10,
+            voto: 'Sim',
+          },
+        ],
+        pagination: {
+          page: 1,
+          per_page: 20,
+          total: 1,
+        },
       };
 
-      expect(placar.sim).toBe(300);
-      expect(placar.nao).toBe(150);
-      expect(placar.abstencao).toBe(50);
-      expect(placar.obstrucao).toBe(13);
+      expect(response.data).toHaveLength(1);
+      expect(response.pagination.total).toBe(1);
+      expectTypeOf<PaginationMeta>().toEqualTypeOf<{
+        page: number;
+        per_page: number;
+        total: number;
+      }>();
     });
 
-    it('should validate placar with sum equal to total', () => {
-      const placar: Placar = {
-        sim: 300,
-        nao: 150,
-        abstencao: 50,
-        obstrucao: 13,
+    it('deve validar envelope de recurso único', () => {
+      const response: SingleResponse<Orientacao> = {
+        data: {
+          id: 2,
+          votacao_id: 9001,
+          sigla_bancada: 'GOV',
+          orientacao: 'Sim',
+          created_at: '2025-06-10T18:00:00Z',
+        },
       };
 
-      const total = placar.sim + placar.nao + placar.abstencao + placar.obstrucao;
-      expect(total).toBe(513); // Total typical size of Brazilian Chamber
-    });
-
-    it('should accept zero values in placar', () => {
-      const placar: Placar = {
-        sim: 513,
-        nao: 0,
-        abstencao: 0,
-        obstrucao: 0,
-      };
-
-      expect(placar.sim).toBe(513);
-      expect(placar.nao).toBe(0);
-      expect(placar.abstencao).toBe(0);
-      expect(placar.obstrucao).toBe(0);
+      expect(response.data.id).toBe(2);
+      expect(response.data.orientacao).toBe('Sim');
     });
   });
 
-  describe('Votacao Interface', () => {
-    it('should create a valid Votacao with required fields only', () => {
-      const votacao: Votacao = {
-        id: 'votacao-1',
-        proposicao_id: 1,
-        data: '2024-01-24T10:30:00Z',
-        resultado: ResultadoVotacao.APROVADO,
-        placar: {
-          sim: 300,
-          nao: 150,
-          abstencao: 50,
-          obstrucao: 13,
-        },
-      };
+  describe('Remoção de expectativas legadas', () => {
+    it('deve garantir campos canônicos e ausência de campos antigos', () => {
+      type PlacarTemSim = 'sim' extends keyof Placar ? true : false;
+      type VotacaoTemData = 'data' extends keyof Votacao ? true : false;
+      type VotoTemTipo = 'tipo' extends keyof Voto ? true : false;
+      type PlacarTemVotosSim = 'votos_sim' extends keyof Placar ? true : false;
+      type VotacaoTemDataHora = 'data_hora' extends keyof Votacao ? true : false;
+      type VotoTemVoto = 'voto' extends keyof Voto ? true : false;
 
-      expect(votacao.id).toBe('votacao-1');
-      expect(votacao.proposicao_id).toBe(1);
-      expect(votacao.data).toBe('2024-01-24T10:30:00Z');
-      expect(votacao.resultado).toBe(ResultadoVotacao.APROVADO);
-      expect(votacao.proposicao).toBeUndefined();
-    });
+      const placarTemSim: PlacarTemSim = false;
+      const votacaoTemData: VotacaoTemData = false;
+      const votoTemTipo: VotoTemTipo = false;
+      const placarTemVotosSim: PlacarTemVotosSim = true;
+      const votacaoTemDataHora: VotacaoTemDataHora = true;
+      const votoTemVoto: VotoTemVoto = true;
 
-    it('should create a valid Votacao with nested Proposicao', () => {
-      const votacao: Votacao = {
-        id: 'votacao-2',
-        proposicao_id: 1,
-        proposicao: {
-          id: 1,
-          tipo: TipoProposicao.PL,
-          numero: 1234,
-          ano: 2024,
-          ementa: 'Test Law',
-        },
-        data: '2024-01-24T10:30:00Z',
-        resultado: ResultadoVotacao.REJEITADO,
-        placar: {
-          sim: 150,
-          nao: 300,
-          abstencao: 50,
-          obstrucao: 13,
-        },
-      };
-
-      expect(votacao.proposicao).toBeDefined();
-      expect(votacao.proposicao?.tipo).toBe(TipoProposicao.PL);
-      expect(votacao.proposicao?.numero).toBe(1234);
-    });
-
-    it('should accept ISO 8601 date strings', () => {
-      const validDates = [
-        '2024-01-24T10:30:00Z',
-        '2024-01-24T10:30:00+00:00',
-        '2024-01-24T10:30:00-03:00',
-      ];
-
-      validDates.forEach((date) => {
-        const votacao: Votacao = {
-          id: 'test',
-          proposicao_id: 1,
-          data: date,
-          resultado: ResultadoVotacao.APROVADO,
-          placar: { sim: 1, nao: 1, abstencao: 1, obstrucao: 1 },
-        };
-        expect(votacao.data).toBe(date);
-      });
-    });
-
-    it('should accept both ResultadoVotacao values', () => {
-      const votacao1: Votacao = {
-        id: 'test-1',
-        proposicao_id: 1,
-        data: '2024-01-24T10:30:00Z',
-        resultado: ResultadoVotacao.APROVADO,
-        placar: { sim: 1, nao: 1, abstencao: 1, obstrucao: 1 },
-      };
-
-      const votacao2: Votacao = {
-        id: 'test-2',
-        proposicao_id: 1,
-        data: '2024-01-24T10:30:00Z',
-        resultado: ResultadoVotacao.REJEITADO,
-        placar: { sim: 1, nao: 1, abstencao: 1, obstrucao: 1 },
-      };
-
-      expect(votacao1.resultado).toBe(ResultadoVotacao.APROVADO);
-      expect(votacao2.resultado).toBe(ResultadoVotacao.REJEITADO);
+      expect(placarTemSim).toBe(false);
+      expect(votacaoTemData).toBe(false);
+      expect(votoTemTipo).toBe(false);
+      expect(placarTemVotosSim).toBe(true);
+      expect(votacaoTemDataHora).toBe(true);
+      expect(votoTemVoto).toBe(true);
     });
   });
 
-  describe('Voto Interface', () => {
-    it('should create a valid Voto with required fields only', () => {
-      const voto: Voto = {
-        id: 'voto-1',
-        votacao_id: 'votacao-1',
-        deputado_id: 1,
-        tipo: TipoVoto.SIM,
-      };
-
-      expect(voto.id).toBe('voto-1');
-      expect(voto.votacao_id).toBe('votacao-1');
-      expect(voto.deputado_id).toBe(1);
-      expect(voto.tipo).toBe(TipoVoto.SIM);
-      expect(voto.deputado).toBeUndefined();
-    });
-
-    it('should create a valid Voto with nested Deputado', () => {
-      const voto: Voto = {
-        id: 'voto-2',
-        votacao_id: 'votacao-1',
-        deputado_id: 1,
-        deputado: {
-          id: 1,
-          nome: 'João Silva',
-          partido: 'PT',
-          uf: 'SP',
-        },
-        tipo: TipoVoto.NAO,
-      };
-
-      expect(voto.deputado).toBeDefined();
-      expect(voto.deputado?.nome).toBe('João Silva');
-      expect(voto.deputado?.partido).toBe('PT');
-    });
-
-    it('should accept all TipoVoto enum values', () => {
-      const tipos = [TipoVoto.SIM, TipoVoto.NAO, TipoVoto.ABSTENCAO, TipoVoto.OBSTRUCAO];
-
-      tipos.forEach((tipo) => {
-        const voto: Voto = {
-          id: 'voto-1',
-          votacao_id: 'votacao-1',
-          deputado_id: 1,
-          tipo,
-        };
-        expect(voto.tipo).toBe(tipo);
-      });
-    });
-
-    it('should have optional Deputado field correctly typed', () => {
-      const voto: Voto = {
-        id: 'voto-3',
-        votacao_id: 'votacao-1',
-        deputado_id: 1,
-        tipo: TipoVoto.ABSTENCAO,
-      };
-
-      // This should not throw a type error
-      const deputado: Deputado | undefined = voto.deputado;
-      expect(deputado).toBeUndefined();
-    });
-  });
-
-  describe('Type Compatibility', () => {
-    it('should handle nested objects in Votacao and Voto together', () => {
-      const proposicao: Proposicao = {
-        id: 1,
-        tipo: TipoProposicao.PL,
-        numero: 1234,
-        ano: 2024,
-        ementa: 'Test Law',
-      };
-
-      const deputado: Deputado = {
-        id: 1,
-        nome: 'Test Deputy',
-        partido: 'PT',
-        uf: 'SP',
-      };
-
-      const votacao: Votacao = {
-        id: 'votacao-1',
-        proposicao_id: 1,
-        proposicao,
-        data: '2024-01-24T10:30:00Z',
-        resultado: ResultadoVotacao.APROVADO,
-        placar: {
-          sim: 300,
-          nao: 150,
-          abstencao: 50,
-          obstrucao: 13,
-        },
-      };
-
-      const voto: Voto = {
-        id: 'voto-1',
-        votacao_id: 'votacao-1',
-        deputado_id: 1,
-        deputado,
-        tipo: TipoVoto.SIM,
-      };
-
-      expect(votacao.proposicao?.tipo).toBe(proposicao.tipo);
-      expect(voto.deputado?.nome).toBe(deputado.nome);
-    });
-
-    it('should allow JSON serialization of all types', () => {
-      const deputado: Deputado = {
-        id: 1,
-        nome: 'Test',
-        partido: 'PT',
-        uf: 'SP',
-      };
-
-      const proposicao: Proposicao = {
-        id: 1,
-        tipo: TipoProposicao.PL,
-        numero: 1234,
-        ano: 2024,
-        ementa: 'Test',
-      };
-
-      const votacao: Votacao = {
-        id: 'votacao-1',
-        proposicao_id: 1,
-        proposicao,
-        data: '2024-01-24T10:30:00Z',
-        resultado: ResultadoVotacao.APROVADO,
-        placar: { sim: 300, nao: 150, abstencao: 50, obstrucao: 13 },
-      };
-
-      const voto: Voto = {
-        id: 'voto-1',
-        votacao_id: 'votacao-1',
-        deputado_id: 1,
-        deputado,
-        tipo: TipoVoto.SIM,
-      };
-
-      // Should be serializable without errors
-      const deputadoJson = JSON.stringify(deputado);
-      const proposicaoJson = JSON.stringify(proposicao);
-      const votacaoJson = JSON.stringify(votacao);
-      const votoJson = JSON.stringify(voto);
-
-      expect(deputadoJson).toBeDefined();
-      expect(proposicaoJson).toBeDefined();
-      expect(votacaoJson).toBeDefined();
-      expect(votoJson).toBeDefined();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle empty optional fields in Deputado', () => {
-      const deputado: Deputado = {
-        id: 1,
-        nome: 'Test',
-        partido: 'PT',
-        uf: 'SP',
-        foto_url: undefined,
-        email: undefined,
-      };
-
-      expect(deputado.foto_url).toBeUndefined();
-      expect(deputado.email).toBeUndefined();
-    });
-
-    it('should handle empty string in ementa field', () => {
-      const proposicao: Proposicao = {
-        id: 1,
-        tipo: TipoProposicao.PL,
-        numero: 1,
-        ano: 2024,
-        ementa: '',
-      };
-
-      expect(proposicao.ementa).toBe('');
-    });
-
-    it('should handle zero values in placar', () => {
-      const placar: Placar = {
-        sim: 0,
-        nao: 0,
-        abstencao: 0,
-        obstrucao: 0,
-      };
-
-      expect(placar.sim).toBe(0);
-    });
-
-    it('should handle large numbers in IDs and counts', () => {
-      const deputado: Deputado = {
-        id: 999999,
-        nome: 'Test',
-        partido: 'PT',
-        uf: 'SP',
-      };
-
-      const placar: Placar = {
-        sim: 999999,
-        nao: 999999,
-        abstencao: 999999,
-        obstrucao: 999999,
-      };
-
-      expect(deputado.id).toBe(999999);
-      expect(placar.sim).toBe(999999);
+  describe('Barrel exports', () => {
+    it('deve manter os tipos acessíveis pelo barrel central', () => {
+      expectTypeOf<Deputado>().toEqualTypeOf<DeputadoFromModule>();
+      expectTypeOf<Proposicao>().toEqualTypeOf<ProposicaoFromModule>();
+      expectTypeOf<Votacao>().toEqualTypeOf<VotacaoFromModule>();
+      expectTypeOf<Voto>().toEqualTypeOf<VotoFromModule>();
+      expectTypeOf<PaginatedResponse<Voto>>().toEqualTypeOf<PaginatedResponseFromModule<Voto>>();
+      expect(true).toBe(true);
     });
   });
 });

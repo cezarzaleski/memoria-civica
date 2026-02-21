@@ -1,11 +1,20 @@
 import { http, HttpResponse } from 'msw';
+import type { SingleResponse, Votacao } from '@/lib/types';
 import { generateVotacoes, getVotacaoById } from '../data/votacoes';
+import { getProposicoesByVotacaoId } from '../data/votacoes-proposicoes';
+import { createPaginatedResponse, getPaginationParams, notFoundError, parseStrictId, validationError } from './utils';
 
 /**
  * Generate the complete list of mock votações once
  * Already sorted by data descending (most recent first)
  */
 const votacoes = generateVotacoes(50);
+
+function parseBoolean(value: string | null): boolean | undefined {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
 
 /**
  * MSW handlers for votações endpoints
@@ -20,8 +29,46 @@ export const votacoesHandlers = [
    * List all votações ordered by date descending (most recent first)
    * Each votação includes its nested proposicao object
    */
-  http.get('*/api/v1/votacoes', () => {
-    return HttpResponse.json(votacoes);
+  http.get('*/api/v1/votacoes', ({ request }) => {
+    const url = new URL(request.url);
+    const { page, perPage } = getPaginationParams(url);
+    const siglaOrgao = url.searchParams.get('sigla_orgao');
+    const ehNominal = parseBoolean(url.searchParams.get('eh_nominal'));
+
+    let filtered: Votacao[] = votacoes;
+
+    if (siglaOrgao) {
+      filtered = filtered.filter((votacao) => votacao.sigla_orgao === siglaOrgao);
+    }
+
+    if (ehNominal !== undefined) {
+      filtered = filtered.filter((votacao) => Boolean(votacao.eh_nominal) === ehNominal);
+    }
+
+    return HttpResponse.json(createPaginatedResponse(filtered, page, perPage));
+  }),
+
+  /**
+   * GET /api/v1/votacoes/:id/proposicoes
+   * Get proposições vinculadas a uma votação
+   */
+  http.get('*/api/v1/votacoes/:id/proposicoes', ({ request, params }) => {
+    const votacaoId = parseStrictId(params.id as string | undefined);
+
+    if (!votacaoId) {
+      return validationError('ID de votação inválido');
+    }
+
+    const votacao = getVotacaoById(votacoes, votacaoId);
+    if (!votacao) {
+      return notFoundError('Votação não encontrada');
+    }
+
+    const url = new URL(request.url);
+    const { page, perPage } = getPaginationParams(url);
+    const proposicoes = getProposicoesByVotacaoId(votacao.id);
+
+    return HttpResponse.json(createPaginatedResponse(proposicoes, page, perPage));
   }),
 
   /**
@@ -30,12 +77,19 @@ export const votacoesHandlers = [
    * Returns 404 if votação not found
    */
   http.get('*/api/v1/votacoes/:id', ({ params }) => {
-    const votacao = getVotacaoById(votacoes, params.id as string);
+    const votacaoId = parseStrictId(params.id as string | undefined);
 
-    if (!votacao) {
-      return new HttpResponse(null, { status: 404 });
+    if (!votacaoId) {
+      return validationError('ID de votação inválido');
     }
 
-    return HttpResponse.json(votacao);
+    const votacao = getVotacaoById(votacoes, votacaoId);
+
+    if (!votacao) {
+      return notFoundError('Votação não encontrada');
+    }
+
+    const response: SingleResponse<Votacao> = { data: votacao };
+    return HttpResponse.json(response);
   }),
 ];

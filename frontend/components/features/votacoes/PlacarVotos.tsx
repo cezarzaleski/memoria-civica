@@ -12,10 +12,10 @@ interface PlacarVotosProps {
 
 /**
  * Displays voting results as visual bars with percentages
- * Shows SIM, NÃO, ABSTENÇÃO, OBSTRUÇÃO vote counts and percentages
+ * Shows SIM, NÃO e OUTROS vote counts and percentages
  */
 export function PlacarVotos({ placar, title = 'Resultado da Votação' }: PlacarVotosProps) {
-  const total = (placar.sim || 0) + (placar.nao || 0) + (placar.abstencao || 0) + (placar.obstrucao || 0)
+  const total = placar.votos_sim + placar.votos_nao + placar.votos_outros
 
   const calculatePercentage = (value: number) => {
     if (total === 0) return 0
@@ -25,27 +25,21 @@ export function PlacarVotos({ placar, title = 'Resultado da Votação' }: Placar
   const votos = [
     {
       label: 'Sim',
-      value: placar.sim || 0,
+      value: placar.votos_sim,
       color: 'bg-green-600 dark:bg-green-500',
       textColor: 'text-green-700 dark:text-green-300',
     },
     {
       label: 'Não',
-      value: placar.nao || 0,
+      value: placar.votos_nao,
       color: 'bg-red-600 dark:bg-red-500',
       textColor: 'text-red-700 dark:text-red-300',
     },
     {
-      label: 'Abstenção',
-      value: placar.abstencao || 0,
-      color: 'bg-yellow-600 dark:bg-yellow-500',
-      textColor: 'text-yellow-700 dark:text-yellow-300',
-    },
-    {
-      label: 'Obstrução',
-      value: placar.obstrucao || 0,
-      color: 'bg-blue-600 dark:bg-blue-500',
-      textColor: 'text-blue-700 dark:text-blue-300',
+      label: 'Outros',
+      value: placar.votos_outros,
+      color: 'bg-slate-600 dark:bg-slate-500',
+      textColor: 'text-slate-700 dark:text-slate-300',
     },
   ]
 

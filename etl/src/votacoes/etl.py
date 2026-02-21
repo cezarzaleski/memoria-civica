@@ -1076,9 +1076,10 @@ def transform_orientacoes(
             if not orientacao_raw:
                 logger.warning(
                     f"Orientação {idx}: orientacao vazia para bancada "
-                    f"'{sigla_bancada}', usando 'Não informado'"
+                    f"'{sigla_bancada}', skipado"
                 )
-                orientacao_raw = "Não informado"
+                skipped += 1
+                continue
 
             orientacao = _ORIENTACAO_NORMALIZADA.get(
                 orientacao_raw.lower(), orientacao_raw

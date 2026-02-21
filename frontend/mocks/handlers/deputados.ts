@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { Deputado } from '@/lib/types';
+import type { Deputado, SingleResponse } from '@/lib/types';
 import {
   generateDeputados,
   getDeputadoById,
@@ -7,6 +7,7 @@ import {
   filterDeputadosByPartido,
   filterDeputadosByUF,
 } from '../data/deputados';
+import { createPaginatedResponse, getPaginationParams, notFoundError, parseStrictId, validationError } from './utils';
 
 /**
  * Generate the complete list of mock deputados once
@@ -35,6 +36,7 @@ export const deputadosHandlers = [
     const nome = url.searchParams.get('nome');
     const partido = url.searchParams.get('partido');
     const uf = url.searchParams.get('uf');
+    const { page, perPage } = getPaginationParams(url);
 
     let filtered: Deputado[] = deputados;
 
@@ -51,7 +53,7 @@ export const deputadosHandlers = [
       filtered = filterDeputadosByUF(filtered, uf);
     }
 
-    return HttpResponse.json(filtered);
+    return HttpResponse.json(createPaginatedResponse(filtered, page, perPage));
   }),
 
   /**
@@ -60,12 +62,19 @@ export const deputadosHandlers = [
    * Returns 404 if deputy not found
    */
   http.get('*/api/v1/deputados/:id', ({ params }) => {
-    const deputado = getDeputadoById(deputados, parseInt(params.id as string));
+    const deputadoId = parseStrictId(params.id as string | undefined);
 
-    if (!deputado) {
-      return new HttpResponse(null, { status: 404 });
+    if (!deputadoId) {
+      return validationError('ID de deputado inválido');
     }
 
-    return HttpResponse.json(deputado);
+    const deputado = getDeputadoById(deputados, deputadoId);
+
+    if (!deputado) {
+      return notFoundError('Deputado não encontrado');
+    }
+
+    const response: SingleResponse<Deputado> = { data: deputado };
+    return HttpResponse.json(response);
   }),
 ];

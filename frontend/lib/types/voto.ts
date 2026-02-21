@@ -1,22 +1,22 @@
 import type { Deputado } from './deputado';
 
-/**
- * Tipo de voto em uma proposição
- */
-export enum TipoVoto {
-  SIM = 'SIM',
-  NAO = 'NAO',
-  ABSTENCAO = 'ABSTENCAO',
-  OBSTRUCAO = 'OBSTRUCAO',
-}
+export const TipoVoto = {
+  SIM: 'Sim',
+  NAO: 'Não',
+  ABSTENCAO: 'Abstenção',
+  OBSTRUCAO: 'Obstrução',
+  ART_17: 'Art. 17',
+} as const;
+
+export type TipoVoto = (typeof TipoVoto)[keyof typeof TipoVoto] | (string & {});
 
 /**
- * Representação de um voto individual de um deputado
+ * Representa um voto individual de um deputado.
  */
 export interface Voto {
-  id: string;
-  votacao_id: string;
+  id: number;
+  votacao_id: number;
   deputado_id: number;
   deputado?: Deputado;
-  tipo: TipoVoto;
+  voto: TipoVoto;
 }

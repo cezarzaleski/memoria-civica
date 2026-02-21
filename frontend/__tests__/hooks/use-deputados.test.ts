@@ -1,171 +1,86 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import { renderHook, waitFor, act } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { server } from '@/mocks/server'
 import { useDeputados } from '@/lib/hooks/use-deputados'
 
 describe('useDeputados', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('should return empty data and loading true initially', () => {
+  it('deve carregar deputados com paginação padrão do envelope', async () => {
     const { result } = renderHook(() => useDeputados())
 
     expect(result.current.data).toEqual([])
     expect(result.current.loading).toBe(true)
     expect(result.current.error).toBeNull()
-  })
-
-  it('should fetch all deputados without filters', async () => {
-    const mockDeputados = [
-      {
-        id: '1',
-        nome: 'João Silva',
-        partido: 'PT',
-        uf: 'SP',
-        foto_url: 'http://example.com/foto1.jpg',
-      },
-      {
-        id: '2',
-        nome: 'Maria Santos',
-        partido: 'PSD',
-        uf: 'RJ',
-        foto_url: 'http://example.com/foto2.jpg',
-      },
-    ]
-
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockDeputados),
-      })
-    ) as any
-
-    const { result } = renderHook(() => useDeputados())
+    expect(result.current.pagination).toBeNull()
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(result.current.data).toEqual(mockDeputados)
     expect(result.current.error).toBeNull()
-  })
-
-  it('should filter by nome', async () => {
-    const mockDeputados = [
-      {
-        id: '1',
-        nome: 'João Silva',
-        partido: 'PT',
-        uf: 'SP',
-        foto_url: 'http://example.com/foto1.jpg',
-      },
-    ]
-
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockDeputados),
-      })
-    ) as any
-
-    const { result } = renderHook(() => useDeputados({ nome: 'João' }))
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
+    expect(result.current.data).toHaveLength(20)
+    expect(result.current.pagination).toEqual({
+      page: 1,
+      per_page: 20,
+      total: 513,
     })
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('nome=Jo')
-    )
-    expect(result.current.data).toEqual(mockDeputados)
-  })
-
-  it('should filter by partido', async () => {
-    const mockDeputados = [
-      {
-        id: '1',
-        nome: 'João Silva',
-        partido: 'PT',
-        uf: 'SP',
-        foto_url: 'http://example.com/foto1.jpg',
-      },
-    ]
-
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockDeputados),
-      })
-    ) as any
-
-    const { result } = renderHook(() => useDeputados({ partido: 'PT' }))
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
+    expect(result.current.data[0]).toMatchObject({
+      id: expect.any(Number),
+      nome: expect.any(String),
+      sigla_partido: expect.any(String),
+      uf: expect.any(String),
     })
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('partido=PT')
-    )
   })
 
-  it('should filter by uf', async () => {
-    const mockDeputados = [
-      {
-        id: '1',
-        nome: 'João Silva',
-        partido: 'PT',
-        uf: 'SP',
-        foto_url: 'http://example.com/foto1.jpg',
-      },
-    ]
+  it('deve enviar filtros e parâmetros de paginação na query string', async () => {
+    let capturedUrl: URL | null = null
 
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockDeputados),
+    server.use(
+      http.get('*/api/v1/deputados', ({ request }) => {
+        capturedUrl = new URL(request.url)
+        return HttpResponse.json({
+          data: [],
+          pagination: {
+            page: Number(capturedUrl.searchParams.get('page') ?? '1'),
+            per_page: Number(capturedUrl.searchParams.get('per_page') ?? '20'),
+            total: 0,
+          },
+        })
       })
-    ) as any
-
-    const { result } = renderHook(() => useDeputados({ uf: 'SP' }))
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
-    })
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('uf=SP')
     )
-  })
-
-  it('should apply multiple filters', async () => {
-    const mockDeputados = []
-
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockDeputados),
-      })
-    ) as any
 
     const { result } = renderHook(() =>
-      useDeputados({ nome: 'João', partido: 'PT', uf: 'SP' })
+      useDeputados({
+        nome: 'Ana',
+        partido: 'PT',
+        uf: 'SP',
+        page: 2,
+        per_page: 5,
+      })
     )
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    const callUrl = (global.fetch as any).mock.calls[0][0]
-    expect(callUrl).toContain('nome=Jo')
-    expect(callUrl).toContain('partido=PT')
-    expect(callUrl).toContain('uf=SP')
+    expect(capturedUrl?.searchParams.get('nome')).toBe('Ana')
+    expect(capturedUrl?.searchParams.get('partido')).toBe('PT')
+    expect(capturedUrl?.searchParams.get('uf')).toBe('SP')
+    expect(capturedUrl?.searchParams.get('page')).toBe('2')
+    expect(capturedUrl?.searchParams.get('per_page')).toBe('5')
+    expect(result.current.pagination).toEqual({
+      page: 2,
+      per_page: 5,
+      total: 0,
+    })
   })
 
-  it('should handle fetch errors', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.reject(new Error('Network error'))
-    ) as any
+  it('deve expor erro e limpar estado em falha de rede', async () => {
+    server.use(
+      http.get('*/api/v1/deputados', () => {
+        return HttpResponse.error()
+      })
+    )
 
     const { result } = renderHook(() => useDeputados())
 
@@ -175,5 +90,34 @@ describe('useDeputados', () => {
 
     expect(result.current.error).toBeTruthy()
     expect(result.current.data).toEqual([])
+    expect(result.current.pagination).toBeNull()
+  })
+
+  it('deve permitir refetch manual', async () => {
+    let calls = 0
+
+    server.use(
+      http.get('*/api/v1/deputados', () => {
+        calls += 1
+        return HttpResponse.json({
+          data: [],
+          pagination: { page: 1, per_page: 20, total: 0 },
+        })
+      })
+    )
+
+    const { result } = renderHook(() => useDeputados())
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    act(() => {
+      result.current.refetch()
+    })
+
+    await waitFor(() => {
+      expect(calls).toBeGreaterThanOrEqual(2)
+    })
   })
 })

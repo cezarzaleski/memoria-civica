@@ -23,6 +23,8 @@ const getTipoBadgeVariant = (tipo: TipoVoto) => {
       return 'secondary'
     case TipoVoto.OBSTRUCAO:
       return 'outline'
+    case TipoVoto.ART_17:
+      return 'outline'
     default:
       return 'secondary'
   }
@@ -38,10 +40,20 @@ const getTipoColor = (tipo: TipoVoto) => {
       return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
     case TipoVoto.OBSTRUCAO:
       return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+    case TipoVoto.ART_17:
+      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200'
     default:
       return ''
   }
 }
+
+const TIPOS_FILTRO: TipoVoto[] = [
+  TipoVoto.SIM,
+  TipoVoto.NAO,
+  TipoVoto.ABSTENCAO,
+  TipoVoto.OBSTRUCAO,
+  TipoVoto.ART_17,
+]
 
 type SortOrder = 'nome-asc' | 'nome-desc' | 'partido-asc'
 type FilterType = 'todos' | TipoVoto
@@ -60,7 +72,7 @@ export function ListaVotos({
   const [sortOrder, setSortOrder] = useState<SortOrder>('nome-asc')
 
   const partidos = useMemo(() => {
-    return [...new Set(votos.map((v) => v.deputado?.partido).filter(Boolean))]
+    return [...new Set(votos.map((v) => v.deputado?.sigla_partido).filter(Boolean))]
       .sort() as string[]
   }, [votos])
 
@@ -71,20 +83,20 @@ export function ListaVotos({
 
     // Aplicar filtro por tipo de voto
     if (filterType !== 'todos') {
-      result = result.filter((v) => v.tipo === filterType)
+      result = result.filter((v) => v.voto === filterType)
     }
 
     // Aplicar filtro por partido
     if (filterPartido !== 'todos') {
-      result = result.filter((v) => v.deputado?.partido === filterPartido)
+      result = result.filter((v) => v.deputado?.sigla_partido === filterPartido)
     }
 
     // Aplicar ordenação
     result = [...result].sort((a, b) => {
       const nomeA = a.deputado?.nome || ''
       const nomeB = b.deputado?.nome || ''
-      const partidoA = a.deputado?.partido || ''
-      const partidoB = b.deputado?.partido || ''
+      const partidoA = a.deputado?.sigla_partido || ''
+      const partidoB = b.deputado?.sigla_partido || ''
 
       switch (sortOrder) {
         case 'nome-asc':
@@ -163,10 +175,11 @@ export function ListaVotos({
               className="text-xs px-2 py-1 border rounded bg-background"
             >
               <option value="todos">Todos</option>
-              <option value={TipoVoto.SIM}>Sim</option>
-              <option value={TipoVoto.NAO}>Não</option>
-              <option value={TipoVoto.ABSTENCAO}>Abstenção</option>
-              <option value={TipoVoto.OBSTRUCAO}>Obstrução</option>
+              {TIPOS_FILTRO.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -216,17 +229,17 @@ export function ListaVotos({
                 <p className="font-medium text-sm sm:text-base truncate">
                   {voto.deputado?.nome || 'Deputado desconhecido'}
                 </p>
-                {voto.deputado?.partido && (
+                {voto.deputado?.sigla_partido && (
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    {voto.deputado.partido} - {voto.deputado.uf}
+                    {voto.deputado.sigla_partido} - {voto.deputado.uf}
                   </p>
                 )}
               </div>
               <Badge
-                className={getTipoColor(voto.tipo)}
-                variant={getTipoBadgeVariant(voto.tipo)}
+                className={getTipoColor(voto.voto)}
+                variant={getTipoBadgeVariant(voto.voto)}
               >
-                {voto.tipo}
+                {voto.voto}
               </Badge>
             </div>
           ))}

@@ -1,128 +1,94 @@
 import { TipoProposicao, type Proposicao } from '@/lib/types';
 
-/**
- * Sample proposição topics relevant to Brazilian Congress
- */
-const PROPOSICAO_TOPICS = [
-  'Reforma Tributária',
-  'Reforma Educacional',
-  'Saúde Pública',
-  'Previdência Social',
-  'Segurança Pública',
-  'Meio Ambiente',
-  'Direitos Trabalhistas',
-  'Reforma Administrativa',
-  'Lei de Acesso à Informação',
-  'Modernização da Legislação',
-  'Combate à Corrupção',
-  'Proteção aos Direitos Humanos',
-  'Desenvolvimento Sustentável',
-  'Energias Renováveis',
-  'Infraestrutura',
-  'Tecnologia e Inovação',
-  'Educação Digital',
-  'Inclusão Social',
-  'Agricultura Familiar',
-  'Defesa do Consumidor',
+const TOTAL_PROPOSICOES_FIXTURE = 80;
+
+const TIPOS_PROPOSICOES: TipoProposicao[] = [
+  TipoProposicao.PL,
+  TipoProposicao.PEC,
+  TipoProposicao.MP,
+  TipoProposicao.PLP,
+  TipoProposicao.PDC,
+  TipoProposicao.REQ,
+  TipoProposicao.RIC,
+  TipoProposicao.PFC,
+  'PDL',
+  'MSC',
 ];
 
-/**
- * Sample bill descriptions/ementas
- */
-const EMENTA_TEMPLATES = [
-  'Dispõe sobre [TOPIC] e altera a Lei nº {num}.',
-  'Institui normas para regulamentação de [TOPIC].',
-  'Estabelece diretrizes para [TOPIC] no país.',
-  'Cria mecanismo de controle sobre [TOPIC].',
-  'Autoriza a implementação de políticas públicas relacionadas a [TOPIC].',
-  'Revoga disposições anteriores sobre [TOPIC] e regulamenta nova metodologia.',
-  'Define procedimentos para [TOPIC] em âmbito federal.',
-  'Determina direitos e deveres relativos a [TOPIC].',
-];
+const TEMAS = [
+  'reforma tributária solidária',
+  'saúde pública no SUS',
+  'transição energética',
+  'defesa dos direitos das mulheres',
+  'infraestrutura ferroviária',
+  'inclusão digital em escolas públicas',
+  'segurança alimentar',
+  'prevenção a desastres climáticos',
+  'transparência e controle social',
+  'economia criativa e inovação',
+  'combate ao trabalho escravo',
+  'fortalecimento da agricultura familiar',
+] as const;
 
-/**
- * Select a random proposal type
- */
-function selectRandomTipo(): TipoProposicao {
-  const tipos = Object.values(TipoProposicao);
-  return tipos[Math.floor(Math.random() * tipos.length)];
+function formatISODateForProposicao(id: number): string {
+  const year = 2022 + (id % 4);
+  const month = (id * 3) % 12;
+  const day = ((id * 5) % 27) + 1;
+
+  return new Date(Date.UTC(year, month, day, 14, 0, 0)).toISOString();
 }
 
-/**
- * Generate random proposition number based on type
- */
-function generateProposicaoNumero(tipo: TipoProposicao): number {
-  const minNum: Record<TipoProposicao, number> = {
-    [TipoProposicao.PL]: 1,
-    [TipoProposicao.PEC]: 1,
-    [TipoProposicao.MP]: 1,
-    [TipoProposicao.PLP]: 1,
-    [TipoProposicao.PDC]: 1,
+function buildNumeroProposicao(id: number, tipo: TipoProposicao): number {
+  const tipoSeed = tipo.length * 97;
+  return tipoSeed + id * 11;
+}
+
+function buildEmenta(id: number, tema: string): string {
+  const artigosReferencia = 20 + (id % 80);
+
+  return `Dispõe sobre ${tema} e altera dispositivos da Lei nº ${artigosReferencia}.`;
+}
+
+function buildProposicao(id: number): Proposicao {
+  const tipo = TIPOS_PROPOSICOES[(id - 1) % TIPOS_PROPOSICOES.length] ?? TipoProposicao.PL;
+  const tema = TEMAS[(id - 1) % TEMAS.length] ?? TEMAS[0];
+  const numero = buildNumeroProposicao(id, tipo);
+
+  return {
+    id,
+    tipo,
+    numero,
+    ano: 2022 + (id % 4),
+    ementa: buildEmenta(id, tema),
+    ementa_simplificada: id % 4 === 0 ? undefined : `Proposição sobre ${tema}`,
+    autor_id: id % 7 === 0 ? undefined : ((id * 13) % 513) + 1,
+    data_apresentacao: formatISODateForProposicao(id),
   };
-
-  const maxNum: Record<TipoProposicao, number> = {
-    [TipoProposicao.PL]: 5000,
-    [TipoProposicao.PEC]: 300,
-    [TipoProposicao.MP]: 1000,
-    [TipoProposicao.PLP]: 200,
-    [TipoProposicao.PDC]: 500,
-  };
-
-  const min = minNum[tipo];
-  const max = maxNum[tipo];
-
-  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/**
- * Generate a realistic ementa (description) for a proposition
- */
-function generateEmenta(): string {
-  const topic = PROPOSICAO_TOPICS[Math.floor(Math.random() * PROPOSICAO_TOPICS.length)];
-  const template = EMENTA_TEMPLATES[Math.floor(Math.random() * EMENTA_TEMPLATES.length)];
-  const num = Math.floor(Math.random() * 15000) + 1000;
+export const PROPOSICOES_FIXTURES: Proposicao[] = Array.from(
+  { length: TOTAL_PROPOSICOES_FIXTURE },
+  (_, index) => buildProposicao(index + 1)
+);
 
-  return template.replace('[TOPIC]', topic).replace('{num}', num.toString());
-}
-
-/**
- * Generate realistic mock proposition data
- * Called to create propositions for mock votações
- *
- * @param count Number of propositions to generate
- * @returns Array of mock Proposicao objects
- */
-export function generateProposicoes(count: number = 50): Proposicao[] {
-  const propositions: Proposicao[] = [];
-  const currentYear = new Date().getFullYear();
-
-  for (let i = 1; i <= count; i++) {
-    const tipo = selectRandomTipo();
-    const proposicao: Proposicao = {
-      id: i,
-      tipo,
-      numero: generateProposicaoNumero(tipo),
-      ano: currentYear - Math.floor(Math.random() * 3),
-      ementa: generateEmenta(),
-      // Some propositions may have simplified descriptions
-      ementa_simplificada: Math.random() > 0.5 ? `Simplified version of proposition ${i}` : undefined,
-      // Some may have an author ID
-      autor_id: Math.random() > 0.7 ? Math.floor(Math.random() * 513) + 1 : undefined,
-    };
-
-    propositions.push(proposicao);
+function normalizeCount(count: number): number {
+  if (!Number.isFinite(count)) {
+    return 0;
   }
 
-  return propositions;
+  return Math.max(0, Math.floor(count));
 }
 
-/**
- * Get a single proposition by ID
- *
- * @param proposicoes Array of propositions
- * @param id Proposition ID
- * @returns Proposition if found, undefined otherwise
- */
+export function generateProposicoes(count: number = 50): Proposicao[] {
+  const normalizedCount = normalizeCount(count);
+
+  if (normalizedCount <= PROPOSICOES_FIXTURES.length) {
+    return PROPOSICOES_FIXTURES.slice(0, normalizedCount);
+  }
+
+  return Array.from({ length: normalizedCount }, (_, index) => buildProposicao(index + 1));
+}
+
 export function getProposicaoById(proposicoes: Proposicao[], id: number): Proposicao | undefined {
-  return proposicoes.find((p) => p.id === id);
+  return proposicoes.find((proposicao) => proposicao.id === id);
 }

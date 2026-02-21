@@ -378,7 +378,7 @@ class TestEndToEndWithRealData:
                     if votacoes_com_prop > 0:
                         # Verificar que proposicoes existem
                         votacoes_sem_prop = session.query(Votacao).filter(
-                            (Votacao.proposicao_id > 0) & (~Votacao.proposicao.any())
+                            (Votacao.proposicao_id > 0) & (~Votacao.proposicao.has())
                         ).count()
                         # Permitir alguns órfãos se dados foram filtrados
                         assert (

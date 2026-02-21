@@ -6,9 +6,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useVotacao } from '@/lib/hooks/use-votacao'
 import { useVotos } from '@/lib/hooks/use-votos'
+import { useOrientacoes } from '@/lib/hooks/use-orientacoes'
+import { useProposicaoCategorias } from '@/lib/hooks/use-proposicoes'
 import { VotacaoDetalhes } from '@/components/features/votacoes/VotacaoDetalhes'
 import { PlacarVotos } from '@/components/features/votacoes/PlacarVotos'
 import { ListaVotos } from '@/components/features/votacoes/ListaVotos'
+import { OrientacoesBancadas } from '@/components/features/votacoes/OrientacoesBancadas'
+import { CategoriasCivicas } from '@/components/features/votacoes/CategoriasCivicas'
 
 /**
  * Mock LLM explanation for voting details
@@ -39,6 +43,12 @@ export default function VotacaoPage() {
 
   const { data: votacao, loading: votacaoLoading, error: votacaoError } = useVotacao(votacaoId)
   const { data: votos, loading: votosLoading, error: votosError } = useVotos(votacaoId)
+  const { data: orientacoes, loading: orientacoesLoading, error: orientacoesError } = useOrientacoes(votacaoId)
+  const {
+    data: categorias,
+    loading: categoriasLoading,
+    error: categoriasError,
+  } = useProposicaoCategorias(votacao?.proposicao_id ?? null)
 
   // Estados de carregamento
   if (votacaoLoading) {
@@ -101,6 +111,21 @@ export default function VotacaoPage() {
 
       {/* Lista de Votos dos Deputados */}
       <ListaVotos votos={votos} loading={votosLoading} error={votosError} />
+
+      {/* Orientações de Bancada */}
+      <OrientacoesBancadas
+        orientacoes={orientacoes}
+        loading={orientacoesLoading}
+        error={orientacoesError}
+      />
+
+      {/* Categorias cívicas da proposição vinculada */}
+      <CategoriasCivicas
+        categorias={categorias}
+        loading={categoriasLoading}
+        error={categoriasError}
+        emptyMessage="Nenhuma categoria cívica foi associada à proposição desta votação."
+      />
 
       {/* Informações adicionais no rodapé */}
       <div className="text-center text-xs text-muted-foreground py-4 border-t">

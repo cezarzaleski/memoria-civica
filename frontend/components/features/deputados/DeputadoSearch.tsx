@@ -53,7 +53,7 @@ export function DeputadoSearch({
       />
       {debouncedValue && !disabled && (
         <p className="text-xs text-muted-foreground mt-2">
-          Buscando por: &ldquo;{debouncedValue}&rdquo;
+          Buscando por: &quot;{debouncedValue}&quot;
         </p>
       )}
     </div>

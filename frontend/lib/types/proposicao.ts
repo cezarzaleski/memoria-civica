@@ -1,16 +1,18 @@
-/**
- * Tipo de proposição legislativa
- */
-export enum TipoProposicao {
-  PL = 'PL', // Projeto de Lei
-  PEC = 'PEC', // Proposta de Emenda Constitucional
-  MP = 'MP', // Medida Provisória
-  PLP = 'PLP', // Projeto de Lei Complementar
-  PDC = 'PDC', // Projeto de Decreto Legislativo
-}
+export const TipoProposicao = {
+  PL: 'PL',
+  PEC: 'PEC',
+  MP: 'MP',
+  PLP: 'PLP',
+  PDC: 'PDC',
+  REQ: 'REQ',
+  RIC: 'RIC',
+  PFC: 'PFC',
+} as const;
+
+export type TipoProposicao = (typeof TipoProposicao)[keyof typeof TipoProposicao] | (string & {});
 
 /**
- * Representação de uma proposição legislativa
+ * Representa uma proposição legislativa conforme contrato canônico do ETL.
  */
 export interface Proposicao {
   id: number;
@@ -20,4 +22,5 @@ export interface Proposicao {
   ementa: string;
   ementa_simplificada?: string;
   autor_id?: number;
+  data_apresentacao: string;
 }

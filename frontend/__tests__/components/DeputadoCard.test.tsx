@@ -5,40 +5,40 @@ import { DeputadoCard } from '@/components/features/deputados/DeputadoCard'
 
 describe('DeputadoCard', () => {
   const mockDeputado = {
-    id: '1',
+    id: 1,
     nome: 'João Silva Santos',
-    partido: 'PT',
+    sigla_partido: 'PT',
     uf: 'SP',
     foto_url: 'http://example.com/foto.jpg',
     email: 'joao@example.com',
   }
 
-  it('should render deputado with name', () => {
+  it('deve renderizar nome do deputado', () => {
     render(<DeputadoCard deputado={mockDeputado} />)
 
     expect(screen.getByText('João Silva Santos')).toBeInTheDocument()
   })
 
-  it('should render deputado party badge', () => {
+  it('deve renderizar badge de sigla_partido', () => {
     render(<DeputadoCard deputado={mockDeputado} />)
 
     expect(screen.getByText('PT')).toBeInTheDocument()
   })
 
-  it('should render deputado state badge', () => {
+  it('deve renderizar badge de UF', () => {
     render(<DeputadoCard deputado={mockDeputado} />)
 
     const ufs = screen.getAllByText('SP')
     expect(ufs.length).toBeGreaterThan(0)
   })
 
-  it('should display email when available', () => {
+  it('deve exibir email quando disponível', () => {
     render(<DeputadoCard deputado={mockDeputado} />)
 
     expect(screen.getByText('joao@example.com')).toBeInTheDocument()
   })
 
-  it('should render photo when foto_url is available', () => {
+  it('deve renderizar foto quando foto_url estiver disponível', () => {
     const { container } = render(<DeputadoCard deputado={mockDeputado} />)
 
     const img = container.querySelector('img')
@@ -47,40 +47,36 @@ describe('DeputadoCard', () => {
     expect(img).toHaveAttribute('alt', 'João Silva Santos')
   })
 
-  it('should render avatar with initials when no foto_url', () => {
+  it('deve renderizar avatar com iniciais quando não houver foto', () => {
     const deputadoSemFoto = {
       ...mockDeputado,
-      foto_url: undefined,
+      foto_url: undefined as unknown as string,
     }
 
     const { container } = render(<DeputadoCard deputado={deputadoSemFoto} />)
 
-    // Should not have image
     const img = container.querySelector('img')
     expect(img).not.toBeInTheDocument()
-
-    // Should display initials JS
     expect(screen.getByText('JS')).toBeInTheDocument()
   })
 
-  it('should handle single name correctly', () => {
+  it('deve lidar com nome único ao gerar iniciais', () => {
     const deputadoUmNome = {
       ...mockDeputado,
       nome: 'João',
-      foto_url: undefined, // Remove foto to show initials
+      foto_url: undefined as unknown as string,
     }
 
     render(<DeputadoCard deputado={deputadoUmNome} />)
 
-    // Should create initials from first letter
     expect(screen.getByText('J')).toBeInTheDocument()
   })
 
-  it('should handle null nome gracefully', () => {
+  it('deve lidar com nome nulo sem quebrar', () => {
     const deputadoSemNome = {
       ...mockDeputado,
-      nome: null as any,
-      foto_url: undefined, // Remove foto to show initials
+      nome: null as unknown as string,
+      foto_url: undefined as unknown as string,
     }
 
     render(<DeputadoCard deputado={deputadoSemNome} />)
@@ -88,21 +84,21 @@ describe('DeputadoCard', () => {
     expect(screen.getByText('?')).toBeInTheDocument()
   })
 
-  it('should call onClick handler when clicked', () => {
+  it('deve chamar onClick quando card for clicado', () => {
     const onClick = vi.fn()
     render(<DeputadoCard deputado={mockDeputado} onClick={onClick} />)
 
-    const card = screen.getByText('João Silva Santos').closest('div').closest('div')
+    const card = screen.getByText('João Silva Santos').closest('div')?.closest('div')
     if (card) {
       card.click()
       expect(onClick).toHaveBeenCalled()
     }
   })
 
-  it('should handle deputado without email', () => {
+  it('deve lidar com deputado sem email', () => {
     const deputadoSemEmail = {
       ...mockDeputado,
-      email: undefined,
+      email: undefined as unknown as string,
     }
 
     render(<DeputadoCard deputado={deputadoSemEmail} />)
@@ -110,22 +106,21 @@ describe('DeputadoCard', () => {
     expect(screen.queryByText('joao@example.com')).not.toBeInTheDocument()
   })
 
-  it('should handle deputado without partido', () => {
+  it('deve lidar com deputado sem sigla_partido', () => {
     const deputadoSemPartido = {
       ...mockDeputado,
-      partido: undefined,
+      sigla_partido: undefined as unknown as string,
     }
 
     render(<DeputadoCard deputado={deputadoSemPartido} />)
 
-    // Should still render name and state
     expect(screen.getByText('João Silva Santos')).toBeInTheDocument()
   })
 
-  it('should handle deputado without uf', () => {
+  it('deve lidar com deputado sem UF', () => {
     const deputadoSemUf = {
       ...mockDeputado,
-      uf: undefined,
+      uf: undefined as unknown as string,
     }
 
     render(<DeputadoCard deputado={deputadoSemUf} />)
@@ -134,13 +129,13 @@ describe('DeputadoCard', () => {
     expect(screen.getByText('PT')).toBeInTheDocument()
   })
 
-  it('should display multiple word names correctly', () => {
+  it('deve exibir nomes longos corretamente', () => {
     const deputadoNomeLongo = {
       ...mockDeputado,
       nome: 'João da Silva Santos Oliveira',
     }
 
-    const { container } = render(<DeputadoCard deputado={deputadoNomeLongo} />)
+    render(<DeputadoCard deputado={deputadoNomeLongo} />)
 
     expect(screen.getByText('João da Silva Santos Oliveira')).toBeInTheDocument()
   })
