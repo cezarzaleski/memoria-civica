@@ -28,12 +28,12 @@ from pathlib import Path
 ETL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ETL_DIR))
 
-from scripts.download_camara import download_all_files, print_summary
-from src.classificacao.etl import run_classificacao_etl
-from src.deputados.etl import run_deputados_etl
-from src.proposicoes.etl import run_proposicoes_etl
-from src.shared.config import settings
-from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl
+from scripts.download_camara import download_all_files, print_summary  # noqa: E402
+from src.classificacao.etl import run_classificacao_etl  # noqa: E402
+from src.deputados.etl import run_deputados_etl  # noqa: E402
+from src.proposicoes.etl import run_proposicoes_etl  # noqa: E402
+from src.shared.config import settings  # noqa: E402
+from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl  # noqa: E402
 
 # Configurar logger
 logger = logging.getLogger(__name__)

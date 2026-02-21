@@ -41,9 +41,9 @@ from pathlib import Path
 ETL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ETL_DIR))
 
-from src.shared.config import settings
-from src.shared.downloader import DownloadResult, download_file
-from src.shared.webhook import send_webhook_notification
+from src.shared.config import settings  # noqa: E402
+from src.shared.downloader import DownloadResult, download_file  # noqa: E402
+from src.shared.webhook import send_webhook_notification  # noqa: E402
 
 # Configurar logger
 logger = logging.getLogger(__name__)
