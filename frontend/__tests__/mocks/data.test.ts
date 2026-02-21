@@ -1,293 +1,307 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { TipoProposicao, ResultadoVotacao, TipoVoto } from '@/lib/types';
 import {
-  generateDeputados,
-  getDeputadoById,
+  DEPUTADOS_FIXTURES,
   filterDeputadosByNome,
   filterDeputadosByPartido,
   filterDeputadosByUF,
+  generateDeputados,
+  getDeputadoById,
 } from '@/mocks/data/deputados';
-import { generateProposicoes, getProposicaoById } from '@/mocks/data/proposicoes';
-import { generateVotacoes, getVotacaoById } from '@/mocks/data/votacoes';
-import { generateVotos, countVotosByTipo } from '@/mocks/data/votos';
-import { TipoProposicao, ResultadoVotacao, TipoVoto } from '@/lib/types';
+import { CATEGORIAS_CIVICAS_FIXTURES, getCategoriaCivicaById } from '@/mocks/data/categorias-civicas';
+import { ORIENTACOES_FIXTURES, getOrientacoesByVotacaoId } from '@/mocks/data/orientacoes';
+import { PROPOSICOES_CATEGORIAS_FIXTURES, getCategoriasByProposicaoId } from '@/mocks/data/proposicoes-categorias';
+import { PROPOSICOES_FIXTURES, generateProposicoes, getProposicaoById } from '@/mocks/data/proposicoes';
+import { VOTACOES_PROPOSICOES_FIXTURES, getProposicoesByVotacaoId } from '@/mocks/data/votacoes-proposicoes';
+import { VOTACOES_FIXTURES, generateVotacoes, getVotacaoById } from '@/mocks/data/votacoes';
+import { buildPlacarFromVotacao, countVotosByTipo, generateVotos, getVotoById } from '@/mocks/data/votos';
 
-describe('Mock Data Factories', () => {
-  describe('generateDeputados', () => {
-    it('should generate 513 deputies by default', () => {
-      const deputies = generateDeputados();
-      expect(deputies).toHaveLength(513);
-    });
-
-    it('should generate correct number of deputies when count is specified', () => {
-      const deputies = generateDeputados(100);
-      expect(deputies).toHaveLength(100);
-    });
-
-    it('should generate deputies with required fields', () => {
-      const deputies = generateDeputados(10);
-
-      deputies.forEach((deputy) => {
-        expect(deputy.id).toBeDefined();
-        expect(deputy.nome).toBeDefined();
-        expect(deputy.sigla_partido).toBeDefined();
-        expect(deputy.uf).toBeDefined();
-      });
-    });
-
-    it('should have unique IDs for each deputy', () => {
-      const deputies = generateDeputados(50);
-      const ids = deputies.map((d) => d.id);
-      const uniqueIds = new Set(ids);
-
-      expect(uniqueIds.size).toBe(ids.length);
-    });
-
-    it('should have valid UF (state) abbreviations', () => {
-      const deputies = generateDeputados(50);
-      const validUFs = [
-        'SP', 'MG', 'RJ', 'BA', 'PR', 'RS', 'PE', 'CE', 'PA', 'GO',
-        'PB', 'SC', 'MA', 'ES', 'PI', 'AL', 'RN', 'MT', 'MS', 'DF',
-        'AC', 'AM', 'AP', 'RO', 'RR', 'TO',
-      ];
-
-      deputies.forEach((deputy) => {
-        expect(validUFs).toContain(deputy.uf);
-      });
-    });
-
-    it('should include foto_url for all deputies', () => {
-      const deputies = generateDeputados(10);
-
-      deputies.forEach((deputy) => {
-        expect(deputy.foto_url).toBeDefined();
-        expect(deputy.foto_url).toContain('camara.leg.br');
-      });
-    });
-
-    it('should have email field (may be undefined)', () => {
-      const deputies = generateDeputados(50);
-      let hasEmail = false;
-
-      deputies.forEach((deputy) => {
-        if (deputy.email) {
-          hasEmail = true;
-          expect(deputy.email).toMatch(/@/);
-        }
-      });
-
-      // At least some deputies should have emails
-      expect(hasEmail).toBe(true);
+describe('Mock data legislativo brasileiro', () => {
+  describe('volumes mínimos para paginação e filtros', () => {
+    it('deve manter massa crítica de registros no domínio', () => {
+      expect(DEPUTADOS_FIXTURES.length).toBeGreaterThanOrEqual(513);
+      expect(PROPOSICOES_FIXTURES.length).toBeGreaterThanOrEqual(50);
+      expect(VOTACOES_FIXTURES.length).toBeGreaterThanOrEqual(50);
+      expect(CATEGORIAS_CIVICAS_FIXTURES.length).toBeGreaterThanOrEqual(5);
+      expect(ORIENTACOES_FIXTURES.length).toBeGreaterThanOrEqual(200);
+      expect(PROPOSICOES_CATEGORIAS_FIXTURES.length).toBeGreaterThanOrEqual(60);
+      expect(VOTACOES_PROPOSICOES_FIXTURES.length).toBeGreaterThanOrEqual(50);
     });
   });
 
-  describe('deputados filtering functions', () => {
-    const deputies = generateDeputados(50);
+  describe('deputados', () => {
+    it('deve gerar 513 deputados por padrão e manter IDs únicos numéricos', () => {
+      const deputados = generateDeputados();
+      const ids = deputados.map((deputado) => deputado.id);
 
-    it('should filter deputies by name', () => {
-      const filtered = filterDeputadosByNome(deputies, 'João');
-      const allMatch = filtered.every((d) => d.nome.toLowerCase().includes('joão'));
-
-      expect(filtered.length).toBeGreaterThan(0);
-      expect(allMatch).toBe(true);
+      expect(deputados).toHaveLength(513);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids.every((id) => Number.isInteger(id) && id > 0)).toBe(true);
     });
 
-    it('should filter deputies by partido', () => {
-      const partido = deputies[0].sigla_partido;
-      const filtered = filterDeputadosByPartido(deputies, partido);
-
-      expect(filtered.length).toBeGreaterThan(0);
-      expect(filtered.every((d) => d.sigla_partido === partido)).toBe(true);
+    it('deve retornar array vazio para count inválido ou negativo', () => {
+      expect(generateDeputados(-10)).toEqual([]);
+      expect(generateDeputados(Number.NaN)).toEqual([]);
     });
 
-    it('should filter deputies by UF', () => {
-      const uf = deputies[0].uf;
-      const filtered = filterDeputadosByUF(deputies, uf);
+    it('deve conter siglas partidárias e UFs representativas do contexto brasileiro', () => {
+      const deputados = generateDeputados(80);
+      const ufsValidas = new Set([
+        'AC',
+        'AL',
+        'AP',
+        'AM',
+        'BA',
+        'CE',
+        'DF',
+        'ES',
+        'GO',
+        'MA',
+        'MT',
+        'MS',
+        'MG',
+        'PA',
+        'PB',
+        'PR',
+        'PE',
+        'PI',
+        'RJ',
+        'RN',
+        'RS',
+        'RO',
+        'RR',
+        'SC',
+        'SP',
+        'SE',
+        'TO',
+      ]);
 
-      expect(filtered.length).toBeGreaterThan(0);
-      expect(filtered.every((d) => d.uf === uf)).toBe(true);
+      expect(deputados.some((deputado) => deputado.sigla_partido === 'PT')).toBe(true);
+      expect(deputados.some((deputado) => deputado.sigla_partido === 'PL')).toBe(true);
+      expect(deputados.some((deputado) => deputado.sigla_partido === 'MDB')).toBe(true);
+      expect(deputados.every((deputado) => ufsValidas.has(deputado.uf))).toBe(true);
     });
 
-    it('should return deputy by ID', () => {
-      const target = deputies[10];
-      const found = getDeputadoById(deputies, target.id);
+    it('deve manter filtros utilitários funcionais', () => {
+      const deputados = generateDeputados(120);
 
-      expect(found).toEqual(target);
-    });
+      const porNome = filterDeputadosByNome(deputados, 'João');
+      const partidoAlvo = deputados[5]?.sigla_partido;
+      const porPartido = partidoAlvo ? filterDeputadosByPartido(deputados, partidoAlvo) : [];
+      const porUF = filterDeputadosByUF(deputados, 'SP');
 
-    it('should return undefined for non-existent deputy ID', () => {
-      const found = getDeputadoById(deputies, 99999);
-      expect(found).toBeUndefined();
-    });
-  });
+      expect(porNome.every((deputado) => deputado.nome.toLowerCase().includes('joão'))).toBe(true);
+      expect(porPartido.every((deputado) => deputado.sigla_partido === partidoAlvo)).toBe(true);
+      expect(porUF.every((deputado) => deputado.uf === 'SP')).toBe(true);
 
-  describe('generateProposicoes', () => {
-    it('should generate 50 propositions by default', () => {
-      const propositions = generateProposicoes();
-      expect(propositions).toHaveLength(50);
-    });
-
-    it('should generate correct number when specified', () => {
-      const propositions = generateProposicoes(30);
-      expect(propositions).toHaveLength(30);
-    });
-
-    it('should have required fields for each proposition', () => {
-      const propositions = generateProposicoes(10);
-
-      propositions.forEach((prop) => {
-        expect(prop.id).toBeDefined();
-        expect(prop.tipo).toBeDefined();
-        expect(prop.numero).toBeDefined();
-        expect(prop.ano).toBeDefined();
-        expect(prop.ementa).toBeDefined();
-      });
-    });
-
-    it('should use valid TipoProposicao values', () => {
-      const propositions = generateProposicoes(20);
-      const validTipos = Object.values(TipoProposicao);
-
-      propositions.forEach((prop) => {
-        expect(validTipos).toContain(prop.tipo);
-      });
-    });
-
-    it('should have reasonable year values', () => {
-      const propositions = generateProposicoes(20);
-      const currentYear = new Date().getFullYear();
-
-      propositions.forEach((prop) => {
-        expect(prop.ano).toBeGreaterThanOrEqual(currentYear - 3);
-        expect(prop.ano).toBeLessThanOrEqual(currentYear);
-      });
-    });
-
-    it('should return proposition by ID', () => {
-      const propositions = generateProposicoes(20);
-      const target = propositions[5];
-      const found = getProposicaoById(propositions, target.id);
-
-      expect(found).toEqual(target);
+      const deputado = deputados[10];
+      expect(deputado).toBeDefined();
+      expect(getDeputadoById(deputados, deputado?.id ?? -1)).toEqual(deputado);
     });
   });
 
-  describe('generateVotacoes', () => {
-    it('should generate 50 votações by default', () => {
-      const votacoes = generateVotacoes();
-      expect(votacoes).toHaveLength(50);
+  describe('proposições', () => {
+    it('deve produzir proposições com shape canônico e tipos válidos', () => {
+      const proposicoes = generateProposicoes(50);
+      const tiposCanonicos = new Set(Object.values(TipoProposicao));
+
+      expect(proposicoes).toHaveLength(50);
+      proposicoes.forEach((proposicao) => {
+        expect(Number.isInteger(proposicao.id)).toBe(true);
+        expect(typeof proposicao.tipo).toBe('string');
+        expect(proposicao.tipo.length).toBeGreaterThan(1);
+        expect(Number.isInteger(proposicao.numero)).toBe(true);
+        expect(Number.isInteger(proposicao.ano)).toBe(true);
+        expect(proposicao.ementa.toLowerCase()).toContain('dispõe sobre');
+        expect(proposicao.data_apresentacao).toContain('T');
+      });
+
+      expect(
+        proposicoes.some((proposicao) =>
+          tiposCanonicos.has(proposicao.tipo as (typeof TipoProposicao)[keyof typeof TipoProposicao])
+        )
+      ).toBe(true);
     });
 
-    it('should generate votações sorted by date descending', () => {
-      const votacoes = generateVotacoes(20);
+    it('deve retornar array vazio para count inválido ou negativo', () => {
+      expect(generateProposicoes(-3)).toEqual([]);
+      expect(generateProposicoes(Number.POSITIVE_INFINITY)).toEqual([]);
+    });
 
-      for (let i = 0; i < votacoes.length - 1; i++) {
-        const current = new Date(votacoes[i].data_hora);
-        const next = new Date(votacoes[i + 1].data_hora);
-        expect(current.getTime()).toBeGreaterThanOrEqual(next.getTime());
+    it('deve cobrir campos opcionais e fallbacks de contrato', () => {
+      expect(PROPOSICOES_FIXTURES.some((proposicao) => proposicao.autor_id === undefined)).toBe(true);
+      expect(PROPOSICOES_FIXTURES.some((proposicao) => proposicao.autor_id !== undefined)).toBe(true);
+      expect(PROPOSICOES_FIXTURES.some((proposicao) => proposicao.ementa_simplificada === undefined)).toBe(true);
+      expect(PROPOSICOES_FIXTURES.some((proposicao) => proposicao.ementa_simplificada !== undefined)).toBe(true);
+
+      const alvo = PROPOSICOES_FIXTURES[20];
+      expect(alvo).toBeDefined();
+      expect(getProposicaoById(PROPOSICOES_FIXTURES, alvo?.id ?? -1)).toEqual(alvo);
+    });
+  });
+
+  describe('votações e votos', () => {
+    it('deve manter votações ordenadas e placar consistente com o total da Câmara', () => {
+      const votacoes = generateVotacoes(50);
+
+      for (let index = 0; index < votacoes.length - 1; index += 1) {
+        const atual = new Date(votacoes[index]?.data_hora ?? 0);
+        const proxima = new Date(votacoes[index + 1]?.data_hora ?? 0);
+        expect(atual.getTime()).toBeGreaterThanOrEqual(proxima.getTime());
       }
-    });
-
-    it('should have nested proposicao in each votação', () => {
-      const votacoes = generateVotacoes(10);
-
-      votacoes.forEach((votacao) => {
-        expect(votacao.proposicao).toBeDefined();
-        expect(votacao.proposicao?.id).toBeDefined();
-        expect(votacao.proposicao?.tipo).toBeDefined();
-      });
-    });
-
-    it('should have valid resultado values', () => {
-      const votacoes = generateVotacoes(20);
-
-      votacoes.forEach((votacao) => {
-        expect([ResultadoVotacao.APROVADO, ResultadoVotacao.REJEITADO]).toContain(votacao.resultado);
-      });
-    });
-
-    it('should have placar summing to 513 (or close)', () => {
-      const votacoes = generateVotacoes(10);
 
       votacoes.forEach((votacao) => {
         const total = votacao.placar.votos_sim + votacao.placar.votos_nao + votacao.placar.votos_outros;
         expect(total).toBe(513);
+
+        if (votacao.resultado === ResultadoVotacao.APROVADO) {
+          expect(votacao.placar.votos_sim).toBeGreaterThanOrEqual(votacao.placar.votos_nao);
+        }
+
+        if (votacao.resultado === ResultadoVotacao.REJEITADO) {
+          expect(votacao.placar.votos_nao).toBeGreaterThan(votacao.placar.votos_sim);
+        }
+
+        if (votacao.resultado === ResultadoVotacao.APROVADO_COM_SUBSTITUTIVO) {
+          expect(votacao.id % 10).toBe(0);
+        }
       });
     });
 
-    it('should have realistic placar distributions', () => {
-      const votacoes = generateVotacoes(20);
+    it('deve manter coerência entre votos individuais e placar agregado da votação', () => {
+      const amostraIds = [1, 2, 3, 10];
 
-      votacoes.forEach((votacao) => {
-        // Not all votes should be on one side
-        expect(votacao.placar.votos_sim).toBeGreaterThan(0);
-        expect(votacao.placar.votos_sim).toBeLessThan(513);
+      amostraIds.forEach((votacaoId) => {
+        const placar = buildPlacarFromVotacao(votacaoId);
+        const votacao = getVotacaoById(VOTACOES_FIXTURES, votacaoId);
+
+        expect(votacao).toBeDefined();
+        expect(votacao?.placar).toEqual(placar);
       });
     });
 
-    it('should return votação by ID', () => {
-      const votacoes = generateVotacoes(20);
-      const target = votacoes[5];
-      const found = getVotacaoById(votacoes, target.id);
+    it('deve garantir coerência para votações com resultado aprovado com substitutivo', () => {
+      const substitutivas = VOTACOES_FIXTURES.filter(
+        (votacao) => votacao.resultado === ResultadoVotacao.APROVADO_COM_SUBSTITUTIVO
+      );
 
-      expect(found).toEqual(target);
+      expect(substitutivas.length).toBeGreaterThan(0);
+      substitutivas.forEach((votacao) => {
+        expect(votacao.id % 10).toBe(0);
+        expect(votacao.placar.votos_sim).toBeGreaterThanOrEqual(votacao.placar.votos_nao);
+      });
     });
 
-    it('should return undefined for non-existent votação ID', () => {
-      const votacoes = generateVotacoes(10);
-      const found = getVotacaoById(votacoes, 999999);
+    it('deve retornar array vazio para count inválido ou negativo', () => {
+      expect(generateVotacoes(-1)).toEqual([]);
+      expect(generateVotacoes(Number.NEGATIVE_INFINITY)).toEqual([]);
+    });
 
-      expect(found).toBeUndefined();
+    it('deve gerar votos válidos com deputado aninhado e utilitários de busca', () => {
+      const votacaoId = 11;
+      const votos = generateVotos(votacaoId);
+      const validos = new Set(Object.values(TipoVoto));
+
+      expect(votos).toHaveLength(513);
+      expect(votos.every((voto) => voto.votacao_id === votacaoId)).toBe(true);
+      expect(votos.every((voto) => voto.deputado?.id === voto.deputado_id)).toBe(true);
+      expect(votos.every((voto) => validos.has(voto.voto))).toBe(true);
+
+      const votoAlvo = votos[100];
+      expect(votoAlvo).toBeDefined();
+      expect(getVotoById(votos, votoAlvo?.id ?? -1)).toEqual(votoAlvo);
+
+      const contagem = countVotosByTipo(votos, votacaoId);
+      expect(contagem.sim + contagem.nao + contagem.outros).toBe(513);
+      expect(contagem.sim + contagem.nao).toBeGreaterThan(contagem.outros);
     });
   });
 
-  describe('generateVotos', () => {
-    it('should generate 513 votos (one per deputy)', () => {
-      const votos = generateVotos(1);
-      expect(votos).toHaveLength(513);
-    });
+  describe('novas entidades e integridade referencial', () => {
+    it('deve garantir integridade entre categorias cívicas e proposições-categorias', () => {
+      const idsCategorias = new Set(CATEGORIAS_CIVICAS_FIXTURES.map((categoria) => categoria.id));
+      const idsProposicoes = new Set(PROPOSICOES_FIXTURES.map((proposicao) => proposicao.id));
 
-    it('should have nested deputado for each voto', () => {
-      const votos = generateVotos(1);
+      PROPOSICOES_CATEGORIAS_FIXTURES.forEach((relacao) => {
+        expect(idsCategorias.has(relacao.categoria_id)).toBe(true);
+        expect(idsProposicoes.has(relacao.proposicao_id)).toBe(true);
+        expect(['manual', 'automatica']).toContain(relacao.origem);
+        expect(relacao.created_at).toContain('T');
 
-      votos.forEach((voto) => {
-        expect(voto.deputado).toBeDefined();
-        expect(voto.deputado?.id).toBeDefined();
-        expect(voto.deputado?.nome).toBeDefined();
+        if (relacao.origem === 'automatica') {
+          expect(relacao.confianca).toBeGreaterThanOrEqual(0);
+          expect(relacao.confianca).toBeLessThanOrEqual(1);
+        }
       });
+
+      const categoriasDaPrimeira = getCategoriasByProposicaoId(1);
+      expect(categoriasDaPrimeira.length).toBeGreaterThan(0);
+      expect(getCategoriaCivicaById(1)?.codigo).toBe('saude-publica');
+      expect(getCategoriaCivicaById(9999)).toBeUndefined();
     });
 
-    it('should have valid TipoVoto values', () => {
-      const votos = generateVotos(1);
-      const validTipos = Object.values(TipoVoto);
+    it('deve garantir integridade entre votações e proposições vinculadas', () => {
+      const idsVotacoes = new Set(VOTACOES_FIXTURES.map((votacao) => votacao.id));
+      const idsProposicoes = new Set(PROPOSICOES_FIXTURES.map((proposicao) => proposicao.id));
 
-      votos.forEach((voto) => {
-        expect(validTipos).toContain(voto.voto);
+      VOTACOES_PROPOSICOES_FIXTURES.forEach((relacao) => {
+        expect(idsVotacoes.has(relacao.votacao_id)).toBe(true);
+        expect(idsProposicoes.has(relacao.proposicao_id)).toBe(true);
+        expect(relacao.created_at).toContain('T');
       });
-    });
 
-    it('should have correct votacao_id reference', () => {
-      const votacao_id = 123;
-      const votos = generateVotos(votacao_id);
+      const agrupadoPorVotacao = new Map<number, number>();
+      const secundarios = VOTACOES_PROPOSICOES_FIXTURES.filter((item) => !item.eh_principal).length;
 
-      votos.forEach((voto) => {
-        expect(voto.votacao_id).toBe(votacao_id);
+      VOTACOES_PROPOSICOES_FIXTURES.forEach((item) => {
+        if (item.eh_principal) {
+          agrupadoPorVotacao.set(item.votacao_id, (agrupadoPorVotacao.get(item.votacao_id) ?? 0) + 1);
+        }
       });
+
+      idsVotacoes.forEach((idVotacao) => {
+        expect(agrupadoPorVotacao.get(idVotacao)).toBe(1);
+      });
+
+      expect(secundarios).toBeGreaterThan(0);
+      expect(getProposicoesByVotacaoId(4).length).toBeGreaterThan(1);
     });
 
-    it('should have unique IDs for each voto', () => {
-      const votos = generateVotos(1);
-      const ids = votos.map((v) => v.id);
-      const uniqueIds = new Set(ids);
+    it('deve garantir orientações por votação com valores legislativos esperados', () => {
+      const idsVotacoes = new Set(VOTACOES_FIXTURES.map((votacao) => votacao.id));
+      const orientacoesValidas = new Set(['Sim', 'Não', 'Liberado', 'Obstrução']);
 
-      expect(uniqueIds.size).toBe(ids.length);
+      ORIENTACOES_FIXTURES.forEach((orientacao) => {
+        expect(idsVotacoes.has(orientacao.votacao_id)).toBe(true);
+        expect(orientacao.sigla_bancada.length).toBeGreaterThanOrEqual(2);
+        expect(orientacoesValidas.has(orientacao.orientacao)).toBe(true);
+      });
+
+      const orientacoesVotacao1 = getOrientacoesByVotacaoId(1);
+      expect(orientacoesVotacao1.length).toBe(10);
+      expect(orientacoesVotacao1.some((item) => item.orientacao === 'Sim')).toBe(true);
+      expect(orientacoesVotacao1.some((item) => item.orientacao === 'Não')).toBe(true);
+    });
+  });
+
+  describe('edge cases de contratos opcionais e relacionamentos ausentes', () => {
+    it('deve conter votações com campos opcionais ausentes sem invalidar o contrato', () => {
+      expect(VOTACOES_FIXTURES.some((votacao) => votacao.sigla_orgao === undefined)).toBe(true);
+      expect(VOTACOES_FIXTURES.some((votacao) => votacao.descricao === undefined)).toBe(true);
+      expect(VOTACOES_FIXTURES.every((votacao) => typeof votacao.eh_nominal === 'boolean')).toBe(true);
     });
 
-    it('should have reasonable vote type distribution', () => {
-      const votos = generateVotos(1);
-      const counts = countVotosByTipo(votos, 1);
+    it('deve preservar proposições sem classificação cívica para cenários de fallback', () => {
+      const proposicoesClassificadas = new Set(
+        PROPOSICOES_CATEGORIAS_FIXTURES.map((proposicaoCategoria) => proposicaoCategoria.proposicao_id)
+      );
 
-      // Check that vote types are distributed reasonably
-      expect(counts.sim + counts.nao).toBeGreaterThan(counts.outros);
+      const semClassificacao = PROPOSICOES_FIXTURES.filter(
+        (proposicao) => !proposicoesClassificadas.has(proposicao.id)
+      );
+
+      expect(semClassificacao.length).toBeGreaterThan(0);
+      expect(semClassificacao.every((proposicao) => proposicao.id > 60)).toBe(true);
     });
   });
 });

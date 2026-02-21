@@ -1,94 +1,78 @@
-import { ResultadoVotacao, type Votacao, type Placar } from '@/lib/types';
-import { generateProposicoes, getProposicaoById } from './proposicoes';
+import { ResultadoVotacao, type Votacao } from '@/lib/types';
+import { PROPOSICOES_FIXTURES, getProposicaoById } from './proposicoes';
+import { buildPlacarFromVotacao } from './votos';
 
-/**
- * Generate a realistic placar (vote count)
- * Creates plausible vote distributions totaling 513 (Brazilian chamber size)
- * Avoids unrealistic outcomes like 513-0
- */
-function generatePlacar(): Placar {
-  // Total should sum to 513 (Brazilian Federal Chamber)
-  const total = 513;
+const TOTAL_VOTACOES_FIXTURE = 50;
+const SIGLAS_ORGAO = ['PLEN', 'CCJC', 'CFT', 'CSSF', 'CMULHER'] as const;
 
-  // Generate realistic distribution - most votes go to SIM or NAO
-  // with smaller number of ABSTENCAO and OBSTRUCAO
-  const baseVotes = Math.floor(total * (0.5 + Math.random() * 0.2)); // 50-70% to SIM
-  const sim = baseVotes + Math.floor(Math.random() * 20 - 10); // Add variation
+function buildDataHora(index: number): string {
+  const baseDate = Date.UTC(2025, 11, 20, 18, 30, 0);
+  const displacementDays = (index - 1) * 2;
+  const displacementHours = index % 4;
 
-  const naoBase = total - sim - Math.floor(Math.random() * 100);
-  const nao = Math.max(Math.floor(naoBase * 0.7), 0); // 70% of remainder
+  return new Date(baseDate - displacementDays * 24 * 60 * 60 * 1000 - displacementHours * 60 * 60 * 1000).toISOString();
+}
 
-  const votosOutros = Math.max(total - sim - nao, 0);
+function buildResultado(votacaoId: number, votosSim: number, votosNao: number): Votacao['resultado'] {
+  if (votacaoId % 10 === 0 && votosSim >= votosNao) {
+    return ResultadoVotacao.APROVADO_COM_SUBSTITUTIVO;
+  }
+
+  return votosSim >= votosNao ? ResultadoVotacao.APROVADO : ResultadoVotacao.REJEITADO;
+}
+
+function buildDescricao(votacaoId: number, tema: string): string {
+  return `Sessão deliberativa nº ${2020 + votacaoId}: ${tema}.`;
+}
+
+function buildVotacao(id: number): Votacao {
+  const proposicao = getProposicaoById(PROPOSICOES_FIXTURES, id);
+  const placar = buildPlacarFromVotacao(id);
+  const siglaOrgao = SIGLAS_ORGAO[(id - 1) % SIGLAS_ORGAO.length] ?? SIGLAS_ORGAO[0];
+  const tema = proposicao?.ementa_simplificada ?? proposicao?.ementa ?? 'matéria legislativa em apreciação';
 
   return {
-    votos_sim: Math.max(sim, 0),
-    votos_nao: Math.max(nao, 0),
-    votos_outros: votosOutros,
+    id,
+    proposicao_id: proposicao?.id,
+    proposicao,
+    data_hora: buildDataHora(id),
+    resultado: buildResultado(id, placar.votos_sim, placar.votos_nao),
+    placar,
+    eh_nominal: id % 5 !== 0,
+    descricao: id % 6 === 0 ? undefined : buildDescricao(id, tema),
+    sigla_orgao: id % 7 === 0 ? undefined : siglaOrgao,
   };
 }
 
-/**
- * Determine voting result based on placar
- */
-function determineResultado(placar: Placar): ResultadoVotacao {
-  return placar.votos_sim > placar.votos_nao
-    ? ResultadoVotacao.APROVADO
-    : ResultadoVotacao.REJEITADO;
-}
+export const VOTACOES_FIXTURES: Votacao[] = Array.from(
+  { length: TOTAL_VOTACOES_FIXTURE },
+  (_, index) => buildVotacao(index + 1)
+).sort((first, second) => new Date(second.data_hora).getTime() - new Date(first.data_hora).getTime());
 
-/**
- * Generate a date within the last 6 months
- */
-function generateRecentDate(): Date {
-  const today = new Date();
-  const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
-
-  const randomTime = Math.random() * (today.getTime() - sixMonthsAgo.getTime()) + sixMonthsAgo.getTime();
-  return new Date(randomTime);
-}
-
-/**
- * Generate realistic mock votação (voting session) data
- *
- * @param count Number of votações to generate (default: 50)
- * @returns Array of mock Votacao objects sorted by data descending
- */
-export function generateVotacoes(count: number = 50): Votacao[] {
-  const proposicoes = generateProposicoes(count);
-  const votacoes: Votacao[] = [];
-
-  for (let i = 1; i <= count; i++) {
-    const proposicao = getProposicaoById(proposicoes, i);
-    const placar = generatePlacar();
-
-    const votacao: Votacao = {
-      id: i,
-      proposicao_id: i,
-      proposicao, // Include nested proposicao
-      data_hora: generateRecentDate().toISOString(),
-      resultado: determineResultado(placar),
-      placar,
-      eh_nominal: true,
-      descricao: `Sessão ${i} de votação`,
-      sigla_orgao: 'PLEN',
-    };
-
-    votacoes.push(votacao);
+function normalizeCount(count: number): number {
+  if (!Number.isFinite(count)) {
+    return 0;
   }
 
-  // Sort by date descending (most recent first)
-  votacoes.sort((a, b) => new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime());
-
-  return votacoes;
+  return Math.max(0, Math.floor(count));
 }
 
-/**
- * Get a single votação by ID
- *
- * @param votacoes Array of votações
- * @param id Votação ID
- * @returns Votação if found, undefined otherwise
- */
+export function generateVotacoes(count: number = TOTAL_VOTACOES_FIXTURE): Votacao[] {
+  const normalizedCount = normalizeCount(count);
+
+  if (normalizedCount <= VOTACOES_FIXTURES.length) {
+    return VOTACOES_FIXTURES.slice(0, normalizedCount);
+  }
+
+  const additionalVotacoes = Array.from({ length: normalizedCount - VOTACOES_FIXTURES.length }, (_, index) =>
+    buildVotacao(VOTACOES_FIXTURES.length + index + 1)
+  );
+
+  return [...VOTACOES_FIXTURES, ...additionalVotacoes].sort(
+    (first, second) => new Date(second.data_hora).getTime() - new Date(first.data_hora).getTime()
+  );
+}
+
 export function getVotacaoById(votacoes: Votacao[], id: number): Votacao | undefined {
-  return votacoes.find((v) => v.id === id);
+  return votacoes.find((votacao) => votacao.id === id);
 }
