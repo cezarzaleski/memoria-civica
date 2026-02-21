@@ -1,3 +1,7 @@
 export { useVotacoes } from './use-votacoes'
+export { useVotacao } from './use-votacao'
 export { useDeputados } from './use-deputados'
 export { useVotos } from './use-votos'
+export { useProposicoes, useProposicaoCategorias } from './use-proposicoes'
+export { useCategoriasCivicas } from './use-categorias-civicas'
+export { useOrientacoes } from './use-orientacoes'

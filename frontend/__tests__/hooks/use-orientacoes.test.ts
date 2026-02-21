@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { server } from '@/mocks/server'
-import { useVotos } from '@/lib/hooks/use-votos'
+import { useOrientacoes } from '@/lib/hooks/use-orientacoes'
 
-describe('useVotos', () => {
+describe('useOrientacoes', () => {
   it('deve retornar estado vazio quando votacaoId não é informado', () => {
-    const { result } = renderHook(() => useVotos(null))
+    const { result } = renderHook(() => useOrientacoes(null))
 
     expect(result.current.loading).toBe(false)
     expect(result.current.error).toBeNull()
@@ -14,8 +14,8 @@ describe('useVotos', () => {
     expect(result.current.pagination).toBeNull()
   })
 
-  it('deve consumir envelope paginado de votos', async () => {
-    const { result } = renderHook(() => useVotos(1))
+  it('deve carregar orientações por votação com envelope paginado', async () => {
+    const { result } = renderHook(() => useOrientacoes(1))
 
     expect(result.current.loading).toBe(true)
 
@@ -24,25 +24,25 @@ describe('useVotos', () => {
     })
 
     expect(result.current.error).toBeNull()
+    expect(result.current.data).toHaveLength(10)
     expect(result.current.pagination).toEqual({
       page: 1,
       per_page: 20,
-      total: 513,
+      total: 10,
     })
-    expect(result.current.data).toHaveLength(20)
     expect(result.current.data[0]).toMatchObject({
       id: expect.any(Number),
       votacao_id: 1,
-      voto: expect.any(String),
+      sigla_bancada: expect.any(String),
+      orientacao: expect.any(String),
     })
-    expect((result.current.data[0] as Record<string, unknown>).tipo).toBeUndefined()
   })
 
-  it('deve enviar parâmetros de paginação na query string', async () => {
+  it('deve enviar paginação na query string', async () => {
     let capturedUrl: URL | null = null
 
     server.use(
-      http.get('*/api/v1/votacoes/:votacao_id/votos', ({ request }) => {
+      http.get('*/api/v1/votacoes/:votacao_id/orientacoes', ({ request }) => {
         capturedUrl = new URL(request.url)
         return HttpResponse.json({
           data: [],
@@ -55,23 +55,23 @@ describe('useVotos', () => {
       })
     )
 
-    const { result } = renderHook(() => useVotos(1, { page: 3, per_page: 7 }))
+    const { result } = renderHook(() => useOrientacoes(1, { page: 2, per_page: 3 }))
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(capturedUrl?.searchParams.get('page')).toBe('3')
-    expect(capturedUrl?.searchParams.get('per_page')).toBe('7')
+    expect(capturedUrl?.searchParams.get('page')).toBe('2')
+    expect(capturedUrl?.searchParams.get('per_page')).toBe('3')
     expect(result.current.pagination).toEqual({
-      page: 3,
-      per_page: 7,
+      page: 2,
+      per_page: 3,
       total: 0,
     })
   })
 
   it('deve expor erro quando votação não existe', async () => {
-    const { result } = renderHook(() => useVotos(999999))
+    const { result } = renderHook(() => useOrientacoes(999999))
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
@@ -80,28 +80,5 @@ describe('useVotos', () => {
     expect(result.current.error).toContain('Votação não encontrada')
     expect(result.current.data).toEqual([])
     expect(result.current.pagination).toBeNull()
-  })
-
-  it('deve refazer busca ao trocar votacaoId', async () => {
-    const { result, rerender } = renderHook(
-      ({ id }) => useVotos(id, { per_page: 5 }),
-      { initialProps: { id: 1 } }
-    )
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
-      expect(result.current.data).toHaveLength(5)
-    })
-
-    const firstId = result.current.data[0]?.id
-
-    rerender({ id: 2 })
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
-      expect(result.current.data).toHaveLength(5)
-    })
-
-    expect(result.current.data[0]?.id).not.toBe(firstId)
   })
 })

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Votacao } from '@/lib/types/votacao'
+import { useState, useEffect, useCallback } from 'react'
+import type { Votacao } from '@/lib/types'
+import { parseSinglePayload, readErrorMessage } from './shared'
 
 interface UseVotacaoReturn {
   data: Votacao | null
@@ -10,17 +11,16 @@ interface UseVotacaoReturn {
 
 /**
  * Fetches a single votacao by ID from /api/v1/votacoes/:id endpoint
- * @param id - ID of the votacao to fetch
- * @returns Object with data, loading, error states
  */
-export function useVotacao(id: string | null): UseVotacaoReturn {
+export function useVotacao(id: number | string | null): UseVotacaoReturn {
   const [data, setData] = useState<Votacao | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchVotacao = async () => {
+  const fetchVotacao = useCallback(async () => {
     if (!id) {
       setData(null)
+      setError(null)
       setLoading(false)
       return
     }
@@ -35,13 +35,14 @@ export function useVotacao(id: string | null): UseVotacaoReturn {
         if (response.status === 404) {
           setError('Votação não encontrada')
           setData(null)
-        } else {
-          throw new Error(`Failed to fetch votacao: ${response.status}`)
+          return
         }
-      } else {
-        const votacao = await response.json()
-        setData(votacao || null)
+
+        throw new Error(await readErrorMessage(response, 'Failed to fetch votacao'))
       }
+
+      const payload = (await response.json()) as unknown
+      setData(parseSinglePayload<Votacao>(payload))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
@@ -49,11 +50,11 @@ export function useVotacao(id: string | null): UseVotacaoReturn {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
-    fetchVotacao()
-  }, [id])
+    void fetchVotacao()
+  }, [fetchVotacao])
 
   return {
     data,
