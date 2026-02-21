@@ -26,7 +26,7 @@ function selectRandomVotoTipo(): TipoVoto {
  * @param votacao_id ID of the votação these votes belong to
  * @returns Array of mock Voto objects
  */
-export function generateVotos(votacao_id: string): Voto[] {
+export function generateVotos(votacao_id: number): Voto[] {
   const deputados = generateDeputados(513);
   const votos: Voto[] = [];
 
@@ -34,11 +34,11 @@ export function generateVotos(votacao_id: string): Voto[] {
     const deputado = getDeputadoById(deputados, i);
 
     const voto: Voto = {
-      id: `voto-${votacao_id}-${i}`,
+      id: votacao_id * 1000 + i,
       votacao_id,
       deputado_id: i,
       deputado, // Include nested deputado for convenience
-      tipo: selectRandomVotoTipo(),
+      voto: selectRandomVotoTipo(),
     };
 
     votos.push(voto);
@@ -54,7 +54,7 @@ export function generateVotos(votacao_id: string): Voto[] {
  * @param id Voto ID
  * @returns Voto if found, undefined otherwise
  */
-export function getVotoById(votos: Voto[], id: string): Voto | undefined {
+export function getVotoById(votos: Voto[], id: number): Voto | undefined {
   return votos.find((v) => v.id === id);
 }
 
@@ -65,7 +65,7 @@ export function getVotoById(votos: Voto[], id: string): Voto | undefined {
  * @param votacao_id Votação ID to filter by
  * @returns Filtered array of votos
  */
-export function filterVotosByVotacaoId(votos: Voto[], votacao_id: string): Voto[] {
+export function filterVotosByVotacaoId(votos: Voto[], votacao_id: number): Voto[] {
   return votos.filter((v) => v.votacao_id === votacao_id);
 }
 
@@ -76,13 +76,12 @@ export function filterVotosByVotacaoId(votos: Voto[], votacao_id: string): Voto[
  * @param votacao_id Votação ID to count votes for
  * @returns Object with count for each vote type
  */
-export function countVotosByTipo(votos: Voto[], votacao_id: string) {
+export function countVotosByTipo(votos: Voto[], votacao_id: number) {
   const votosForVotacao = filterVotosByVotacaoId(votos, votacao_id);
 
   return {
-    sim: votosForVotacao.filter((v) => v.tipo === TipoVoto.SIM).length,
-    nao: votosForVotacao.filter((v) => v.tipo === TipoVoto.NAO).length,
-    abstencao: votosForVotacao.filter((v) => v.tipo === TipoVoto.ABSTENCAO).length,
-    obstrucao: votosForVotacao.filter((v) => v.tipo === TipoVoto.OBSTRUCAO).length,
+    sim: votosForVotacao.filter((v) => v.voto === TipoVoto.SIM).length,
+    nao: votosForVotacao.filter((v) => v.voto === TipoVoto.NAO).length,
+    outros: votosForVotacao.filter((v) => ![TipoVoto.SIM, TipoVoto.NAO].includes(v.voto)).length,
   };
 }

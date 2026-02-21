@@ -52,24 +52,30 @@ function selectRandomTipo(): TipoProposicao {
  * Generate random proposition number based on type
  */
 function generateProposicaoNumero(tipo: TipoProposicao): number {
-  const minNum: Record<TipoProposicao, number> = {
-    [TipoProposicao.PL]: 1,
-    [TipoProposicao.PEC]: 1,
-    [TipoProposicao.MP]: 1,
-    [TipoProposicao.PLP]: 1,
-    [TipoProposicao.PDC]: 1,
+  const minNum: Record<string, number> = {
+    PL: 1,
+    PEC: 1,
+    MP: 1,
+    PLP: 1,
+    PDC: 1,
+    REQ: 1,
+    RIC: 1,
+    PFC: 1,
   };
 
-  const maxNum: Record<TipoProposicao, number> = {
-    [TipoProposicao.PL]: 5000,
-    [TipoProposicao.PEC]: 300,
-    [TipoProposicao.MP]: 1000,
-    [TipoProposicao.PLP]: 200,
-    [TipoProposicao.PDC]: 500,
+  const maxNum: Record<string, number> = {
+    PL: 5000,
+    PEC: 300,
+    MP: 1000,
+    PLP: 200,
+    PDC: 500,
+    REQ: 2000,
+    RIC: 3000,
+    PFC: 1200,
   };
 
-  const min = minNum[tipo];
-  const max = maxNum[tipo];
+  const min = minNum[tipo] ?? 1;
+  const max = maxNum[tipo] ?? 5000;
 
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -108,6 +114,7 @@ export function generateProposicoes(count: number = 50): Proposicao[] {
       ementa_simplificada: Math.random() > 0.5 ? `Simplified version of proposition ${i}` : undefined,
       // Some may have an author ID
       autor_id: Math.random() > 0.7 ? Math.floor(Math.random() * 513) + 1 : undefined,
+      data_apresentacao: new Date(currentYear - 1, Math.floor(Math.random() * 12), 1).toISOString(),
     };
 
     propositions.push(proposicao);

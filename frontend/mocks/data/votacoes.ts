@@ -18,15 +18,12 @@ function generatePlacar(): Placar {
   const naoBase = total - sim - Math.floor(Math.random() * 100);
   const nao = Math.max(Math.floor(naoBase * 0.7), 0); // 70% of remainder
 
-  const remaining = total - sim - nao;
-  const abstencao = Math.max(Math.floor(remaining * 0.75), 0);
-  const obstrucao = Math.max(total - sim - nao - abstencao, 0);
+  const votosOutros = Math.max(total - sim - nao, 0);
 
   return {
-    sim: Math.max(sim, 0),
-    nao: Math.max(nao, 0),
-    abstencao: Math.max(abstencao, 0),
-    obstrucao: Math.max(obstrucao, 0),
+    votos_sim: Math.max(sim, 0),
+    votos_nao: Math.max(nao, 0),
+    votos_outros: votosOutros,
   };
 }
 
@@ -34,7 +31,9 @@ function generatePlacar(): Placar {
  * Determine voting result based on placar
  */
 function determineResultado(placar: Placar): ResultadoVotacao {
-  return placar.sim > placar.nao ? ResultadoVotacao.APROVADO : ResultadoVotacao.REJEITADO;
+  return placar.votos_sim > placar.votos_nao
+    ? ResultadoVotacao.APROVADO
+    : ResultadoVotacao.REJEITADO;
 }
 
 /**
@@ -63,19 +62,22 @@ export function generateVotacoes(count: number = 50): Votacao[] {
     const placar = generatePlacar();
 
     const votacao: Votacao = {
-      id: `votacao-${i}`,
+      id: i,
       proposicao_id: i,
       proposicao, // Include nested proposicao
-      data: generateRecentDate().toISOString(),
+      data_hora: generateRecentDate().toISOString(),
       resultado: determineResultado(placar),
       placar,
+      eh_nominal: true,
+      descricao: `Sessão ${i} de votação`,
+      sigla_orgao: 'PLEN',
     };
 
     votacoes.push(votacao);
   }
 
   // Sort by date descending (most recent first)
-  votacoes.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  votacoes.sort((a, b) => new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime());
 
   return votacoes;
 }
@@ -87,6 +89,6 @@ export function generateVotacoes(count: number = 50): Votacao[] {
  * @param id Votação ID
  * @returns Votação if found, undefined otherwise
  */
-export function getVotacaoById(votacoes: Votacao[], id: string): Votacao | undefined {
+export function getVotacaoById(votacoes: Votacao[], id: number): Votacao | undefined {
   return votacoes.find((v) => v.id === id);
 }

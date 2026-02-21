@@ -124,11 +124,10 @@ export function generateDeputados(count: number = 513): Deputado[] {
     const deputado: Deputado = {
       id: i,
       nome: deputyName,
-      partido: selectRandomParty(),
+      sigla_partido: selectRandomParty(),
       uf: selectRandomUF(),
       foto_url: `${CAMERA_PHOTO_BASE_URL}/${i}.jpg`,
-      // Some deputies may not have email in mock data
-      email: Math.random() > 0.3 ? `deputado${i}@camara.leg.br` : undefined,
+      email: `deputado${i}@camara.leg.br`,
     };
 
     deputies.push(deputado);
@@ -168,7 +167,7 @@ export function filterDeputadosByNome(deputados: Deputado[], nome: string): Depu
  * @returns Filtered array of deputies
  */
 export function filterDeputadosByPartido(deputados: Deputado[], partido: string): Deputado[] {
-  return deputados.filter((d) => d.partido === partido);
+  return deputados.filter((d) => d.sigla_partido === partido);
 }
 
 /**

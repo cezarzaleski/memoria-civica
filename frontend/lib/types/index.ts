@@ -5,3 +5,8 @@ export type { Votacao, Placar } from './votacao';
 export { ResultadoVotacao } from './votacao';
 export type { Voto } from './voto';
 export { TipoVoto } from './voto';
+export type { CategoriaCivica } from './categoria-civica';
+export type { ProposicaoCategoria, OrigemClassificacao } from './proposicao-categoria';
+export type { VotacaoProposicao } from './votacao-proposicao';
+export type { Orientacao } from './orientacao';
+export type { PaginatedResponse, PaginationMeta, SingleResponse } from './pagination';

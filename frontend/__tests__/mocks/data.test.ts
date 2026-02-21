@@ -29,7 +29,7 @@ describe('Mock Data Factories', () => {
       deputies.forEach((deputy) => {
         expect(deputy.id).toBeDefined();
         expect(deputy.nome).toBeDefined();
-        expect(deputy.partido).toBeDefined();
+        expect(deputy.sigla_partido).toBeDefined();
         expect(deputy.uf).toBeDefined();
       });
     });
@@ -92,11 +92,11 @@ describe('Mock Data Factories', () => {
     });
 
     it('should filter deputies by partido', () => {
-      const partido = deputies[0].partido;
+      const partido = deputies[0].sigla_partido;
       const filtered = filterDeputadosByPartido(deputies, partido);
 
       expect(filtered.length).toBeGreaterThan(0);
-      expect(filtered.every((d) => d.partido === partido)).toBe(true);
+      expect(filtered.every((d) => d.sigla_partido === partido)).toBe(true);
     });
 
     it('should filter deputies by UF', () => {
@@ -181,8 +181,8 @@ describe('Mock Data Factories', () => {
       const votacoes = generateVotacoes(20);
 
       for (let i = 0; i < votacoes.length - 1; i++) {
-        const current = new Date(votacoes[i].data);
-        const next = new Date(votacoes[i + 1].data);
+        const current = new Date(votacoes[i].data_hora);
+        const next = new Date(votacoes[i + 1].data_hora);
         expect(current.getTime()).toBeGreaterThanOrEqual(next.getTime());
       }
     });
@@ -209,7 +209,7 @@ describe('Mock Data Factories', () => {
       const votacoes = generateVotacoes(10);
 
       votacoes.forEach((votacao) => {
-        const total = votacao.placar.sim + votacao.placar.nao + votacao.placar.abstencao + votacao.placar.obstrucao;
+        const total = votacao.placar.votos_sim + votacao.placar.votos_nao + votacao.placar.votos_outros;
         expect(total).toBe(513);
       });
     });
@@ -219,8 +219,8 @@ describe('Mock Data Factories', () => {
 
       votacoes.forEach((votacao) => {
         // Not all votes should be on one side
-        expect(votacao.placar.sim).toBeGreaterThan(0);
-        expect(votacao.placar.sim).toBeLessThan(513);
+        expect(votacao.placar.votos_sim).toBeGreaterThan(0);
+        expect(votacao.placar.votos_sim).toBeLessThan(513);
       });
     });
 
@@ -234,7 +234,7 @@ describe('Mock Data Factories', () => {
 
     it('should return undefined for non-existent votação ID', () => {
       const votacoes = generateVotacoes(10);
-      const found = getVotacaoById(votacoes, 'non-existent-id');
+      const found = getVotacaoById(votacoes, 999999);
 
       expect(found).toBeUndefined();
     });
@@ -242,12 +242,12 @@ describe('Mock Data Factories', () => {
 
   describe('generateVotos', () => {
     it('should generate 513 votos (one per deputy)', () => {
-      const votos = generateVotos('votacao-1');
+      const votos = generateVotos(1);
       expect(votos).toHaveLength(513);
     });
 
     it('should have nested deputado for each voto', () => {
-      const votos = generateVotos('votacao-1');
+      const votos = generateVotos(1);
 
       votos.forEach((voto) => {
         expect(voto.deputado).toBeDefined();
@@ -257,16 +257,16 @@ describe('Mock Data Factories', () => {
     });
 
     it('should have valid TipoVoto values', () => {
-      const votos = generateVotos('votacao-1');
+      const votos = generateVotos(1);
       const validTipos = Object.values(TipoVoto);
 
       votos.forEach((voto) => {
-        expect(validTipos).toContain(voto.tipo);
+        expect(validTipos).toContain(voto.voto);
       });
     });
 
     it('should have correct votacao_id reference', () => {
-      const votacao_id = 'votacao-test-123';
+      const votacao_id = 123;
       const votos = generateVotos(votacao_id);
 
       votos.forEach((voto) => {
@@ -275,7 +275,7 @@ describe('Mock Data Factories', () => {
     });
 
     it('should have unique IDs for each voto', () => {
-      const votos = generateVotos('votacao-1');
+      const votos = generateVotos(1);
       const ids = votos.map((v) => v.id);
       const uniqueIds = new Set(ids);
 
@@ -283,11 +283,11 @@ describe('Mock Data Factories', () => {
     });
 
     it('should have reasonable vote type distribution', () => {
-      const votos = generateVotos('votacao-1');
-      const counts = countVotosByTipo(votos, 'votacao-1');
+      const votos = generateVotos(1);
+      const counts = countVotosByTipo(votos, 1);
 
       // Check that vote types are distributed reasonably
-      expect(counts.sim + counts.nao).toBeGreaterThan(counts.abstencao + counts.obstrucao);
+      expect(counts.sim + counts.nao).toBeGreaterThan(counts.outros);
     });
   });
 });
