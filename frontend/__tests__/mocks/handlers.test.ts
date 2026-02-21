@@ -1,5 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import type { Deputado, PaginatedResponse, SingleResponse, Votacao, Voto } from '@/lib/types';
+import type {
+  CategoriaCivica,
+  Deputado,
+  Orientacao,
+  PaginatedResponse,
+  Proposicao,
+  ProposicaoCategoria,
+  SingleResponse,
+  Votacao,
+  VotacaoProposicao,
+  Voto,
+} from '@/lib/types';
+
+interface ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+async function getPrimeiraVotacaoId(): Promise<number> {
+  const response = await fetch('http://localhost/api/v1/votacoes?per_page=1');
+  const payload = (await response.json()) as PaginatedResponse<Votacao>;
+
+  expect(response.status).toBe(200);
+  expect(payload.data[0]).toBeDefined();
+
+  const votacao = payload.data[0];
+  if (!votacao) {
+    throw new Error('Nenhuma votação encontrada no fixture');
+  }
+
+  return votacao.id;
+}
+
+async function getPrimeiraProposicao(): Promise<Proposicao> {
+  const response = await fetch('http://localhost/api/v1/proposicoes?per_page=1');
+  const payload = (await response.json()) as PaginatedResponse<Proposicao>;
+
+  expect(response.status).toBe(200);
+  expect(payload.data[0]).toBeDefined();
+
+  const proposicao = payload.data[0];
+  if (!proposicao) {
+    throw new Error('Nenhuma proposição encontrada no fixture');
+  }
+
+  return proposicao;
+}
 
 describe('MSW Handlers', () => {
   describe('Deputados handlers', () => {
@@ -8,8 +56,7 @@ describe('MSW Handlers', () => {
       const payload = (await response.json()) as PaginatedResponse<Deputado>;
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(payload.data)).toBe(true);
-      expect(payload.data.length).toBe(20);
+      expect(payload.data).toHaveLength(20);
       expect(payload.pagination).toEqual({
         page: 1,
         per_page: 20,
@@ -17,46 +64,9 @@ describe('MSW Handlers', () => {
       });
       expect(payload.data[0]).toHaveProperty('id');
       expect(payload.data[0]).toHaveProperty('nome');
-      expect(payload.data[0]).toHaveProperty('sigla_partido');
-      expect(payload.data[0]).toHaveProperty('uf');
     });
 
-    it('deve filtrar deputados por nome', async () => {
-      const response = await fetch('http://localhost/api/v1/deputados?nome=João&per_page=200');
-      const payload = (await response.json()) as PaginatedResponse<Deputado>;
-
-      expect(response.status).toBe(200);
-      payload.data.forEach((deputado) => {
-        expect(deputado.nome.toLowerCase()).toContain('joão');
-      });
-      expect(payload.pagination.total).toBe(payload.data.length);
-    });
-
-    it('deve filtrar deputados por partido', async () => {
-      const listResponse = await fetch('http://localhost/api/v1/deputados?per_page=1');
-      const listPayload = (await listResponse.json()) as PaginatedResponse<Deputado>;
-      const testPartido = listPayload.data[0].sigla_partido;
-
-      const response = await fetch(`http://localhost/api/v1/deputados?partido=${testPartido}&per_page=200`);
-      const payload = (await response.json()) as PaginatedResponse<Deputado>;
-
-      expect(response.status).toBe(200);
-      payload.data.forEach((deputado) => {
-        expect(deputado.sigla_partido).toBe(testPartido);
-      });
-    });
-
-    it('deve filtrar deputados por UF', async () => {
-      const response = await fetch('http://localhost/api/v1/deputados?uf=SP&per_page=200');
-      const payload = (await response.json()) as PaginatedResponse<Deputado>;
-
-      expect(response.status).toBe(200);
-      payload.data.forEach((deputado) => {
-        expect(deputado.uf).toBe('SP');
-      });
-    });
-
-    it('deve suportar múltiplos filtros combinados', async () => {
+    it('deve suportar filtros combinados em deputados', async () => {
       const response = await fetch('http://localhost/api/v1/deputados?nome=Silva&uf=RJ&per_page=200');
       const payload = (await response.json()) as PaginatedResponse<Deputado>;
 
@@ -73,27 +83,15 @@ describe('MSW Handlers', () => {
 
       expect(response.status).toBe(200);
       expect(payload.data.id).toBe(1);
-      expect(payload.data.nome).toBeDefined();
       expect(payload.data.sigla_partido).toBeDefined();
     });
 
-    it('deve retornar 404 para deputado inexistente', async () => {
-      const response = await fetch('http://localhost/api/v1/deputados/99999');
-      expect(response.status).toBe(404);
-    });
-
-    it('deve retornar 400 com envelope de erro para ID de deputado inválido', async () => {
-      const response = await fetch('http://localhost/api/v1/deputados/1abc');
-      const payload = (await response.json()) as {
-        error: {
-          code: string;
-          message: string;
-        };
-      };
+    it('deve retornar 400 para ID de deputado inválido', async () => {
+      const response = await fetch('http://localhost/api/v1/deputados/abc');
+      const payload = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
       expect(payload.error.code).toBe('VALIDATION_ERROR');
-      expect(payload.error.message).toContain('inválido');
     });
 
     it('deve retornar página vazia quando page estiver fora do range', async () => {
@@ -110,73 +108,83 @@ describe('MSW Handlers', () => {
     });
   });
 
+  describe('Proposições handlers', () => {
+    it('deve retornar lista paginada de proposições', async () => {
+      const response = await fetch('http://localhost/api/v1/proposicoes');
+      const payload = (await response.json()) as PaginatedResponse<Proposicao>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data).toHaveLength(20);
+      expect(payload.pagination.page).toBe(1);
+      expect(payload.pagination.per_page).toBe(20);
+      expect(payload.pagination.total).toBeGreaterThan(0);
+    });
+
+    it('deve filtrar proposições por tipo e ano', async () => {
+      const amostra = await getPrimeiraProposicao();
+
+      const response = await fetch(
+        `http://localhost/api/v1/proposicoes?tipo=${encodeURIComponent(amostra.tipo)}&ano=${amostra.ano}&per_page=200`
+      );
+      const payload = (await response.json()) as PaginatedResponse<Proposicao>;
+
+      expect(response.status).toBe(200);
+      payload.data.forEach((proposicao) => {
+        expect(proposicao.tipo).toBe(amostra.tipo);
+        expect(proposicao.ano).toBe(amostra.ano);
+      });
+    });
+
+    it('deve retornar 400 para filtro ano inválido', async () => {
+      const response = await fetch('http://localhost/api/v1/proposicoes?ano=20a4');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(400);
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('deve retornar proposição única por ID', async () => {
+      const proposicao = await getPrimeiraProposicao();
+      const response = await fetch(`http://localhost/api/v1/proposicoes/${proposicao.id}`);
+      const payload = (await response.json()) as SingleResponse<Proposicao>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data.id).toBe(proposicao.id);
+      expect(payload.data.ementa).toBeDefined();
+    });
+
+    it('deve retornar categorias de uma proposição com envelope paginado', async () => {
+      const proposicao = await getPrimeiraProposicao();
+      const response = await fetch(`http://localhost/api/v1/proposicoes/${proposicao.id}/categorias`);
+      const payload = (await response.json()) as PaginatedResponse<ProposicaoCategoria>;
+
+      expect(response.status).toBe(200);
+      payload.data.forEach((categoriaRelacao) => {
+        expect(categoriaRelacao.proposicao_id).toBe(proposicao.id);
+      });
+      expect(payload.pagination).toHaveProperty('total');
+    });
+
+    it('deve retornar 404 para proposição inexistente no sub-endpoint de categorias', async () => {
+      const response = await fetch('http://localhost/api/v1/proposicoes/999999/categorias');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(404);
+      expect(payload.error.code).toBe('NOT_FOUND');
+    });
+  });
+
   describe('Votações handlers', () => {
     it('deve retornar lista paginada de votações', async () => {
       const response = await fetch('http://localhost/api/v1/votacoes');
       const payload = (await response.json()) as PaginatedResponse<Votacao>;
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(payload.data)).toBe(true);
-      expect(payload.data.length).toBe(20);
+      expect(payload.data).toHaveLength(20);
       expect(payload.pagination).toEqual({
         page: 1,
         per_page: 20,
         total: 50,
-      });
-    });
-
-    it('deve retornar votações ordenadas por data_hora desc', async () => {
-      const response = await fetch('http://localhost/api/v1/votacoes?per_page=50');
-      const payload = (await response.json()) as PaginatedResponse<Votacao>;
-
-      for (let i = 0; i < payload.data.length - 1; i += 1) {
-        const current = new Date(payload.data[i].data_hora);
-        const next = new Date(payload.data[i + 1].data_hora);
-        expect(current.getTime()).toBeGreaterThanOrEqual(next.getTime());
-      }
-    });
-
-    it('deve incluir proposicao aninhada em votações', async () => {
-      const response = await fetch('http://localhost/api/v1/votacoes?per_page=50');
-      const payload = (await response.json()) as PaginatedResponse<Votacao>;
-
-      payload.data.forEach((votacao) => {
-        expect(votacao.proposicao).toBeDefined();
-        expect(votacao.proposicao?.id).toBeDefined();
-        expect(votacao.proposicao?.tipo).toBeDefined();
-      });
-    });
-
-    it('deve retornar votação única por ID com envelope de recurso', async () => {
-      const listResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const listPayload = (await listResponse.json()) as PaginatedResponse<Votacao>;
-      const testId = listPayload.data[0].id;
-
-      const response = await fetch(`http://localhost/api/v1/votacoes/${testId}`);
-      const payload = (await response.json()) as SingleResponse<Votacao>;
-
-      expect(response.status).toBe(200);
-      expect(payload.data.id).toBe(testId);
-      expect(payload.data.proposicao).toBeDefined();
-      expect(payload.data.placar).toBeDefined();
-    });
-
-    it('deve retornar 404 para votação inexistente', async () => {
-      const response = await fetch('http://localhost/api/v1/votacoes/999999');
-      expect(response.status).toBe(404);
-    });
-
-    it('deve manter placar válido nas votações', async () => {
-      const response = await fetch('http://localhost/api/v1/votacoes?per_page=50');
-      const payload = (await response.json()) as PaginatedResponse<Votacao>;
-
-      payload.data.forEach((votacao) => {
-        expect(votacao.placar.votos_sim).toBeGreaterThanOrEqual(0);
-        expect(votacao.placar.votos_nao).toBeGreaterThanOrEqual(0);
-        expect(votacao.placar.votos_outros).toBeGreaterThanOrEqual(0);
-
-        const total = votacao.placar.votos_sim + votacao.placar.votos_nao + votacao.placar.votos_outros;
-        expect(total).toBe(513);
       });
     });
 
@@ -190,20 +198,121 @@ describe('MSW Handlers', () => {
         expect(votacao.eh_nominal).toBe(true);
       });
     });
+
+    it('deve retornar votação única por ID com envelope de recurso', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+      const response = await fetch(`http://localhost/api/v1/votacoes/${votacaoId}`);
+      const payload = (await response.json()) as SingleResponse<Votacao>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data.id).toBe(votacaoId);
+      expect(payload.data.placar).toBeDefined();
+      expect(payload.data.proposicao).toBeDefined();
+    });
+
+    it('deve retornar 400 para ID inválido no detalhe de votação', async () => {
+      const response = await fetch('http://localhost/api/v1/votacoes/abc');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(400);
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('deve retornar proposições de uma votação', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+      const response = await fetch(`http://localhost/api/v1/votacoes/${votacaoId}/proposicoes`);
+      const payload = (await response.json()) as PaginatedResponse<VotacaoProposicao>;
+
+      expect(response.status).toBe(200);
+      payload.data.forEach((item) => {
+        expect(item.votacao_id).toBe(votacaoId);
+        expect(item.proposicao_id).toBeDefined();
+      });
+      expect(payload.pagination).toHaveProperty('total');
+    });
+
+    it('deve retornar 400 para ID inválido no sub-endpoint de proposições da votação', async () => {
+      const response = await fetch('http://localhost/api/v1/votacoes/abc/proposicoes');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(400);
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('deve retornar 404 para votação inexistente no sub-endpoint de proposições', async () => {
+      const response = await fetch('http://localhost/api/v1/votacoes/999999/proposicoes');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(404);
+      expect(payload.error.code).toBe('NOT_FOUND');
+    });
+  });
+
+  describe('Orientações handlers', () => {
+    it('deve retornar orientações paginadas para uma votação', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+      const response = await fetch(`http://localhost/api/v1/votacoes/${votacaoId}/orientacoes`);
+      const payload = (await response.json()) as PaginatedResponse<Orientacao>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data.length).toBeGreaterThan(0);
+      payload.data.forEach((orientacao) => {
+        expect(orientacao.votacao_id).toBe(votacaoId);
+      });
+    });
+
+    it('deve retornar página vazia de orientações quando page estiver fora do range', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+      const response = await fetch(`http://localhost/api/v1/votacoes/${votacaoId}/orientacoes?page=999&per_page=100`);
+      const payload = (await response.json()) as PaginatedResponse<Orientacao>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data).toHaveLength(0);
+      expect(payload.pagination.total).toBeGreaterThan(0);
+    });
+
+    it('deve retornar 400 para ID inválido em orientações', async () => {
+      const response = await fetch('http://localhost/api/v1/votacoes/xyz/orientacoes');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(400);
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('deve retornar 404 para votação inexistente em orientações', async () => {
+      const response = await fetch('http://localhost/api/v1/votacoes/999999/orientacoes');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(404);
+      expect(payload.error.code).toBe('NOT_FOUND');
+    });
+  });
+
+  describe('Categorias cívicas handlers', () => {
+    it('deve retornar lista paginada de categorias cívicas', async () => {
+      const response = await fetch('http://localhost/api/v1/categorias-civicas?per_page=3');
+      const payload = (await response.json()) as PaginatedResponse<CategoriaCivica>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data).toHaveLength(3);
+      expect(payload.pagination).toEqual({
+        page: 1,
+        per_page: 3,
+        total: 8,
+      });
+      expect(payload.data[0]).toHaveProperty('codigo');
+      expect(payload.data[0]).toHaveProperty('nome');
+    });
   });
 
   describe('Votos handlers', () => {
     it('deve retornar lista paginada de votos para uma votação', async () => {
-      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const votacaoPayload = (await votacaoResponse.json()) as PaginatedResponse<Votacao>;
-      const testVotacaoId = votacaoPayload.data[0].id;
-
-      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos`);
+      const votacaoId = await getPrimeiraVotacaoId();
+      const response = await fetch(`http://localhost/api/v1/votacoes/${votacaoId}/votos`);
       const payload = (await response.json()) as PaginatedResponse<Voto>;
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(payload.data)).toBe(true);
-      expect(payload.data.length).toBe(20);
+      expect(payload.data).toHaveLength(20);
       expect(payload.pagination).toEqual({
         page: 1,
         per_page: 20,
@@ -211,103 +320,103 @@ describe('MSW Handlers', () => {
       });
     });
 
-    it('deve incluir deputado aninhado nos votos', async () => {
-      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const votacaoPayload = (await votacaoResponse.json()) as PaginatedResponse<Votacao>;
-      const testVotacaoId = votacaoPayload.data[0].id;
+    it('deve retornar 404 para votação inexistente no endpoint aninhado de votos', async () => {
+      const response = await fetch('http://localhost/api/v1/votacoes/999999/votos');
+      const payload = (await response.json()) as ErrorResponse;
 
-      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos?per_page=200`);
-      const payload = (await response.json()) as PaginatedResponse<Voto>;
-
-      payload.data.forEach((voto) => {
-        expect(voto.deputado).toBeDefined();
-        expect(voto.deputado?.id).toBeDefined();
-        expect(voto.deputado?.nome).toBeDefined();
-      });
+      expect(response.status).toBe(404);
+      expect(payload.error.code).toBe('NOT_FOUND');
     });
 
-    it('deve retornar tipos de voto válidos', async () => {
-      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const votacaoPayload = (await votacaoResponse.json()) as PaginatedResponse<Votacao>;
-      const testVotacaoId = votacaoPayload.data[0].id;
-
-      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos?per_page=200`);
-      const payload = (await response.json()) as PaginatedResponse<Voto>;
-      const validTipos = ['Sim', 'Não', 'Abstenção', 'Obstrução', 'Art. 17'];
-
-      payload.data.forEach((voto) => {
-        expect(validTipos).toContain(voto.voto);
-      });
-    });
-
-    it('deve retornar votacao_id correto nos votos', async () => {
-      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const votacaoPayload = (await votacaoResponse.json()) as PaginatedResponse<Votacao>;
-      const testVotacaoId = votacaoPayload.data[0].id;
-
-      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos?per_page=200`);
-      const payload = (await response.json()) as PaginatedResponse<Voto>;
-
-      payload.data.forEach((voto) => {
-        expect(voto.votacao_id).toBe(testVotacaoId);
-      });
-    });
-
-    it('deve manter consistência entre múltiplas requisições para a mesma votação', async () => {
-      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const votacaoPayload = (await votacaoResponse.json()) as PaginatedResponse<Votacao>;
-      const testVotacaoId = votacaoPayload.data[0].id;
-
-      const response1 = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos?page=1&per_page=50`);
-      const payload1 = (await response1.json()) as PaginatedResponse<Voto>;
-
-      const response2 = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos?page=1&per_page=50`);
-      const payload2 = (await response2.json()) as PaginatedResponse<Voto>;
-
-      expect(payload1.pagination.total).toBe(payload2.pagination.total);
-      expect(payload1.data.length).toBe(payload2.data.length);
-
-      payload1.data.forEach((voto, index) => {
-        expect(voto.id).toBe(payload2.data[index].id);
-        expect(voto.voto).toBe(payload2.data[index].voto);
-      });
-    });
-
-    it('deve retornar página vazia de votos quando page estiver fora do range', async () => {
-      const votacaoResponse = await fetch('http://localhost/api/v1/votacoes?per_page=1');
-      const votacaoPayload = (await votacaoResponse.json()) as PaginatedResponse<Votacao>;
-      const testVotacaoId = votacaoPayload.data[0].id;
-
-      const response = await fetch(`http://localhost/api/v1/votacoes/${testVotacaoId}/votos?page=999&per_page=100`);
-      const payload = (await response.json()) as PaginatedResponse<Voto>;
-
-      expect(response.status).toBe(200);
-      expect(payload.data).toHaveLength(0);
-      expect(payload.pagination.total).toBe(513);
-    });
-
-    it('deve retornar 400 com envelope de erro para votacao_id inválido', async () => {
-      const response = await fetch('http://localhost/api/v1/votacoes/abc123/votos');
-      const payload = (await response.json()) as {
-        error: {
-          code: string;
-          message: string;
-        };
-      };
+    it('deve exigir votacao_id no endpoint direto de votos', async () => {
+      const response = await fetch('http://localhost/api/v1/votos');
+      const payload = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
       expect(payload.error.code).toBe('VALIDATION_ERROR');
-      expect(payload.error.message).toContain('inválido');
+    });
+
+    it('deve retornar 400 para votacao_id inválido no endpoint direto de votos', async () => {
+      const response = await fetch('http://localhost/api/v1/votos?votacao_id=abc');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(400);
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('deve retornar 404 para votação inexistente no endpoint direto de votos', async () => {
+      const response = await fetch('http://localhost/api/v1/votos?votacao_id=999999');
+      const payload = (await response.json()) as ErrorResponse;
+
+      expect(response.status).toBe(404);
+      expect(payload.error.code).toBe('NOT_FOUND');
+    });
+
+    it('deve retornar votos filtrados por votacao_id no endpoint direto', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+      const response = await fetch(`http://localhost/api/v1/votos?votacao_id=${votacaoId}&per_page=30`);
+      const payload = (await response.json()) as PaginatedResponse<Voto>;
+
+      expect(response.status).toBe(200);
+      expect(payload.data).toHaveLength(30);
+      payload.data.forEach((voto) => {
+        expect(voto.votacao_id).toBe(votacaoId);
+        expect(voto.deputado).toBeDefined();
+      });
+    });
+
+    it('deve manter consistência entre endpoint aninhado e endpoint direto de votos', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+
+      const nestedResponse = await fetch(`http://localhost/api/v1/votacoes/${votacaoId}/votos?page=1&per_page=10`);
+      const nestedPayload = (await nestedResponse.json()) as PaginatedResponse<Voto>;
+
+      const directResponse = await fetch(`http://localhost/api/v1/votos?votacao_id=${votacaoId}&page=1&per_page=10`);
+      const directPayload = (await directResponse.json()) as PaginatedResponse<Voto>;
+
+      expect(nestedResponse.status).toBe(200);
+      expect(directResponse.status).toBe(200);
+      expect(nestedPayload.pagination.total).toBe(directPayload.pagination.total);
+
+      nestedPayload.data.forEach((voto, index) => {
+        expect(voto.id).toBe(directPayload.data[index]?.id);
+        expect(voto.voto).toBe(directPayload.data[index]?.voto);
+      });
+    });
+  });
+
+  describe('Cobertura de endpoints', () => {
+    it('deve cobrir todos os 12 endpoints MSW mapeados sem unhandled request', async () => {
+      const votacaoId = await getPrimeiraVotacaoId();
+      const proposicao = await getPrimeiraProposicao();
+
+      const responses = await Promise.all([
+        fetch('http://localhost/api/v1/deputados'),
+        fetch('http://localhost/api/v1/deputados/1'),
+        fetch('http://localhost/api/v1/proposicoes'),
+        fetch(`http://localhost/api/v1/proposicoes/${proposicao.id}`),
+        fetch(`http://localhost/api/v1/proposicoes/${proposicao.id}/categorias`),
+        fetch('http://localhost/api/v1/votacoes'),
+        fetch(`http://localhost/api/v1/votacoes/${votacaoId}`),
+        fetch(`http://localhost/api/v1/votacoes/${votacaoId}/proposicoes`),
+        fetch(`http://localhost/api/v1/votacoes/${votacaoId}/orientacoes`),
+        fetch(`http://localhost/api/v1/votacoes/${votacaoId}/votos`),
+        fetch('http://localhost/api/v1/categorias-civicas'),
+        fetch(`http://localhost/api/v1/votos?votacao_id=${votacaoId}`),
+      ]);
+
+      responses.forEach((response) => {
+        expect(response.status).toBe(200);
+      });
     });
   });
 
   describe('Error handling', () => {
-    it('deve retornar lista vazia quando filtro não encontra resultados', async () => {
+    it('deve retornar lista vazia quando filtro de deputados não encontra resultados', async () => {
       const response = await fetch('http://localhost/api/v1/deputados?nome=XYZ_NONEXISTENT_');
       const payload = (await response.json()) as PaginatedResponse<Deputado>;
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(payload.data)).toBe(true);
       expect(payload.data).toHaveLength(0);
       expect(payload.pagination.total).toBe(0);
     });

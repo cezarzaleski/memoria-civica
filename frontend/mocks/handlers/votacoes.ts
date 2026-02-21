@@ -1,36 +1,19 @@
 import { http, HttpResponse } from 'msw';
-import type { PaginatedResponse, SingleResponse, Votacao } from '@/lib/types';
+import type { SingleResponse, Votacao } from '@/lib/types';
 import { generateVotacoes, getVotacaoById } from '../data/votacoes';
+import { getProposicoesByVotacaoId } from '../data/votacoes-proposicoes';
+import { createPaginatedResponse, getPaginationParams, notFoundError, parseStrictId, validationError } from './utils';
 
 /**
  * Generate the complete list of mock votações once
  * Already sorted by data descending (most recent first)
  */
 const votacoes = generateVotacoes(50);
-const DEFAULT_PAGE = 1;
-const DEFAULT_PER_PAGE = 20;
-
-function parsePositiveInteger(value: string | null, fallback: number): number {
-  const parsedValue = Number.parseInt(value ?? '', 10);
-  return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
-}
 
 function parseBoolean(value: string | null): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
-}
-
-function paginate<T>(items: T[], page: number, perPage: number): PaginatedResponse<T> {
-  const startIndex = (page - 1) * perPage;
-  return {
-    data: items.slice(startIndex, startIndex + perPage),
-    pagination: {
-      page,
-      per_page: perPage,
-      total: items.length,
-    },
-  };
 }
 
 /**
@@ -48,8 +31,7 @@ export const votacoesHandlers = [
    */
   http.get('*/api/v1/votacoes', ({ request }) => {
     const url = new URL(request.url);
-    const page = parsePositiveInteger(url.searchParams.get('page'), DEFAULT_PAGE);
-    const perPage = parsePositiveInteger(url.searchParams.get('per_page'), DEFAULT_PER_PAGE);
+    const { page, perPage } = getPaginationParams(url);
     const siglaOrgao = url.searchParams.get('sigla_orgao');
     const ehNominal = parseBoolean(url.searchParams.get('eh_nominal'));
 
@@ -63,7 +45,30 @@ export const votacoesHandlers = [
       filtered = filtered.filter((votacao) => Boolean(votacao.eh_nominal) === ehNominal);
     }
 
-    return HttpResponse.json(paginate(filtered, page, perPage));
+    return HttpResponse.json(createPaginatedResponse(filtered, page, perPage));
+  }),
+
+  /**
+   * GET /api/v1/votacoes/:id/proposicoes
+   * Get proposições vinculadas a uma votação
+   */
+  http.get('*/api/v1/votacoes/:id/proposicoes', ({ request, params }) => {
+    const votacaoId = parseStrictId(params.id as string | undefined);
+
+    if (!votacaoId) {
+      return validationError('ID de votação inválido');
+    }
+
+    const votacao = getVotacaoById(votacoes, votacaoId);
+    if (!votacao) {
+      return notFoundError('Votação não encontrada');
+    }
+
+    const url = new URL(request.url);
+    const { page, perPage } = getPaginationParams(url);
+    const proposicoes = getProposicoesByVotacaoId(votacao.id);
+
+    return HttpResponse.json(createPaginatedResponse(proposicoes, page, perPage));
   }),
 
   /**
@@ -72,32 +77,16 @@ export const votacoesHandlers = [
    * Returns 404 if votação not found
    */
   http.get('*/api/v1/votacoes/:id', ({ params }) => {
-    const votacaoId = Number(params.id);
+    const votacaoId = parseStrictId(params.id as string | undefined);
 
-    if (!Number.isInteger(votacaoId)) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'ID de votação inválido',
-          },
-        },
-        { status: 400 }
-      );
+    if (!votacaoId) {
+      return validationError('ID de votação inválido');
     }
 
     const votacao = getVotacaoById(votacoes, votacaoId);
 
     if (!votacao) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Votação não encontrada',
-          },
-        },
-        { status: 404 }
-      );
+      return notFoundError('Votação não encontrada');
     }
 
     const response: SingleResponse<Votacao> = { data: votacao };

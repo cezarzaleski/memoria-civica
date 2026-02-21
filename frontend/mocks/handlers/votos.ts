@@ -1,39 +1,34 @@
 import { http, HttpResponse } from 'msw';
-import type { PaginatedResponse, Voto } from '@/lib/types';
+import type { Voto } from '@/lib/types';
 import { generateVotos } from '../data/votos';
+import { generateVotacoes } from '../data/votacoes';
+import { createPaginatedResponse, getPaginationParams, notFoundError, parseStrictId, validationError } from './utils';
 
 /**
  * Cache for generated votos per votação
  * This ensures consistent data for the same votação across multiple requests
  */
 const votosCache = new Map<number, ReturnType<typeof generateVotos>>();
-const DEFAULT_PAGE = 1;
-const DEFAULT_PER_PAGE = 20;
+const votacaoIds = new Set(generateVotacoes(50).map((votacao) => votacao.id));
 
-function parsePositiveInteger(value: string | null, fallback: number): number {
-  const parsedValue = Number.parseInt(value ?? '', 10);
-  return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
-}
-
-function parseStrictId(value: string | undefined): number | null {
-  if (!value || !/^\d+$/.test(value)) {
-    return null;
+function getVotosByVotacaoId(votacaoId: number): Voto[] {
+  if (!votosCache.has(votacaoId)) {
+    votosCache.set(votacaoId, generateVotos(votacaoId));
   }
 
-  const parsedValue = Number(value);
-  return Number.isSafeInteger(parsedValue) && parsedValue > 0 ? parsedValue : null;
+  return votosCache.get(votacaoId) ?? [];
 }
 
-function paginate<T>(items: T[], page: number, perPage: number): PaginatedResponse<T> {
-  const startIndex = (page - 1) * perPage;
-  return {
-    data: items.slice(startIndex, startIndex + perPage),
-    pagination: {
-      page,
-      per_page: perPage,
-      total: items.length,
-    },
-  };
+function handleVotosList(requestUrl: string, votacaoId: number) {
+  if (!votacaoIds.has(votacaoId)) {
+    return notFoundError('Votação não encontrada');
+  }
+
+  const url = new URL(requestUrl);
+  const { page, perPage } = getPaginationParams(url);
+  const votos = getVotosByVotacaoId(votacaoId);
+
+  return HttpResponse.json(createPaginatedResponse(votos, page, perPage));
 }
 
 /**
@@ -41,6 +36,7 @@ function paginate<T>(items: T[], page: number, perPage: number): PaginatedRespon
  *
  * Endpoints:
  * - GET /api/v1/votacoes/:id/votos - Get all votos (individual votes) for a specific votação
+ * - GET /api/v1/votos?votacao_id=:id - Get votos with votação filter
  */
 export const votosHandlers = [
   /**
@@ -52,42 +48,32 @@ export const votosHandlers = [
    * For this mock, we generate votos for any requested votação_id.
    */
   http.get('*/api/v1/votacoes/:votacao_id/votos', ({ request, params }) => {
-    const url = new URL(request.url);
     const votacao_id = parseStrictId(params.votacao_id as string | undefined);
-    const page = parsePositiveInteger(url.searchParams.get('page'), DEFAULT_PAGE);
-    const perPage = parsePositiveInteger(url.searchParams.get('per_page'), DEFAULT_PER_PAGE);
 
     if (!votacao_id) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'ID de votação inválido',
-          },
-        },
-        { status: 400 }
-      );
+      return validationError('ID de votação inválido');
     }
 
-    // Check if we've already generated votos for this votação
-    if (!votosCache.has(votacao_id)) {
-      votosCache.set(votacao_id, generateVotos(votacao_id));
+    return handleVotosList(request.url, votacao_id);
+  }),
+
+  /**
+   * GET /api/v1/votos?votacao_id=:id
+   * Lista votos por votação com filtro obrigatório de votacao_id
+   */
+  http.get('*/api/v1/votos', ({ request }) => {
+    const url = new URL(request.url);
+    const votacaoIdParam = url.searchParams.get('votacao_id');
+
+    if (votacaoIdParam === null) {
+      return validationError('Parâmetro votacao_id é obrigatório');
     }
 
-    const votos = votosCache.get(votacao_id);
-    if (!votos) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Votos não encontrados para a votação',
-          },
-        },
-        { status: 404 }
-      );
+    const votacaoId = parseStrictId(votacaoIdParam);
+    if (!votacaoId) {
+      return validationError('Parâmetro votacao_id inválido');
     }
 
-    const orderedVotes: Voto[] = votos;
-    return HttpResponse.json(paginate(orderedVotes, page, perPage));
+    return handleVotosList(request.url, votacaoId);
   }),
 ];
