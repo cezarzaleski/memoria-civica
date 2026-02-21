@@ -1,4 +1,4 @@
-export { useVotacoes } from './use-votacoes'
+export { useVotacoes, useVotacaoProposicoes } from './use-votacoes'
 export { useVotacao } from './use-votacao'
 export { useDeputados } from './use-deputados'
 export { useVotos } from './use-votos'

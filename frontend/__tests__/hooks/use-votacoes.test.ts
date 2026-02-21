@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { server } from '@/mocks/server'
-import { useVotacoes } from '@/lib/hooks/use-votacoes'
+import { useVotacoes, useVotacaoProposicoes } from '@/lib/hooks/use-votacoes'
 
 describe('useVotacoes', () => {
   it('deve consumir envelope paginado de votações', async () => {
@@ -117,5 +117,112 @@ describe('useVotacoes', () => {
     expect(result.current.error).toContain('Falha forçada')
     expect(result.current.data).toEqual([])
     expect(result.current.pagination).toBeNull()
+  })
+})
+
+describe('useVotacaoProposicoes', () => {
+  it('deve retornar estado vazio quando votacaoId não é informado', () => {
+    const { result } = renderHook(() => useVotacaoProposicoes(null))
+
+    expect(result.current.loading).toBe(false)
+    expect(result.current.error).toBeNull()
+    expect(result.current.data).toEqual([])
+    expect(result.current.pagination).toBeNull()
+  })
+
+  it('deve consumir envelope paginado de proposições por votação', async () => {
+    const { result } = renderHook(() => useVotacaoProposicoes(4))
+
+    expect(result.current.loading).toBe(true)
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.error).toBeNull()
+    expect(result.current.data).toHaveLength(2)
+    expect(result.current.pagination).toEqual({
+      page: 1,
+      per_page: 20,
+      total: 2,
+    })
+    expect(result.current.data[0]).toMatchObject({
+      id: expect.any(Number),
+      votacao_id: 4,
+      proposicao_id: expect.any(Number),
+      eh_principal: expect.any(Boolean),
+    })
+  })
+
+  it('deve enviar paginação na query string', async () => {
+    let capturedUrl: URL | null = null
+
+    server.use(
+      http.get('*/api/v1/votacoes/:id/proposicoes', ({ request }) => {
+        capturedUrl = new URL(request.url)
+        return HttpResponse.json({
+          data: [],
+          pagination: {
+            page: Number(capturedUrl.searchParams.get('page') ?? '1'),
+            per_page: Number(capturedUrl.searchParams.get('per_page') ?? '20'),
+            total: 0,
+          },
+        })
+      })
+    )
+
+    const { result } = renderHook(() => useVotacaoProposicoes(1, { page: 3, per_page: 7 }))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(capturedUrl?.searchParams.get('page')).toBe('3')
+    expect(capturedUrl?.searchParams.get('per_page')).toBe('7')
+    expect(result.current.pagination).toEqual({
+      page: 3,
+      per_page: 7,
+      total: 0,
+    })
+  })
+
+  it('deve expor erro quando votação não existe', async () => {
+    const { result } = renderHook(() => useVotacaoProposicoes(999999))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.error).toContain('Votação não encontrada')
+    expect(result.current.data).toEqual([])
+    expect(result.current.pagination).toBeNull()
+  })
+
+  it('deve permitir refetch manual', async () => {
+    let calls = 0
+
+    server.use(
+      http.get('*/api/v1/votacoes/:id/proposicoes', () => {
+        calls += 1
+        return HttpResponse.json({
+          data: [],
+          pagination: { page: 1, per_page: 20, total: 0 },
+        })
+      })
+    )
+
+    const { result } = renderHook(() => useVotacaoProposicoes(1))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    act(() => {
+      result.current.refetch()
+    })
+
+    await waitFor(() => {
+      expect(calls).toBeGreaterThanOrEqual(2)
+    })
   })
 })
