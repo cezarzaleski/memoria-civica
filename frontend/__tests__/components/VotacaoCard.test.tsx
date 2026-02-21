@@ -2,73 +2,70 @@ import React from 'react'
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VotacaoCard } from '@/components/features/votacoes/VotacaoCard'
-import { ResultadoVotacao } from '@/lib/types/votacao'
+import { ResultadoVotacao, Votacao } from '@/lib/types/votacao'
 
 describe('VotacaoCard', () => {
-  const mockVotacaoAprovado = {
-    id: '1',
+  const mockVotacaoAprovado: Votacao = {
+    id: 1,
     proposicao_id: 1,
-    data: '2024-01-15T10:00:00Z',
+    data_hora: '2024-01-15T10:00:00Z',
     resultado: ResultadoVotacao.APROVADO,
-    placar: { sim: 200, nao: 100, abstencao: 50, obstrucao: 13 },
+    placar: { votos_sim: 200, votos_nao: 100, votos_outros: 63 },
     proposicao: {
       id: 1,
       tipo: 'PL',
       numero: 1234,
       ano: 2024,
       ementa: 'Reforma Tributária: Implementação de novo sistema de impostos',
+      data_apresentacao: '2024-01-01T00:00:00Z',
     },
   }
 
-  const mockVotacaoRejeitado = {
+  const mockVotacaoRejeitado: Votacao = {
     ...mockVotacaoAprovado,
-    id: '2',
+    id: 2,
     resultado: ResultadoVotacao.REJEITADO,
   }
 
-  it('should render votacao card with proposicao identifier and date', () => {
+  it('deve renderizar identificador da proposição e data_hora formatada', () => {
     render(<VotacaoCard votacao={mockVotacaoAprovado} />)
 
     expect(screen.getByText('PL 1234/2024')).toBeInTheDocument()
     expect(screen.getByText(/15\/01\/2024/)).toBeInTheDocument()
   })
 
-  it('should render APROVADO badge with default styling', () => {
+  it('deve renderizar badge de aprovado para resultado aprovado', () => {
     render(<VotacaoCard votacao={mockVotacaoAprovado} />)
 
-    const badge = screen.getByText('APROVADO')
-    expect(badge).toBeInTheDocument()
+    expect(screen.getByText('Aprovado')).toBeInTheDocument()
   })
 
-  it('should render REJEITADO badge with destructive styling', () => {
+  it('deve renderizar badge de rejeitado para resultado rejeitado', () => {
     render(<VotacaoCard votacao={mockVotacaoRejeitado} />)
 
-    const badge = screen.getByText('REJEITADO')
-    expect(badge).toBeInTheDocument()
+    expect(screen.getByText('Rejeitado')).toBeInTheDocument()
   })
 
-  it('should display placar summary', () => {
+  it('deve exibir resumo do placar canônico', () => {
     render(<VotacaoCard votacao={mockVotacaoAprovado} />)
 
     expect(screen.getByText('Sim')).toBeInTheDocument()
     expect(screen.getByText('Não')).toBeInTheDocument()
-    expect(screen.getByText('Abstenção')).toBeInTheDocument()
-    expect(screen.getByText('Obstrução')).toBeInTheDocument()
+    expect(screen.getByText('Outros')).toBeInTheDocument()
 
     expect(screen.getByText('200')).toBeInTheDocument()
     expect(screen.getByText('100')).toBeInTheDocument()
-    expect(screen.getByText('50')).toBeInTheDocument()
-    expect(screen.getByText('13')).toBeInTheDocument()
+    expect(screen.getByText('63')).toBeInTheDocument()
   })
 
-  it('should display ementa (proposicao title) truncated if too long', () => {
+  it('deve exibir ementa truncada quando necessário', () => {
     render(<VotacaoCard votacao={mockVotacaoAprovado} />)
 
     expect(screen.getByText(/Reforma Tributária/)).toBeInTheDocument()
   })
 
-  it('should handle missing proposicao gracefully', () => {
-    const votacaoSemProposicao = {
+  it('deve tratar ausência de proposição sem quebrar renderização', () => {
+    const votacaoSemProposicao: Votacao = {
       ...mockVotacaoAprovado,
       proposicao: undefined,
     }
@@ -78,14 +75,14 @@ describe('VotacaoCard', () => {
     expect(screen.getByText('Votação')).toBeInTheDocument()
   })
 
-  it('should handle missing placar values', () => {
-    const votacaoSemPlacar = {
+  it('deve tratar placar zerado', () => {
+    const votacaoSemPlacar: Votacao = {
       ...mockVotacaoAprovado,
-      placar: { sim: 0, nao: 0, abstencao: 0, obstrucao: 0 },
+      placar: { votos_sim: 0, votos_nao: 0, votos_outros: 0 },
     }
 
     render(<VotacaoCard votacao={votacaoSemPlacar} />)
 
-    expect(screen.getAllByText('0')).toHaveLength(4)
+    expect(screen.getAllByText('0')).toHaveLength(3)
   })
 })

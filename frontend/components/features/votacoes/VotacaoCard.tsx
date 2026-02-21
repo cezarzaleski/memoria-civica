@@ -15,7 +15,9 @@ interface VotacaoCardProps {
  * Shows title, date, resultado badge, and placar summary
  */
 export function VotacaoCard({ votacao }: VotacaoCardProps) {
-  const isAprovado = votacao.resultado === ResultadoVotacao.APROVADO
+  const isAprovado =
+    votacao.resultado === ResultadoVotacao.APROVADO ||
+    votacao.resultado === ResultadoVotacao.APROVADO_COM_SUBSTITUTIVO
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('pt-BR', {
@@ -49,11 +51,11 @@ export function VotacaoCard({ votacao }: VotacaoCardProps) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="text-sm font-medium text-muted-foreground mb-1">
-              {formatProposicao()}
-            </div>
-            <CardTitle className="text-lg line-clamp-2">
-              {ementaTruncated}
-            </CardTitle>
+            {formatProposicao()}
+          </div>
+          <CardTitle className="text-lg line-clamp-2">
+            {ementaTruncated}
+          </CardTitle>
           </div>
           <Badge
             variant={isAprovado ? 'default' : 'destructive'}
@@ -63,35 +65,30 @@ export function VotacaoCard({ votacao }: VotacaoCardProps) {
           </Badge>
         </div>
         <div className="text-sm text-muted-foreground mt-2">
-          {votacao.data && formatDate(votacao.data)}
+          {formatDate(votacao.data_hora)}
+          {votacao.sigla_orgao ? ` • ${votacao.sigla_orgao}` : ''}
         </div>
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col justify-between">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {votacao.placar?.sim || 0}
+              {votacao.placar.votos_sim}
             </div>
             <div className="text-xs text-muted-foreground">Sim</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {votacao.placar?.nao || 0}
+              {votacao.placar.votos_nao}
             </div>
             <div className="text-xs text-muted-foreground">Não</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-              {votacao.placar?.abstencao || 0}
+            <div className="text-2xl font-bold text-slate-600 dark:text-slate-300">
+              {votacao.placar.votos_outros}
             </div>
-            <div className="text-xs text-muted-foreground">Abstenção</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {votacao.placar?.obstrucao || 0}
-            </div>
-            <div className="text-xs text-muted-foreground">Obstrução</div>
+            <div className="text-xs text-muted-foreground">Outros</div>
           </div>
         </div>
       </CardContent>

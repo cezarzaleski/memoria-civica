@@ -5,20 +5,48 @@ import { Deputado } from '@/lib/types/deputado'
 
 describe('ListaVotos', () => {
   const mockDeputados: Deputado[] = [
-    { id: 1, nome: 'João Silva', partido: 'PT', uf: 'SP', foto_url: 'http://example.com/1.jpg' },
-    { id: 2, nome: 'Maria Santos', partido: 'PSDB', uf: 'MG', foto_url: 'http://example.com/2.jpg' },
-    { id: 3, nome: 'Pedro Oliveira', partido: 'PT', uf: 'RJ', foto_url: 'http://example.com/3.jpg' },
-    { id: 4, nome: 'Ana Costa', partido: 'MDB', uf: 'BA', foto_url: 'http://example.com/4.jpg' },
+    {
+      id: 1,
+      nome: 'João Silva',
+      sigla_partido: 'PT',
+      uf: 'SP',
+      foto_url: 'http://example.com/1.jpg',
+      email: 'joao@example.com',
+    },
+    {
+      id: 2,
+      nome: 'Maria Santos',
+      sigla_partido: 'PSDB',
+      uf: 'MG',
+      foto_url: 'http://example.com/2.jpg',
+      email: 'maria@example.com',
+    },
+    {
+      id: 3,
+      nome: 'Pedro Oliveira',
+      sigla_partido: 'PT',
+      uf: 'RJ',
+      foto_url: 'http://example.com/3.jpg',
+      email: 'pedro@example.com',
+    },
+    {
+      id: 4,
+      nome: 'Ana Costa',
+      sigla_partido: 'MDB',
+      uf: 'BA',
+      foto_url: 'http://example.com/4.jpg',
+      email: 'ana@example.com',
+    },
   ]
 
   const mockVotos: Voto[] = [
-    { id: '1', votacao_id: '1', deputado_id: 1, tipo: TipoVoto.SIM, deputado: mockDeputados[0] },
-    { id: '2', votacao_id: '1', deputado_id: 2, tipo: TipoVoto.NAO, deputado: mockDeputados[1] },
-    { id: '3', votacao_id: '1', deputado_id: 3, tipo: TipoVoto.ABSTENCAO, deputado: mockDeputados[2] },
-    { id: '4', votacao_id: '1', deputado_id: 4, tipo: TipoVoto.OBSTRUCAO, deputado: mockDeputados[3] },
+    { id: 1, votacao_id: 1, deputado_id: 1, voto: TipoVoto.SIM, deputado: mockDeputados[0] },
+    { id: 2, votacao_id: 1, deputado_id: 2, voto: TipoVoto.NAO, deputado: mockDeputados[1] },
+    { id: 3, votacao_id: 1, deputado_id: 3, voto: TipoVoto.ABSTENCAO, deputado: mockDeputados[2] },
+    { id: 4, votacao_id: 1, deputado_id: 4, voto: TipoVoto.OBSTRUCAO, deputado: mockDeputados[3] },
   ]
 
-  it('should render list of votes with correct count', () => {
+  it('deve renderizar lista de votos com contagem correta', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     expect(screen.getByText(/Votos \(4 de 4\)/)).toBeInTheDocument()
@@ -26,29 +54,29 @@ describe('ListaVotos', () => {
     expect(screen.getByText('Maria Santos')).toBeInTheDocument()
   })
 
-  it('should display deputy info correctly', () => {
+  it('deve exibir informações do deputado com sigla_partido', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     expect(screen.getByText('João Silva')).toBeInTheDocument()
     expect(screen.getByText('PT - SP')).toBeInTheDocument()
   })
 
-  it('should display vote types as badges', () => {
+  it('deve exibir tipos de voto em badges', () => {
     render(<ListaVotos votos={mockVotos} />)
 
-    expect(screen.getByText('SIM')).toBeInTheDocument()
-    expect(screen.getByText('NAO')).toBeInTheDocument()
-    expect(screen.getByText('ABSTENCAO')).toBeInTheDocument()
-    expect(screen.getByText('OBSTRUCAO')).toBeInTheDocument()
+    expect(screen.getAllByText('Sim').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Não').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Abstenção').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Obstrução').length).toBeGreaterThan(0)
   })
 
-  it('should show loading state', () => {
+  it('deve exibir estado de loading', () => {
     render(<ListaVotos votos={[]} loading={true} />)
 
     expect(screen.getByText('Votos')).toBeInTheDocument()
   })
 
-  it('should show error state', () => {
+  it('deve exibir estado de erro', () => {
     const errorMessage = 'Erro ao carregar dados'
     render(<ListaVotos votos={[]} error={errorMessage} />)
 
@@ -56,13 +84,13 @@ describe('ListaVotos', () => {
     expect(screen.getByText(errorMessage)).toBeInTheDocument()
   })
 
-  it('should show empty state', () => {
+  it('deve exibir estado vazio', () => {
     render(<ListaVotos votos={[]} />)
 
     expect(screen.getByText('Nenhum voto encontrado')).toBeInTheDocument()
   })
 
-  it('should filter by vote type', () => {
+  it('deve filtrar por tipo de voto canônico', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     const typeSelect = screen.getAllByDisplayValue('Todos')[0]
@@ -73,7 +101,7 @@ describe('ListaVotos', () => {
     expect(screen.queryByText('Maria Santos')).not.toBeInTheDocument()
   })
 
-  it('should filter by party', () => {
+  it('deve filtrar por partido', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     const partySelects = screen.getAllByDisplayValue('Todos')
@@ -85,7 +113,7 @@ describe('ListaVotos', () => {
     expect(screen.getByText('Pedro Oliveira')).toBeInTheDocument()
   })
 
-  it('should sort by name ascending', () => {
+  it('deve ordenar por nome ascendente', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     const sortSelect = screen.getAllByDisplayValue('Nome (A-Z)')[0]
@@ -95,7 +123,7 @@ describe('ListaVotos', () => {
     expect(names[0].textContent).toContain('Ana Costa')
   })
 
-  it('should combine filters and sort correctly', () => {
+  it('deve combinar filtros corretamente', () => {
     render(<ListaVotos votos={mockVotos} />)
 
     const typeSelects = screen.getAllByDisplayValue('Todos')
@@ -105,24 +133,19 @@ describe('ListaVotos', () => {
     expect(screen.getByText(/Votos \(1 de 4\)/)).toBeInTheDocument()
   })
 
-  it('should show message when no votes match filters', () => {
+  it('deve exibir mensagem quando não houver votos após filtros', () => {
     render(<ListaVotos votos={mockVotos} />)
 
-    // Get all selects in order: [Tipo, Partido, Ordenar]
     const selects = screen.getAllByRole('combobox')
-
-    // Filter by vote type (first select)
     fireEvent.change(selects[0], { target: { value: TipoVoto.SIM } })
-
-    // Filter by party (second select) - SIM + PSDB should result in 0 votes
     fireEvent.change(selects[1], { target: { value: 'PSDB' } })
 
     expect(screen.getByText('Nenhum voto encontrado com os filtros selecionados')).toBeInTheDocument()
   })
 
-  it('should handle votes without deputado info', () => {
+  it('deve lidar com votos sem dados do deputado', () => {
     const votosWithoutDeputado: Voto[] = [
-      { id: '1', votacao_id: '1', deputado_id: 1, tipo: TipoVoto.SIM },
+      { id: 1, votacao_id: 1, deputado_id: 1, voto: TipoVoto.SIM },
     ]
 
     render(<ListaVotos votos={votosWithoutDeputado} />)

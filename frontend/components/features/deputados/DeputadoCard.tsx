@@ -63,9 +63,9 @@ export function DeputadoCard({ deputado, onClick }: DeputadoCardProps) {
 
           {/* Party and State */}
           <div className="flex flex-wrap gap-2 justify-center">
-            {deputado.partido && (
+            {deputado.sigla_partido && (
               <Badge variant="secondary" className="text-xs">
-                {deputado.partido}
+                {deputado.sigla_partido}
               </Badge>
             )}
             {deputado.uf && (

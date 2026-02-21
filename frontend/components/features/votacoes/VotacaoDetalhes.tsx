@@ -58,6 +58,8 @@ export function VotacaoDetalhes({
   }
 
   const documentLink = buildDocumentLink()
+  const resultadoAprovado =
+    votacao.resultado === 'Aprovado' || votacao.resultado === 'Aprovado com substitutivo'
 
   return (
     <div className="space-y-4">
@@ -73,10 +75,19 @@ export function VotacaoDetalhes({
             {getProposicaoTitle()}
           </CardTitle>
           <CardDescription className="mt-4">
-            {votacao.data && formatDate(votacao.data)}
+            {formatDate(votacao.data_hora)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {votacao.descricao && (
+            <div>
+              <label className="font-medium text-sm">Descrição da Sessão</label>
+              <p className="text-sm text-muted-foreground mt-1">
+                {votacao.descricao}
+              </p>
+            </div>
+          )}
+
           {votacao.proposicao?.ementa && (
             <div>
               <label className="font-medium text-sm">Ementa</label>
@@ -100,13 +111,28 @@ export function VotacaoDetalhes({
               <label className="font-medium text-sm">Resultado</label>
               <div className="mt-2">
                 <Badge
-                  variant={votacao.resultado === 'APROVADO' ? 'default' : 'destructive'}
+                  variant={resultadoAprovado ? 'default' : 'destructive'}
                 >
                   {votacao.resultado}
                 </Badge>
               </div>
             </div>
           )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="font-medium text-sm">Órgão</label>
+              <p className="text-sm text-muted-foreground mt-1">
+                {votacao.sigla_orgao || 'Não informado'}
+              </p>
+            </div>
+            <div>
+              <label className="font-medium text-sm">Votação nominal</label>
+              <p className="text-sm text-muted-foreground mt-1">
+                {votacao.eh_nominal ? 'Sim' : 'Não'}
+              </p>
+            </div>
+          </div>
 
           {documentLink && (
             <div>

@@ -29,7 +29,10 @@ describe('Home Page - Feed de Votações', () => {
     server.use(
       http.get('/api/v1/votacoes', async () => {
         await new Promise(resolve => setTimeout(resolve, 100))
-        return HttpResponse.json([])
+        return HttpResponse.json({
+          data: [],
+          pagination: { page: 1, per_page: 20, total: 0 },
+        })
       })
     )
 
@@ -102,8 +105,11 @@ describe('Home Page - Feed de Votações', () => {
         if (callCount === 1) {
           return new HttpResponse(null, { status: 500 })
         }
-        // Second call succeeds with empty array
-        return HttpResponse.json([])
+        // Second call succeeds with empty list envelope
+        return HttpResponse.json({
+          data: [],
+          pagination: { page: 1, per_page: 20, total: 0 },
+        })
       })
     )
 
@@ -128,7 +134,10 @@ describe('Home Page - Feed de Votações', () => {
   it('should display empty state when no votações available', async () => {
     server.use(
       http.get('/api/v1/votacoes', () => {
-        return HttpResponse.json([])
+        return HttpResponse.json({
+          data: [],
+          pagination: { page: 1, per_page: 20, total: 0 },
+        })
       })
     )
 
@@ -160,7 +169,7 @@ describe('Home Page - Feed de Votações', () => {
     render(<Home />)
 
     await waitFor(() => {
-      const badges = screen.queryAllByText(/APROVADO|REJEITADO/)
+      const badges = screen.queryAllByText(/Aprovado|Rejeitado/)
       expect(badges.length).toBeGreaterThan(0)
     })
 
@@ -174,8 +183,7 @@ describe('Home Page - Feed de Votações', () => {
       // Check for placar labels and values (multiple cards with these labels)
       expect(screen.queryAllByText('Sim').length).toBeGreaterThan(0)
       expect(screen.queryAllByText('Não').length).toBeGreaterThan(0)
-      expect(screen.queryAllByText('Abstenção').length).toBeGreaterThan(0)
-      expect(screen.queryAllByText('Obstrução').length).toBeGreaterThan(0)
+      expect(screen.queryAllByText('Outros').length).toBeGreaterThan(0)
     })
   })
 
@@ -231,6 +239,6 @@ describe('Home Page - Feed de Votações', () => {
     )
 
     expect(firstVotacaoLink).toBeDefined()
-    expect(firstVotacaoLink?.getAttribute('href')).toMatch(/^\/votacoes\/votacao-\d+$/)
+    expect(firstVotacaoLink?.getAttribute('href')).toMatch(/^\/votacoes\/\d+$/)
   })
 })

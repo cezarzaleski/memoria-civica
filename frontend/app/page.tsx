@@ -16,8 +16,8 @@ function VotacaoCardSkeleton() {
         <Skeleton className="h-6 w-2/3" />
         <Skeleton className="h-5 w-full" />
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="text-center space-y-2">
             <Skeleton className="h-8 w-12 mx-auto" />
             <Skeleton className="h-4 w-16 mx-auto" />
