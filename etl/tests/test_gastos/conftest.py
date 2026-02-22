@@ -1,5 +1,7 @@
 """Fixtures pytest compartilhadas para testes de Gastos."""
 
+from pathlib import Path
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -35,3 +37,15 @@ def db_session(temp_db):
 def gasto_repository(db_session) -> GastoRepository:
     """Fixture que fornece um GastoRepository com banco in-memory."""
     return GastoRepository(db_session)
+
+
+@pytest.fixture
+def fixtures_dir() -> Path:
+    """Fixture que fornece o caminho para o diretório de fixtures."""
+    return Path(__file__).parent.parent / "fixtures"
+
+
+@pytest.fixture
+def gastos_csv_path(fixtures_dir) -> str:
+    """Fixture que fornece o caminho para o CSV de gastos."""
+    return str(fixtures_dir / "gastos.csv")

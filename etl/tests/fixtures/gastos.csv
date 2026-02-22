@@ -1,0 +1,7 @@
+idDeputado;ano;mes;tipoDespesa;tipoDocumento;dataDocumento;numDocumento;valorDocumento;valorLiquido;valorGlosa;nomeFornecedor;cnpjCpfFornecedor;urlDocumento;idDocumento;codLote;parcela
+1001;2024;1;COMBUSTIVEL;NOTA FISCAL;2024-01-10;DOC-001;1.234,56;1.200,00;34,56;Posto A;12345678000199;https://example.com/doc-1;10001;9001;1
+1002;2024;2;PASSAGEM AEREA;RECIBO;15/02/2024;DOC-002;500,00;500,00;0,00;Companhia Aerea;10987654000188;https://example.com/doc-2;10002;9002;1
+9999;2024;3;HOSPEDAGEM;NOTA FISCAL;2024-03-20;DOC-003;300,00;280,00;20,00;Hotel B;22333444000155;https://example.com/doc-3;10003;9003;1
+1001;2024;4;ALIMENTACAO;;;;;;;Restaurante C;33444555000166;;10004;9004;
+1002;2024;5;DIVULGACAO;NOTA FISCAL;data-invalida;DOC-005;valor_invalido;120,50;abc;Fornecedor D;44555666000177;https://example.com/doc-5;10005;9005;2
+;2024;6;SERVICOS POSTAIS;FATURA;2024-06-01;DOC-006;50,00;49,00;1,00;Correios;55666777000188;https://example.com/doc-6;10006;9006;1
