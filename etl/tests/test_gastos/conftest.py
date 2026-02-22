@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 # Importa models com FK para garantir criação correta do schema em memória
 import src.deputados.models
 import src.gastos.models  # noqa: F401
+from src.gastos.repository import GastoRepository
 from src.shared.database import Base
 
 
@@ -28,3 +29,9 @@ def db_session(temp_db):
     session = temp_db()
     yield session
     session.close()
+
+
+@pytest.fixture
+def gasto_repository(db_session) -> GastoRepository:
+    """Fixture que fornece um GastoRepository com banco in-memory."""
+    return GastoRepository(db_session)
