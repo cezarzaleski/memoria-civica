@@ -6,6 +6,7 @@ Executa o pipeline completo:
 0. Migrations do banco de dados (Alembic)
 1. Download dos CSVs da Câmara dos Deputados
 2. ETL Fase 1: deputados → proposições → votações + votos
+   2.4 ETL de gastos (CRÍTICO, depende de deputados)
 3. ETL Fase 2: votacoes_proposicoes (CRÍTICO) → orientacoes (NÃO-CRÍTICO)
 4. ETL Fase 3: classificação cívica (NÃO-CRÍTICO)
 
@@ -31,6 +32,7 @@ sys.path.insert(0, str(ETL_DIR))
 from scripts.download_camara import download_all_files, print_summary  # noqa: E402
 from src.classificacao.etl import run_classificacao_etl  # noqa: E402
 from src.deputados.etl import run_deputados_etl  # noqa: E402
+from src.gastos.etl import run_gastos_etl  # noqa: E402
 from src.proposicoes.etl import run_proposicoes_etl  # noqa: E402
 from src.shared.config import settings  # noqa: E402
 from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl  # noqa: E402
@@ -111,6 +113,12 @@ def run_proposicoes_etl_with_retry(csv_path: str) -> int:
 def run_votacoes_etl_with_retry(votacoes_csv: str, votos_csv: str) -> int:
     """Executa ETL de votações com retry automático."""
     return run_votacoes_etl(votacoes_csv, votos_csv)
+
+
+@retry_with_backoff(max_retries=3, initial_wait=1)
+def run_gastos_etl_with_retry(csv_path: str) -> int:
+    """Executa ETL de gastos com retry automático."""
+    return run_gastos_etl(csv_path)
 
 
 def run_migrations() -> int:
@@ -235,6 +243,17 @@ def run_etl(data_dir: Path) -> int:
         result = run_votacoes_etl_with_retry(str(votacoes_csv), str(votos_csv))
         if result != 0:
             logger.error("ETL de votações falhou")
+            return 1
+
+        # Step: Gastos (CRÍTICO)
+        logger.info("Step 2.4: Gastos parlamentares CEAP (depende de deputados)")
+        gastos_csv = data_dir / f"gastos-{settings.CAMARA_ANO}.csv"
+        if not gastos_csv.exists():
+            logger.error(f"Arquivo não encontrado: {gastos_csv}")
+            return 1
+        result = run_gastos_etl_with_retry(str(gastos_csv))
+        if result != 0:
+            logger.error("ETL de gastos falhou")
             return 1
 
         phase_time = time.time() - phase_start

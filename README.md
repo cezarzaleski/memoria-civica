@@ -111,6 +111,7 @@ O projeto inclui um script para download automatizado de arquivos CSV da API Dad
 
 O script `scripts/download_camara.py` baixa os seguintes arquivos:
 - `deputados.csv`: Lista de todos os deputados federais
+- `gastos-{ano}.csv`: Gastos parlamentares CEAP do ano (ex: gastos-2025.csv)
 - `proposicoes-{ano}.csv`: Proposições do ano (ex: proposicoes-2025.csv)
 - `votacoes-{legislatura}.csv`: Votações da legislatura
 - `votacoesVotos-{legislatura}.csv`: Votos individuais
@@ -128,7 +129,7 @@ PYTHONPATH=. python scripts/download_camara.py --help
 | `--dry-run` | Simula downloads sem executar | Desabilitado |
 | `-v, --verbose` | Habilita logging detalhado (DEBUG) | Desabilitado |
 
-Arquivos válidos para `--file`: `deputados`, `proposicoes`, `votacoes`, `votos`
+Arquivos válidos para `--file`: `deputados`, `gastos`, `proposicoes`, `votacoes`, `votos`, `votacoes_proposicoes`, `votacoes_orientacoes`
 
 #### Exemplos de Uso
 

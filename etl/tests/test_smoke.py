@@ -18,6 +18,7 @@ def test_project_structure():
     required_dirs_etl = [
         "src",
         "src/deputados",
+        "src/gastos",
         "src/votacoes",
         "src/proposicoes",
         "src/shared",
@@ -81,6 +82,7 @@ def test_basic_imports():
     try:
         import src
         import src.deputados
+        import src.gastos
         import src.proposicoes
         import src.shared
         import src.votacoes  # noqa: F401

@@ -6,12 +6,13 @@ O import de annotations permite sintaxe moderna de tipos.
 
 Este script baixa os arquivos CSV necessários para o pipeline ETL:
 - deputados.csv: Lista de todos os deputados
+- gastos-{ano}.csv: Gastos parlamentares (CEAP)
 - proposicoes-{ano}.csv: Proposições do ano
-- votacoes-{legislatura}.csv: Votações da legislatura
-- votacoesVotos-{legislatura}.csv: Votos individuais
+- votacoes-{ano}.csv: Votações do ano
+- votacoesVotos-{ano}.csv: Votos individuais do ano
 
 O download respeita a sequência de dependências:
-deputados → proposições → votações → votos
+deputados → proposições → votações → votos → gastos
 
 Example:
     # Baixar todos os arquivos para diretório padrão
@@ -129,6 +130,12 @@ FILE_CONFIGS = {
         "requires_legislatura": False,
         "requires_ano": True,
     },
+    "gastos": {
+        "url_path": "deputadosDespesas/csv/deputadosDespesas-{ano}.csv",
+        "filename": "gastos-{ano}.csv",
+        "requires_legislatura": False,
+        "requires_ano": True,
+    },
     "votacoes": {
         "url_path": "votacoes/csv/votacoes-{ano}.csv",
         "filename": "votacoes-{ano}.csv",
@@ -156,7 +163,15 @@ FILE_CONFIGS = {
 }
 
 # Ordem de download (respeita dependências)
-DOWNLOAD_ORDER = ["deputados", "proposicoes", "votacoes", "votos", "votacoes_proposicoes", "votacoes_orientacoes"]
+DOWNLOAD_ORDER = [
+    "deputados",
+    "proposicoes",
+    "votacoes",
+    "votos",
+    "gastos",
+    "votacoes_proposicoes",
+    "votacoes_orientacoes",
+]
 
 
 def setup_logging(verbose: bool = False) -> None:
