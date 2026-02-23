@@ -28,6 +28,8 @@ if config.config_file_name is not None:
 # from src.deputados.models import Deputado
 # from src.proposicoes.models import Proposicao
 # from src.votacoes.models import Votacao, Voto
+from src.enriquecimento.models import EnriquecimentoLLM  # noqa: F401, E402
+
 target_metadata = Base.metadata
 
 # Sobrescrever sqlalchemy.url com valor de settings

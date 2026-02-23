@@ -3,12 +3,22 @@
 import sys
 from pathlib import Path
 
+import pytest
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+_DATA_DIR = _PROJECT_ROOT / "data" / "dados_camara"
+_requires_local_data = pytest.mark.skipif(
+    not _DATA_DIR.exists(),
+    reason="Diretório data/dados_camara não encontrado (ambiente de CI ou setup local ausente)",
+)
+
 
 def test_python_version():
     """Verifica se a versão do Python é 3.11 ou superior."""
     assert sys.version_info >= (3, 11), f"Python 3.11+ é obrigatório, versão atual: {sys.version}"
 
 
+@_requires_local_data
 def test_project_structure():
     """Verifica se todos os diretórios necessários existem."""
     etl_root = Path(__file__).parent.parent
@@ -108,6 +118,7 @@ def test_dependencies_installed():
             raise AssertionError(f"Dependência crítica não instalada: {dep}") from e
 
 
+@_requires_local_data
 def test_data_directory_has_csv_files():
     """Verifica se o diretório de dados contém arquivos CSV."""
     etl_root = Path(__file__).parent.parent

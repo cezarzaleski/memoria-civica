@@ -8,7 +8,7 @@ Executa o pipeline completo:
 2. ETL Fase 1: deputados → proposições → votações + votos
    2.4 ETL de gastos (CRÍTICO, depende de deputados)
 3. ETL Fase 2: votacoes_proposicoes (CRÍTICO) → orientacoes (NÃO-CRÍTICO)
-4. ETL Fase 3: classificação cívica (NÃO-CRÍTICO)
+4. ETL Fase 3: classificação cívica (NÃO-CRÍTICO) + enriquecimento LLM (NÃO-CRÍTICO)
 
 Example:
     python scripts/run_full_etl.py
@@ -32,6 +32,7 @@ sys.path.insert(0, str(ETL_DIR))
 from scripts.download_camara import download_all_files, print_summary  # noqa: E402
 from src.classificacao.etl import run_classificacao_etl  # noqa: E402
 from src.deputados.etl import run_deputados_etl  # noqa: E402
+from src.enriquecimento.etl import run_enriquecimento_etl  # noqa: E402
 from src.gastos.etl import run_gastos_etl  # noqa: E402
 from src.proposicoes.etl import run_proposicoes_etl  # noqa: E402
 from src.shared.config import settings  # noqa: E402
@@ -182,7 +183,7 @@ def run_etl(data_dir: Path) -> int:
 
     Fase 1: Ingestão base (deputados → proposições → votações + votos)
     Fase 2: Ingestão relacional (votacoes_proposicoes → orientacoes)
-    Fase 3: Enriquecimento (classificação cívica)
+    Fase 3: Enriquecimento (classificação cívica + enriquecimento LLM)
 
     Args:
         data_dir: Diretório com os arquivos CSV
@@ -309,6 +310,14 @@ def run_etl(data_dir: Path) -> int:
             run_classificacao_etl()
         except Exception as e:
             logger.warning(f"Step não-crítico falhou: classificacao — {e}")
+            warnings_count += 1
+
+        # Step: Enriquecimento LLM (NÃO-CRÍTICO)
+        logger.info("Step 4.2: Enriquecimento LLM (NÃO-CRÍTICO)")
+        try:
+            run_enriquecimento_etl()
+        except Exception as e:
+            logger.warning(f"Step não-crítico falhou: enriquecimento_llm — {e}")
             warnings_count += 1
 
         phase_time = time.time() - phase_start

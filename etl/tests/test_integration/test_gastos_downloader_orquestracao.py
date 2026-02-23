@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import scripts.download_camara as download_camara
 import scripts.run_full_etl as run_full_etl
+
+pytestmark = pytest.mark.integration
 
 
 def _touch_csv(path: Path) -> None:

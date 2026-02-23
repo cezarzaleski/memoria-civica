@@ -1,0 +1,66 @@
+# CI ETL - Unit and Integration Tests
+#
+# This workflow runs the ETL test suite on pull requests:
+# - Unit tests: fast, no external dependencies
+# - Integration tests: require PostgreSQL (via testcontainers + Docker)
+#
+# Trigger:
+#   - On pull_request targeting main branch when etl/** files change
+
+name: CI ETL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'etl/**'
+      - '.github/workflows/ci-etl.yml'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: etl
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: Run unit tests
+        run: poetry run pytest -m "not integration" --tb=short -q
+
+  integration-tests:
+    name: Integration Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: etl
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: Run integration tests
+        run: poetry run pytest -m integration --tb=short -q
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'

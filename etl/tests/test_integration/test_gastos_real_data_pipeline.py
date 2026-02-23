@@ -7,8 +7,7 @@ import os
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 import scripts.run_full_etl as run_full_etl
 import src.classificacao.models
@@ -22,7 +21,6 @@ from src.deputados.models import Deputado
 from src.gastos.etl import run_gastos_etl
 from src.gastos.models import Gasto
 from src.proposicoes.etl import run_proposicoes_etl
-from src.shared.database import Base
 from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -117,21 +115,17 @@ def real_data_subset_dir(tmp_path_factory) -> Path:
 
 
 @pytest.fixture
-def pipeline_db_session(tmp_path) -> Session:
-    db_path = tmp_path / "real_data_pipeline.db"
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-    )
-    Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
-
+def pipeline_db_session(db_engine) -> Session:
+    """Sessão PostgreSQL com rollback automático para testes de pipeline com dados reais."""
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
     try:
         yield session
     finally:
         session.close()
-        engine.dispose()
+        transaction.rollback()
+        connection.close()
 
 
 def _patch_run_full_with_real_etls(monkeypatch: pytest.MonkeyPatch, db: Session, call_order: list[str]) -> None:

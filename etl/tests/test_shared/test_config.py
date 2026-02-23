@@ -110,3 +110,94 @@ class TestSettingsSingleton:
         assert hasattr(settings, "DATA_DIR")
         assert hasattr(settings, "LOG_LEVEL")
         assert hasattr(settings, "LOG_FILE")
+
+
+# ---------------------------------------------------------------------------
+# LLM Settings Defaults
+# ---------------------------------------------------------------------------
+class TestLLMSettingsDefaults:
+    """Testes para valores padrão dos campos LLM no Settings."""
+
+    def test_llm_enabled_defaults_to_false(self):
+        """LLM_ENABLED é False por padrão."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_ENABLED is False
+
+    def test_llm_api_key_defaults_to_none(self):
+        """LLM_API_KEY é None por padrão."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_API_KEY is None
+
+    def test_llm_model_defaults_to_gpt4o_mini(self):
+        """LLM_MODEL é 'gpt-4o-mini' por padrão."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_MODEL == "gpt-4o-mini"
+
+    def test_llm_batch_size_defaults_to_10(self):
+        """LLM_BATCH_SIZE é 10 por padrão."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_BATCH_SIZE == 10
+
+    def test_llm_confidence_threshold_defaults_to_0_5(self):
+        """LLM_CONFIDENCE_THRESHOLD é 0.5 por padrão."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_CONFIDENCE_THRESHOLD == 0.5
+
+
+# ---------------------------------------------------------------------------
+# LLM Settings Override via Env
+# ---------------------------------------------------------------------------
+class TestLLMSettingsEnvOverride:
+    """Testes para override de campos LLM via variáveis de ambiente."""
+
+    def test_llm_enabled_override(self, monkeypatch):
+        """LLM_ENABLED pode ser ativado via variável de ambiente."""
+        monkeypatch.setenv("LLM_ENABLED", "true")
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_ENABLED is True
+
+    def test_llm_api_key_override(self, monkeypatch):
+        """LLM_API_KEY pode ser definida via variável de ambiente."""
+        monkeypatch.setenv("LLM_API_KEY", "sk-test-12345")
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_API_KEY == "sk-test-12345"
+
+    def test_llm_model_override(self, monkeypatch):
+        """LLM_MODEL pode ser alterado via variável de ambiente."""
+        monkeypatch.setenv("LLM_MODEL", "gpt-4o")
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_MODEL == "gpt-4o"
+
+    def test_llm_batch_size_override(self, monkeypatch):
+        """LLM_BATCH_SIZE pode ser alterado via variável de ambiente."""
+        monkeypatch.setenv("LLM_BATCH_SIZE", "25")
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_BATCH_SIZE == 25
+
+    def test_llm_confidence_threshold_override(self, monkeypatch):
+        """LLM_CONFIDENCE_THRESHOLD pode ser alterado via variável de ambiente."""
+        monkeypatch.setenv("LLM_CONFIDENCE_THRESHOLD", "0.7")
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LLM_CONFIDENCE_THRESHOLD == 0.7
+
+
+# ---------------------------------------------------------------------------
+# Existing settings not broken by LLM additions
+# ---------------------------------------------------------------------------
+class TestExistingSettingsNotBrokenByLLM:
+    """Verifica que campos existentes continuam com valores padrão corretos após adição dos campos LLM."""
+
+    def test_postgres_user_default_unchanged(self):
+        """POSTGRES_USER mantém padrão original."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.POSTGRES_USER == "memoria"
+
+    def test_log_level_default_unchanged(self):
+        """LOG_LEVEL mantém padrão original."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.LOG_LEVEL == "INFO"
+
+    def test_camara_legislatura_default_unchanged(self):
+        """CAMARA_LEGISLATURA mantém padrão original."""
+        s = Settings(POSTGRES_PASSWORD="test")
+        assert s.CAMARA_LEGISLATURA == 57

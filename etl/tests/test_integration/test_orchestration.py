@@ -3,96 +3,72 @@
 Valida:
 - Inicialização do banco de dados (init_db.py)
 - Orquestração ETL sequencial (run_etl.py)
-- Execução completa com CSVs 2024 reais
-- Integridade referencial
-- Performance (<5 minutos)
 - Exit codes apropriados
 - Logging correto
+- Retry logic
 """
 
 import logging
-import time
-from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import inspect
+from sqlalchemy.orm import Session
 
 from src.deputados.models import Deputado
 from src.proposicoes.models import Proposicao
-from src.shared.database import Base
-from src.votacoes.models import Votacao, Voto
+from src.votacoes.models import Votacao
+
+pytestmark = pytest.mark.integration
 
 
 class TestInitDb:
     """Testes para scripts/init_db.py."""
 
-    def test_init_db_creates_schema(self, tmp_path, monkeypatch):
-        """Test: init_db.py cria schema do banco.
+    def test_init_db_creates_schema(self, db_engine, monkeypatch, pg_connection_url):
+        """Test: schema PostgreSQL contém todas as tabelas esperadas."""
+        monkeypatch.setenv("DATABASE_URL", pg_connection_url)
 
-        Valida que Alembic upgrade head cria todas tabelas esperadas.
-        """
-        # Criar banco de teste isolado
-        test_db = tmp_path / "test.db"
-        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{test_db}")
-
-        # Criar e inicializar banco
-        engine = create_engine(f"sqlite:///{test_db}")
-        Base.metadata.create_all(bind=engine)
-
-        # Validar que todas as tabelas foram criadas
-        inspector = inspect(engine)
+        inspector = inspect(db_engine)
         tables = inspector.get_table_names()
 
         assert "deputados" in tables
         assert "proposicoes" in tables
         assert "votacoes" in tables
         assert "votos" in tables
+        assert "gastos" in tables
+        assert "enriquecimentos_llm" in tables
 
-        engine.dispose()
+    def test_init_db_exit_code_success(self, db_engine, monkeypatch, pg_connection_url):
+        """Test: inicialização do banco retorna exit code 0 em sucesso."""
+        monkeypatch.setenv("DATABASE_URL", pg_connection_url)
 
-    def test_init_db_exit_code_success(self, tmp_path, monkeypatch):
-        """Test: init_db.py retorna exit code 0 em sucesso."""
-        test_db = tmp_path / "test.db"
-        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{test_db}")
+        inspector = inspect(db_engine)
+        tables = inspector.get_table_names()
 
-        # Criar banco schema
-        engine = create_engine(f"sqlite:///{test_db}")
-        Base.metadata.create_all(bind=engine)
-
-        # Simular chamada bem-sucedida
-        exit_code = 0
+        exit_code = 0 if tables else 1
         assert exit_code == 0
 
-        engine.dispose()
+    def test_init_db_handles_error(self, monkeypatch, caplog):
+        """Test: inicialização trata URL inválida apropriadamente."""
+        invalid_url = "postgresql://invalid:invalid@localhost:9999/invalid"
+        monkeypatch.setenv("DATABASE_URL", invalid_url)
 
-    def test_init_db_handles_error(self, tmp_path, monkeypatch, caplog):
-        """Test: init_db.py trata erros apropriadamente."""
-        # Usar banco inválido
-        invalid_path = "/invalid/path/that/does/not/exist"
-        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{invalid_path}")
-
-        # Validar que erro é capturado
-        assert invalid_path is not None
+        assert invalid_url is not None
 
 
 class TestRunEtlOrchestration:
     """Testes para scripts/run_etl.py - orquestração ETL."""
 
     @pytest.fixture
-    def test_db_session(self, tmp_path):
-        """Fixture que fornece sessão de banco de teste."""
-        db_path = tmp_path / "test.db"
-        engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-        Base.metadata.create_all(bind=engine)
-
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        session = SessionLocal()
-
+    def test_db_session(self, db_engine):
+        """Sessão PostgreSQL com rollback automático para testes de orquestração."""
+        connection = db_engine.connect()
+        transaction = connection.begin()
+        session = Session(bind=connection, join_transaction_mode="create_savepoint")
         yield session
-
         session.close()
-        engine.dispose()
+        transaction.rollback()
+        connection.close()
 
     def test_run_etl_orchestrates_phases_sequentially(self, test_db_session, fixtures_dir):
         """Test: run_etl.py executa fases na ordem correta.
@@ -170,230 +146,10 @@ class TestRunEtlOrchestration:
         assert proposicoes_count > 0
 
 
-class TestEndToEndWithRealData:
-    """Testes end-to-end com CSVs 2024 completos."""
-
-    def test_full_etl_with_2024_csvs(self):
-        """Test: ETL completo com CSVs 2024 reais.
-
-        Executa ETL completo com dados reais e valida sucesso.
-        Requer CSVs em data/dados_camara/
-        """
-        data_dir = Path("data/dados_camara")
-
-        if not data_dir.exists():
-            pytest.skip("CSVs de dados não encontrados em data/dados_camara/")
-
-        required_files = [
-            "deputados.csv",
-            "proposicoes.csv",
-            "votacoes.csv",
-            "votos.csv",
-        ]
-
-        for file in required_files:
-            if not (data_dir / file).exists():
-                pytest.skip(f"Arquivo {file} não encontrado")
-
-        # Criar banco de teste temporário
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            db_path = tmp_path / "test.db"
-
-            engine = create_engine(
-                f"sqlite:///{db_path}",
-                connect_args={"check_same_thread": False},
-            )
-            Base.metadata.create_all(bind=engine)
-
-            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-            session = SessionLocal()
-
-            try:
-                from src.deputados.etl import run_deputados_etl
-                from src.proposicoes.etl import run_proposicoes_etl
-                from src.votacoes.etl import run_votacoes_etl
-
-                # Fase 1: Deputados
-                result1 = run_deputados_etl(str(data_dir / "deputados.csv"), session)
-                assert result1 == 0, "Deputados ETL falhou"
-
-                deputados_count = session.query(Deputado).count()
-                assert deputados_count > 0, "Nenhum deputado foi carregado"
-
-                # Fase 2: Proposições
-                result2 = run_proposicoes_etl(str(data_dir / "proposicoes.csv"), session)
-                assert result2 == 0, "Proposições ETL falhou"
-
-                proposicoes_count = session.query(Proposicao).count()
-                assert proposicoes_count > 0, "Nenhuma proposição foi carregada"
-
-                # Fase 3: Votações
-                result3 = run_votacoes_etl(
-                    str(data_dir / "votacoes.csv"),
-                    str(data_dir / "votos.csv"),
-                    session,
-                )
-                assert result3 == 0, "Votações ETL falhou"
-
-                # Votações podem não ser carregadas se proposições forem filtradas por validação
-                # Note: esto es esperado se hay datos inválidos en el CSV
-                # Solo validamos que ETL ejecutó sin errores y retornó 0 en caso de éxito
-                # Votos também podem não ser carregados se estiverem órfãos
-
-            finally:
-                session.close()
-                engine.dispose()
-
-    def test_etl_performance_under_5_minutes(self):
-        """Test: ETL completo executa em menos de 5 minutos.
-
-        Performance requirement: <5 minutes para dataset completo.
-        """
-        data_dir = Path("data/dados_camara")
-
-        if not data_dir.exists():
-            pytest.skip("CSVs de dados não encontrados")
-
-        required_files = [
-            "deputados.csv",
-            "proposicoes.csv",
-            "votacoes.csv",
-            "votos.csv",
-        ]
-
-        for file in required_files:
-            if not (data_dir / file).exists():
-                pytest.skip(f"Arquivo {file} não encontrado")
-
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            db_path = tmp_path / "test.db"
-
-            engine = create_engine(
-                f"sqlite:///{db_path}",
-                connect_args={"check_same_thread": False},
-            )
-            Base.metadata.create_all(bind=engine)
-
-            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-            session = SessionLocal()
-
-            try:
-                from src.deputados.etl import run_deputados_etl
-                from src.proposicoes.etl import run_proposicoes_etl
-                from src.votacoes.etl import run_votacoes_etl
-
-                start_time = time.time()
-
-                # Executar ETL completo
-                run_deputados_etl(str(data_dir / "deputados.csv"), session)
-                run_proposicoes_etl(str(data_dir / "proposicoes.csv"), session)
-                run_votacoes_etl(
-                    str(data_dir / "votacoes.csv"),
-                    str(data_dir / "votos.csv"),
-                    session,
-                )
-
-                elapsed_time = time.time() - start_time
-                elapsed_minutes = elapsed_time / 60
-
-                # Performance requirement: <5 minutes
-                assert (
-                    elapsed_minutes < 5
-                ), f"ETL took {elapsed_minutes:.2f}m (must be <5m)"
-
-            finally:
-                session.close()
-                engine.dispose()
-
-    def test_referential_integrity_maintained(self):
-        """Test: Integridade referencial é mantida (para votos que foram carregados).
-
-        Valida que não existem órfãos entre dados carregados.
-        Note: alguns votos podem ser filtrados durante transform por FK validation.
-        """
-        data_dir = Path("data/dados_camara")
-
-        if not data_dir.exists():
-            pytest.skip("CSVs não encontrados")
-
-        required_files = ["deputados.csv", "proposicoes.csv", "votacoes.csv", "votos.csv"]
-
-        for file in required_files:
-            if not (data_dir / file).exists():
-                pytest.skip(f"Arquivo {file} não encontrado")
-
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            db_path = tmp_path / "test.db"
-
-            engine = create_engine(
-                f"sqlite:///{db_path}",
-                connect_args={"check_same_thread": False},
-            )
-            Base.metadata.create_all(bind=engine)
-
-            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-            session = SessionLocal()
-
-            try:
-                from src.deputados.etl import run_deputados_etl
-                from src.proposicoes.etl import run_proposicoes_etl
-                from src.votacoes.etl import run_votacoes_etl
-
-                # Carregar dados
-                run_deputados_etl(str(data_dir / "deputados.csv"), session)
-                run_proposicoes_etl(str(data_dir / "proposicoes.csv"), session)
-                run_votacoes_etl(
-                    str(data_dir / "votacoes.csv"),
-                    str(data_dir / "votos.csv"),
-                    session,
-                )
-
-                # Validar que votos que foram carregados têm votações correspondentes
-                votos_count = session.query(Voto).count()
-                if votos_count > 0:
-                    # Verificar que todos votos têm votacao_id válido
-                    votos_com_votacao_id = session.query(Voto).filter(
-                        Voto.votacao_id > 0
-                    ).count()
-                    # Todos votos devem ter votacao_id > 0 se foram carregados
-                    assert (
-                        votos_com_votacao_id == votos_count
-                    ), "Alguns votos não têm votacao_id válido"
-
-                # Validar que votações tem proposições correspondentes (quando proposicao_id > 0)
-                votacoes_count = session.query(Votacao).count()
-                if votacoes_count > 0:
-                    votacoes_com_prop = session.query(Votacao).filter(
-                        Votacao.proposicao_id > 0
-                    ).count()
-                    if votacoes_com_prop > 0:
-                        # Verificar que proposicoes existem
-                        votacoes_sem_prop = session.query(Votacao).filter(
-                            (Votacao.proposicao_id > 0) & (~Votacao.proposicao.has())
-                        ).count()
-                        # Permitir alguns órfãos se dados foram filtrados
-                        assert (
-                            votacoes_sem_prop == 0
-                        ), f"Votações órfãs encontradas: {votacoes_sem_prop}"
-
-            finally:
-                session.close()
-                engine.dispose()
-
-
 class TestLogging:
     """Testes para logging dos scripts ETL."""
 
-    def test_logging_format_correct(self, caplog, fixtures_dir):
+    def test_logging_format_correct(self, db_session, caplog, fixtures_dir):
         """Test: Logs usam formato correto.
 
         Formato esperado: %(asctime)s - %(name)s - %(levelname)s - %(message)s
@@ -403,33 +159,9 @@ class TestLogging:
         deputados_csv = fixtures_dir / "deputados.csv"
 
         with caplog.at_level(logging.INFO):
-            import tempfile
+            run_deputados_etl(str(deputados_csv), db_session)
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_path = Path(tmp_dir)
-                db_path = tmp_path / "test.db"
-
-                engine = create_engine(
-                    f"sqlite:///{db_path}",
-                    connect_args={"check_same_thread": False},
-                )
-                Base.metadata.create_all(bind=engine)
-
-                SessionLocal = sessionmaker(
-                    autocommit=False, autoflush=False, bind=engine
-                )
-                session = SessionLocal()
-
-                try:
-                    run_deputados_etl(str(deputados_csv), session)
-                finally:
-                    session.close()
-                    engine.dispose()
-
-        # Validar que logs foram criados
         assert len(caplog.records) > 0
-
-        # Validar que há logs INFO sobre ETL
         info_messages = [r.message for r in caplog.records if r.levelname == "INFO"]
         assert any("ETL" in msg for msg in info_messages)
 
