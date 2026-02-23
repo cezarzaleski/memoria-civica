@@ -69,7 +69,7 @@ export function countVotosByTipo(votos: Voto[], votacao_id: number) {
   return {
     sim: votosDaVotacao.filter((voto) => voto.voto === TipoVoto.SIM).length,
     nao: votosDaVotacao.filter((voto) => voto.voto === TipoVoto.NAO).length,
-    outros: votosDaVotacao.filter((voto) => ![TipoVoto.SIM, TipoVoto.NAO].includes(voto.voto)).length,
+    outros: votosDaVotacao.filter((voto) => !([TipoVoto.SIM, TipoVoto.NAO] as TipoVoto[]).includes(voto.voto)).length,
   };
 }
 

@@ -2,7 +2,7 @@
 """Orquestra ETL completo em 3 fases sequenciais.
 
 Fase 1 — Ingestão base:
-    deputados → proposições → votações + votos
+    deputados → proposições → votações + votos → gastos
 
 Fase 2 — Ingestão relacional:
     votacoes_proposicoes (CRÍTICO) → orientacoes (NÃO-CRÍTICO)
@@ -29,7 +29,9 @@ from pathlib import Path
 
 from src.classificacao.etl import run_classificacao_etl
 from src.deputados.etl import run_deputados_etl
+from src.gastos.etl import run_gastos_etl
 from src.proposicoes.etl import run_proposicoes_etl
+from src.shared.config import settings
 from src.votacoes.etl import run_orientacoes_etl, run_votacoes_etl, run_votacoes_proposicoes_etl
 
 # Add src to path so imports work when script is run from anywhere
@@ -167,10 +169,51 @@ def run_votacoes_etl_with_retry(votacoes_csv: str, votos_csv: str) -> int:
     return run_votacoes_etl(votacoes_csv, votos_csv)
 
 
+@retry_with_backoff(max_retries=3, initial_wait=1)
+def run_gastos_etl_with_retry(csv_path: str) -> int:
+    """Executa ETL de gastos com retry automático.
+
+    Args:
+        csv_path: Caminho para o arquivo CSV de gastos
+
+    Returns:
+        Exit code (0 sucesso, 1 falha)
+    """
+    return run_gastos_etl(csv_path)
+
+
+def resolve_csv_path(
+    data_dir: Path,
+    legacy_name: str,
+    *,
+    annual_name: str | None = None,
+    ano: int | None = None,
+) -> Path:
+    """Resolve caminho de CSV aceitando convenções anual e legado.
+
+    Regra:
+    1. Se existir arquivo anual (`{annual_name}-{ano}.csv`), usa anual.
+    2. Senão, usa nome legado (`{legacy_name}.csv`).
+    3. Se nenhum existir, retorna o caminho anual (quando configurado) para
+       manter mensagem de erro mais alinhada ao pipeline atual.
+    """
+    annual_path = None
+    if annual_name and ano is not None:
+        annual_path = data_dir / f"{annual_name}-{ano}.csv"
+        if annual_path.exists():
+            return annual_path
+
+    legacy_path = data_dir / f"{legacy_name}.csv"
+    if legacy_path.exists():
+        return legacy_path
+
+    return annual_path or legacy_path
+
+
 def main() -> int:
     """Orquestra ETL completo em 3 fases sequenciais.
 
-    Fase 1: Ingestão base (deputados → proposições → votações + votos)
+    Fase 1: Ingestão base (deputados → proposições → votações + votos → gastos)
     Fase 2: Ingestão relacional (votacoes_proposicoes → orientacoes)
     Fase 3: Enriquecimento (classificação cívica)
 
@@ -178,6 +221,7 @@ def main() -> int:
         Exit code (0 sucesso, 1 falha em step crítico)
     """
     data_dir = Path("data/dados_camara")
+    ano = settings.CAMARA_ANO
 
     # Validar que diretório de dados existe
     if not data_dir.exists():
@@ -213,7 +257,12 @@ def main() -> int:
 
         # Step 1.2: Proposições (depende de deputados)
         logger.info("Step 1.2: Proposições (depende de deputados)")
-        proposicoes_csv = data_dir / "proposicoes.csv"
+        proposicoes_csv = resolve_csv_path(
+            data_dir,
+            "proposicoes",
+            annual_name="proposicoes",
+            ano=ano,
+        )
         result = run_proposicoes_etl_with_retry(str(proposicoes_csv))
         if result != 0:
             logger.error("ETL de proposições falhou")
@@ -221,11 +270,34 @@ def main() -> int:
 
         # Step 1.3: Votações + Votos (depende de proposições e deputados)
         logger.info("Step 1.3: Votações + Votos (depende de proposições e deputados)")
-        votacoes_csv = data_dir / "votacoes.csv"
-        votos_csv = data_dir / "votos.csv"
+        votacoes_csv = resolve_csv_path(
+            data_dir,
+            "votacoes",
+            annual_name="votacoes",
+            ano=ano,
+        )
+        votos_csv = resolve_csv_path(
+            data_dir,
+            "votos",
+            annual_name="votacoesVotos",
+            ano=ano,
+        )
         result = run_votacoes_etl_with_retry(str(votacoes_csv), str(votos_csv))
         if result != 0:
             logger.error("ETL de votações falhou")
+            return 1
+
+        # Step 1.4: Gastos (depende de deputados)
+        logger.info("Step 1.4: Gastos parlamentares CEAP (depende de deputados)")
+        gastos_csv = resolve_csv_path(
+            data_dir,
+            "gastos",
+            annual_name="gastos",
+            ano=ano,
+        )
+        result = run_gastos_etl_with_retry(str(gastos_csv))
+        if result != 0:
+            logger.error("ETL de gastos falhou")
             return 1
 
         phase_time = time.time() - phase_start
@@ -241,7 +313,12 @@ def main() -> int:
 
         # Step 2.1: Votações-Proposições (CRÍTICO — pipeline para se falhar)
         logger.info("Step 2.1: Votações-Proposições (CRÍTICO)")
-        vp_csv = data_dir / "votacoes_proposicoes.csv"
+        vp_csv = resolve_csv_path(
+            data_dir,
+            "votacoes_proposicoes",
+            annual_name="votacoesProposicoes",
+            ano=ano,
+        )
         try:
             run_votacoes_proposicoes_etl(str(vp_csv))
         except Exception as e:
@@ -250,7 +327,12 @@ def main() -> int:
 
         # Step 2.2: Orientações (NÃO-CRÍTICO — pipeline continua com warning)
         logger.info("Step 2.2: Orientações de bancada (NÃO-CRÍTICO)")
-        orientacoes_csv = data_dir / "orientacoes.csv"
+        orientacoes_csv = resolve_csv_path(
+            data_dir,
+            "orientacoes",
+            annual_name="votacoesOrientacoes",
+            ano=ano,
+        )
         try:
             run_orientacoes_etl(str(orientacoes_csv))
         except Exception as e:

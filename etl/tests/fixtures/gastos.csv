@@ -1,0 +1,7 @@
+txNomeParlamentar;cpf;ideCadastro;nuCarteiraParlamentar;nuLegislatura;sgUF;sgPartido;codLegislatura;numSubCota;txtDescricao;numEspecificacaoSubCota;txtDescricaoEspecificacao;txtFornecedor;txtCNPJCPF;txtNumero;indTipoDocumento;datEmissao;vlrDocumento;vlrGlosa;vlrLiquido;numMes;numAno;numParcela;txtPassageiro;txtTrecho;numLote;numRessarcimento;datPagamentoRestituicao;vlrRestituicao;nuDeputadoId;ideDocumento;urlDocumento
+Deputada 1001;00000000001;1001;1;57;SP;PT;57;3;COMBUSTIVEL;;;Posto A;12345678000199;DOC-001;NOTA FISCAL;2024-01-10;1.234,56;34,56;1.200,00;1;2024;1;;;9001;;;;1001;10001;https://example.com/doc-1
+Deputado 1002;00000000002;1002;2;57;RJ;PSB;57;7;PASSAGEM AEREA;;;Companhia Aerea;10987654000188;DOC-002;RECIBO;15/02/2024;500,00;0,00;500,00;2;2024;1;;;9002;;;;1002;10002;https://example.com/doc-2
+Deputado 9999;00000000003;9999;3;57;MG;UNI;57;13;HOSPEDAGEM;;;Hotel B;22333444000155;DOC-003;NOTA FISCAL;2024-03-20;300,00;20,00;280,00;3;2024;1;;;9003;;;;9999;10003;https://example.com/doc-3
+Deputada 1001;00000000001;1001;1;57;SP;PT;57;11;ALIMENTACAO;;;Restaurante C;33444555000166;;;;;;;4;2024;;;;9004;;;;1001;10004;
+Deputado 1002;00000000002;1002;2;57;RJ;PSB;57;4;DIVULGACAO;;;Fornecedor D;44555666000177;DOC-005;NOTA FISCAL;data-invalida;valor_invalido;abc;120,50;5;2024;2;;;9005;;;;1002;10005;https://example.com/doc-5
+Sem Deputado;00000000004;0;0;57;DF;SEM;57;9;SERVICOS POSTAIS;;;Correios;55666777000188;DOC-006;FATURA;2024-06-01;50,00;1,00;49,00;6;2024;1;;;9006;;;;;10006;https://example.com/doc-6

@@ -5,19 +5,19 @@ com validação de tipos, enums e constraints.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ResultadoVotacao(str, Enum):
+class ResultadoVotacao(StrEnum):
     """Enum dos possíveis resultados de uma votação."""
 
     APROVADO = "APROVADO"
     REJEITADO = "REJEITADO"
 
 
-class TipoVoto(str, Enum):
+class TipoVoto(StrEnum):
     """Enum dos possíveis tipos de voto."""
 
     SIM = "SIM"
@@ -42,10 +42,10 @@ class VotacaoCreate(BaseModel):
         ...     id=1,
         ...     proposicao_id=123,
         ...     data_hora="2024-01-15T14:30:00",
-        ...     resultado="Aprovado"
+        ...     resultado="APROVADO"
         ... )
         >>> votacao.resultado
-        <ResultadoVotacao.APROVADO: 'Aprovado'>
+        <ResultadoVotacao.APROVADO: 'APROVADO'>
     """
 
     id: int
@@ -92,10 +92,10 @@ class VotoCreate(BaseModel):
         ...     id=1,
         ...     votacao_id=123,
         ...     deputado_id=456,
-        ...     voto="Sim"
+        ...     voto="SIM"
         ... )
         >>> voto.voto
-        <TipoVoto.SIM: 'Sim'>
+        <TipoVoto.SIM: 'SIM'>
     """
 
     id: int

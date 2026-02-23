@@ -12,7 +12,7 @@ from sqlalchemy.orm import relationship
 from src.shared.database import Base
 
 
-class ResultadoVotacao(str, enum.Enum):
+class ResultadoVotacao(enum.StrEnum):
     """Enum para os possíveis resultados de uma votação.
 
     Attributes:
@@ -24,7 +24,7 @@ class ResultadoVotacao(str, enum.Enum):
     REJEITADO = "REJEITADO"
 
 
-class TipoVoto(str, enum.Enum):
+class TipoVoto(enum.StrEnum):
     """Enum para os possíveis tipos de voto.
 
     Attributes:

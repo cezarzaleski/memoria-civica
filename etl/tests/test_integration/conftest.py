@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 # consiga criar todas as tabelas necessárias
 import src.classificacao.models
 import src.deputados.models
+import src.gastos.models
 import src.proposicoes.models
 import src.votacoes.models  # noqa: F401
 from src.shared.database import Base

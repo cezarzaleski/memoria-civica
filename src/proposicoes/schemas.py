@@ -4,12 +4,12 @@ Definem os DTOs (Data Transfer Objects) para criar e ler proposições,
 com validação de tipos e constraints.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class TipoProposicao(str, Enum):
+class TipoProposicao(StrEnum):
     """Enum dos tipos válidos de proposições legislativas."""
 
     PL = "PL"  # Projeto de Lei
