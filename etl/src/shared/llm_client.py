@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from openai import APITimeoutError, OpenAI, RateLimitError
 from pydantic import BaseModel, Field
 
+from src.enriquecimento.prompts import SYSTEM_PROMPT, build_user_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -130,25 +132,8 @@ class OpenAIClient(LLMClient):
             openai.APITimeoutError: Se retries forem esgotados para timeout.
             openai.APIError: Para outros erros de API.
         """
-        categorias_text = ""
-        if categorias:
-            categorias_text = f"\nCategorias já atribuídas: {', '.join(categorias)}"
-
-        system_prompt = (
-            "Você é um assistente especializado em legislação brasileira. "
-            "Sua tarefa é transformar ementas legislativas em linguagem acessível ao cidadão comum. "
-            "Responda SEMPRE em português brasileiro e em formato JSON com os campos: "
-            "headline (string, máx 120 caracteres), resumo_simples (string), "
-            "impacto_cidadao (array de strings com impactos concretos), "
-            "confianca (float entre 0.0 e 1.0, indicando sua confiança no resumo)."
-        )
-
-        user_prompt = (
-            f"Proposição: {tipo} {numero}/{ano}\n"
-            f"Ementa: {ementa}"
-            f"{categorias_text}\n\n"
-            "Gere um JSON com headline, resumo_simples, impacto_cidadao e confianca."
-        )
+        system_prompt = SYSTEM_PROMPT
+        user_prompt = build_user_prompt(tipo, numero, ano, ementa, categorias)
 
         messages = [
             {"role": "system", "content": system_prompt},
