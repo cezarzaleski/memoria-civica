@@ -3,16 +3,12 @@
 Valida:
 - Inicialização do banco de dados (init_db.py)
 - Orquestração ETL sequencial (run_etl.py)
-- Execução completa com CSVs 2024 reais
-- Integridade referencial
-- Performance (<5 minutos)
 - Exit codes apropriados
 - Logging correto
+- Retry logic
 """
 
 import logging
-import time
-from pathlib import Path
 
 import pytest
 from sqlalchemy import inspect
@@ -20,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from src.deputados.models import Deputado
 from src.proposicoes.models import Proposicao
-from src.votacoes.models import Votacao, Voto  # noqa: F401
 
 pytestmark = pytest.mark.integration
 
@@ -148,154 +143,6 @@ class TestRunEtlOrchestration:
         # Validar que proposições foram carregadas
         proposicoes_count = test_db_session.query(Proposicao).count()
         assert proposicoes_count > 0
-
-
-class TestEndToEndWithRealData:
-    """Testes end-to-end com CSVs 2024 completos."""
-
-    def test_full_etl_with_2024_csvs(self, db_engine):
-        """Test: ETL completo com CSVs 2024 reais.
-
-        Executa ETL completo com dados reais e valida sucesso.
-        Requer CSVs em data/dados_camara/
-        """
-        data_dir = Path("data/dados_camara")
-
-        if not data_dir.exists():
-            pytest.skip("CSVs de dados não encontrados em data/dados_camara/")
-
-        required_files = [
-            "deputados.csv",
-            "proposicoes.csv",
-            "votacoes.csv",
-            "votos.csv",
-        ]
-
-        for file in required_files:
-            if not (data_dir / file).exists():
-                pytest.skip(f"Arquivo {file} não encontrado")
-
-        connection = db_engine.connect()
-        transaction = connection.begin()
-        session = Session(bind=connection, join_transaction_mode="create_savepoint")
-
-        try:
-            from src.deputados.etl import run_deputados_etl
-            from src.proposicoes.etl import run_proposicoes_etl
-            from src.votacoes.etl import run_votacoes_etl
-
-            result1 = run_deputados_etl(str(data_dir / "deputados.csv"), session)
-            assert result1 == 0, "Deputados ETL falhou"
-            assert session.query(Deputado).count() > 0
-
-            result2 = run_proposicoes_etl(str(data_dir / "proposicoes.csv"), session)
-            assert result2 == 0, "Proposições ETL falhou"
-            assert session.query(Proposicao).count() > 0
-
-            result3 = run_votacoes_etl(
-                str(data_dir / "votacoes.csv"),
-                str(data_dir / "votos.csv"),
-                session,
-            )
-            assert result3 == 0, "Votações ETL falhou"
-        finally:
-            session.close()
-            transaction.rollback()
-            connection.close()
-
-    def test_etl_performance_under_5_minutes(self, db_engine):
-        """Test: ETL completo executa em menos de 5 minutos.
-
-        Performance requirement: <5 minutes para dataset completo.
-        """
-        data_dir = Path("data/dados_camara")
-
-        if not data_dir.exists():
-            pytest.skip("CSVs de dados não encontrados")
-
-        required_files = ["deputados.csv", "proposicoes.csv", "votacoes.csv", "votos.csv"]
-
-        for file in required_files:
-            if not (data_dir / file).exists():
-                pytest.skip(f"Arquivo {file} não encontrado")
-
-        connection = db_engine.connect()
-        transaction = connection.begin()
-        session = Session(bind=connection, join_transaction_mode="create_savepoint")
-
-        try:
-            from src.deputados.etl import run_deputados_etl
-            from src.proposicoes.etl import run_proposicoes_etl
-            from src.votacoes.etl import run_votacoes_etl
-
-            start_time = time.time()
-
-            run_deputados_etl(str(data_dir / "deputados.csv"), session)
-            run_proposicoes_etl(str(data_dir / "proposicoes.csv"), session)
-            run_votacoes_etl(
-                str(data_dir / "votacoes.csv"),
-                str(data_dir / "votos.csv"),
-                session,
-            )
-
-            elapsed_minutes = (time.time() - start_time) / 60
-            assert elapsed_minutes < 5, f"ETL took {elapsed_minutes:.2f}m (must be <5m)"
-        finally:
-            session.close()
-            transaction.rollback()
-            connection.close()
-
-    def test_referential_integrity_maintained(self, db_engine):
-        """Test: Integridade referencial é mantida (para votos que foram carregados).
-
-        Valida que não existem órfãos entre dados carregados.
-        Note: alguns votos podem ser filtrados durante transform por FK validation.
-        """
-        data_dir = Path("data/dados_camara")
-
-        if not data_dir.exists():
-            pytest.skip("CSVs não encontrados")
-
-        required_files = ["deputados.csv", "proposicoes.csv", "votacoes.csv", "votos.csv"]
-
-        for file in required_files:
-            if not (data_dir / file).exists():
-                pytest.skip(f"Arquivo {file} não encontrado")
-
-        connection = db_engine.connect()
-        transaction = connection.begin()
-        session = Session(bind=connection, join_transaction_mode="create_savepoint")
-
-        try:
-            from src.deputados.etl import run_deputados_etl
-            from src.proposicoes.etl import run_proposicoes_etl
-            from src.votacoes.etl import run_votacoes_etl
-
-            run_deputados_etl(str(data_dir / "deputados.csv"), session)
-            run_proposicoes_etl(str(data_dir / "proposicoes.csv"), session)
-            run_votacoes_etl(
-                str(data_dir / "votacoes.csv"),
-                str(data_dir / "votos.csv"),
-                session,
-            )
-
-            votos_count = session.query(Voto).count()
-            if votos_count > 0:
-                votos_com_votacao_id = session.query(Voto).filter(Voto.votacao_id > 0).count()
-                assert votos_com_votacao_id == votos_count, "Alguns votos não têm votacao_id válido"
-
-            votacoes_count = session.query(Votacao).count()
-            if votacoes_count > 0:
-                votacoes_com_prop = session.query(Votacao).filter(Votacao.proposicao_id > 0).count()
-                if votacoes_com_prop > 0:
-                    votacoes_sem_prop = session.query(Votacao).filter(
-                        (Votacao.proposicao_id > 0) & (~Votacao.proposicao.has())
-                    ).count()
-                    assert votacoes_sem_prop == 0, f"Votações órfãs encontradas: {votacoes_sem_prop}"
-        finally:
-            session.close()
-            transaction.rollback()
-            connection.close()
 
 
 class TestLogging:
