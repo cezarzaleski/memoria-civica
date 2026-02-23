@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from src.deputados.models import Deputado
 from src.proposicoes.models import Proposicao
+from src.votacoes.models import Votacao
 
 pytestmark = pytest.mark.integration
 
