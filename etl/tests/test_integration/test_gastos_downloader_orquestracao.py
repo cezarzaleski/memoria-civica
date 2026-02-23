@@ -21,8 +21,11 @@ class TestDownloadGastosContract:
         assert "gastos" in download_camara.FILE_CONFIGS
 
         config = download_camara.FILE_CONFIGS["gastos"]
-        assert config["url_path"] == "deputadosDespesas/csv/deputadosDespesas-{ano}.csv"
+        assert config["base_url"] == "https://www.camara.leg.br"
+        assert config["url_path"] == "cotas/Ano-{ano}.csv.zip"
         assert config["filename"] == "gastos-{ano}.csv"
+        assert config["source_format"] == "zip"
+        assert config["zip_inner_file"] == "Ano-{ano}.csv"
         assert config["requires_ano"] is True
         assert config["requires_legislatura"] is False
 

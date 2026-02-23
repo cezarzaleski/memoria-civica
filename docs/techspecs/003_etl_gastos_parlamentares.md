@@ -21,7 +21,7 @@ Não existe nenhum dado sobre gastos parlamentares no sistema. A Cota Parlamenta
 
 ### 1.3 Objetivo
 
-Criar o domínio `src/gastos/` no ETL, ingerindo o CSV de despesas da Câmara (`deputadosDespesas-{ano}.csv`) seguindo os padrões estabelecidos, com upsert idempotente e integração no pipeline orquestrado.
+Criar o domínio `src/gastos/` no ETL, ingerindo o CSV de despesas da Câmara a partir da origem anual compactada (`Ano-{ano}.csv.zip`) e produzindo `gastos-{ano}.csv` para consumo do ETL, seguindo os padrões estabelecidos, com upsert idempotente e integração no pipeline orquestrado.
 
 ---
 
@@ -31,8 +31,8 @@ Criar o domínio `src/gastos/` no ETL, ingerindo o CSV de despesas da Câmara (`
 
 | Atributo | Valor |
 |----------|-------|
-| **URL** | `https://dadosabertos.camara.leg.br/arquivos/deputadosDespesas/csv/deputadosDespesas-{ano}.csv` |
-| **Formato** | CSV, encoding UTF-8-sig, separador `;` |
+| **URL** | `https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip` |
+| **Formato** | ZIP contendo `Ano-{ano}.csv` (CSV, encoding UTF-8-sig, separador `;`) |
 | **Atualização** | Diária |
 | **Histórico** | 2008 até ano corrente |
 | **Volume** | ~256.000 registros/ano (513 deputados x ~500 despesas) |
@@ -214,7 +214,7 @@ FASE 0: Migrations (alembic upgrade head)
     └── 009_add_gastos_table
 
 FASE 1: Download
-    └── deputadosDespesas-{ano}.csv         ← NOVO
+    └── gastos-{ano}.csv (extraído de Ano-{ano}.csv.zip)  ← NOVO
 
 FASE 2: ETL base
     2.1 deputados

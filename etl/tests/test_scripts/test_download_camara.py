@@ -10,6 +10,7 @@ Testa funcionalidades do script CLI de download da API Câmara:
 from __future__ import annotations
 
 import logging
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -189,6 +190,16 @@ class TestBuildUrl:
         url = build_url("votos")
 
         assert url == "https://api.example.com/arquivos/votacoesVotos/csv/votacoesVotos-2025.csv"
+
+    @patch("scripts.download_camara.settings")
+    def test_build_url_gastos_zip_with_ano(self, mock_settings):
+        """Testa URL de gastos (origem ZIP) com ano."""
+        mock_settings.CAMARA_API_BASE_URL = "https://api.example.com/arquivos"
+        mock_settings.CAMARA_ANO = 2025
+
+        url = build_url("gastos")
+
+        assert url == "https://www.camara.leg.br/cotas/Ano-2025.csv.zip"
 
 
 class TestGetDestPath:
@@ -406,6 +417,92 @@ class TestDownloadSingleFile:
         download_single_file("deputados", tmp_path, stats)
 
         assert stats.retry_count == 2
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_download_gastos_zip_extracts_csv(self, mock_settings, mock_download, tmp_path):
+        """Testa extração de gastos quando a origem é ZIP."""
+        mock_settings.CAMARA_ANO = 2025
+        zip_content = b"idDeputado;ano;mes\n123;2025;1\n"
+
+        def _fake_download(*_args, **kwargs):
+            zip_path = kwargs["dest_path"]
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("Ano-2025.csv", zip_content)
+            return DownloadResult(
+                success=True, path=zip_path, skipped=False, error=None,
+                file_size=zip_path.stat().st_size, etag='"test"', status_code=200, retry_attempts=1
+            )
+
+        mock_download.side_effect = _fake_download
+        stats = DownloadStats()
+
+        result = download_single_file("gastos", tmp_path, stats)
+
+        csv_path = tmp_path / "gastos-2025.csv"
+        zip_path = tmp_path / "gastos-2025.zip"
+        assert result is True
+        assert csv_path.exists()
+        assert zip_path.exists()  # Mantido para cache ETag nas execuções seguintes
+        assert csv_path.read_bytes() == zip_content
+        assert stats.downloaded == 1
+        assert stats.failed == 0
+        assert stats.retry_count == 1
+
+    @patch("scripts.download_camara.send_webhook_notification")
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_download_gastos_zip_fails_when_inner_file_is_missing(
+        self, mock_settings, mock_download, mock_webhook, tmp_path
+    ):
+        """Testa falha de extração quando arquivo esperado não existe no ZIP."""
+        mock_settings.CAMARA_ANO = 2025
+
+        def _fake_download(*_args, **kwargs):
+            zip_path = kwargs["dest_path"]
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("arquivo-inesperado.csv", "conteudo")
+            return DownloadResult(
+                success=True, path=zip_path, skipped=False, error=None,
+                file_size=zip_path.stat().st_size, etag='"test"', status_code=200, retry_attempts=2
+            )
+
+        mock_download.side_effect = _fake_download
+        stats = DownloadStats()
+
+        result = download_single_file("gastos", tmp_path, stats)
+
+        assert result is False
+        assert stats.failed == 1
+        assert stats.retry_count == 2
+        assert "Erro ao extrair ZIP" in stats.errors[0]
+        mock_webhook.assert_called_once()
+        assert "Erro ao extrair ZIP" in mock_webhook.call_args.kwargs["message"]
+
+    @patch("scripts.download_camara.download_file")
+    @patch("scripts.download_camara.settings")
+    def test_download_gastos_zip_skipped_reextracts_when_csv_is_missing(self, mock_settings, mock_download, tmp_path):
+        """Testa reextração do ZIP em cache quando CSV final foi removido."""
+        mock_settings.CAMARA_ANO = 2025
+        zip_content = b"idDeputado;ano;mes\n456;2025;2\n"
+        zip_path = tmp_path / "gastos-2025.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("Ano-2025.csv", zip_content)
+
+        mock_download.return_value = DownloadResult(
+            success=True, path=zip_path, skipped=True, error=None,
+            file_size=zip_path.stat().st_size, etag='"cached"', status_code=304, retry_attempts=0
+        )
+        stats = DownloadStats()
+
+        result = download_single_file("gastos", tmp_path, stats)
+
+        csv_path = tmp_path / "gastos-2025.csv"
+        assert result is True
+        assert stats.skipped == 1
+        assert stats.failed == 0
+        assert csv_path.exists()
+        assert csv_path.read_bytes() == zip_content
 
 
 class TestDownloadAllFiles:

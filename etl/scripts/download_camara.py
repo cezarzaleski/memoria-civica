@@ -35,6 +35,7 @@ import argparse
 import logging
 import sys
 import time
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -131,8 +132,11 @@ FILE_CONFIGS = {
         "requires_ano": True,
     },
     "gastos": {
-        "url_path": "deputadosDespesas/csv/deputadosDespesas-{ano}.csv",
+        "base_url": "https://www.camara.leg.br",
+        "url_path": "cotas/Ano-{ano}.csv.zip",
         "filename": "gastos-{ano}.csv",
+        "source_format": "zip",
+        "zip_inner_file": "Ano-{ano}.csv",
         "requires_legislatura": False,
         "requires_ano": True,
     },
@@ -210,7 +214,8 @@ def build_url(file_key: str) -> str:
     elif config["requires_ano"]:
         url_path = url_path.format(ano=settings.CAMARA_ANO)
 
-    return f"{settings.CAMARA_API_BASE_URL}/{url_path}"
+    base_url = config.get("base_url", settings.CAMARA_API_BASE_URL)
+    return f"{base_url}/{url_path}"
 
 
 def get_dest_path(file_key: str, data_dir: Path) -> Path:
@@ -267,10 +272,43 @@ def download_single_file(
         stats.phase_times[file_key] = phase_time
         return True
 
-    result: DownloadResult = download_file(url=url, dest_path=dest_path)
+    config = FILE_CONFIGS[file_key]
+    zip_inner_file = config.get("zip_inner_file")
+
+    # Para arquivos ZIP, baixar em .zip e materializar CSV final para o ETL
+    result: DownloadResult
+    zip_path: Path | None = None
+    if zip_inner_file:
+        zip_inner_file = zip_inner_file.format(ano=settings.CAMARA_ANO) if config["requires_ano"] else zip_inner_file
+        zip_path = dest_path.with_suffix(".zip")
+        result = download_file(url=url, dest_path=zip_path)
+    else:
+        result = download_file(url=url, dest_path=dest_path)
 
     phase_time = time.time() - phase_start
     stats.phase_times[file_key] = phase_time
+
+    needs_extraction = bool(result.success and zip_path and zip_inner_file and (not result.skipped or not dest_path.exists()))
+
+    if needs_extraction and zip_path and zip_inner_file:
+        if result.skipped:
+            logger.info("  ZIP em cache, reextraindo '%s' para recompor CSV final", zip_inner_file)
+        else:
+            logger.info("  Extraindo '%s' do ZIP: %s", zip_inner_file, zip_path)
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf, zf.open(zip_inner_file) as src, dest_path.open("wb") as dst:
+                dst.write(src.read())
+            logger.info("  Extração concluída: %s", dest_path)
+        except (KeyError, zipfile.BadZipFile, OSError) as e:
+            logger.error("  Falha ao extrair ZIP: %s", e)
+            stats.failed += 1
+            stats.errors.append(f"{file_key}: Erro ao extrair ZIP: {e}")
+            stats.retry_count += result.retry_attempts
+            send_webhook_notification(
+                stage=f"download_{file_key}",
+                message=f"Erro ao extrair ZIP: {e}",
+            )
+            return False
 
     if result.success:
         if result.skipped:
@@ -283,6 +321,7 @@ def download_single_file(
             # Adicionar tamanho do arquivo existente para estatísticas
             if result.file_size:
                 stats.total_bytes += result.file_size
+            stats.retry_count += result.retry_attempts
         else:
             logger.info(
                 "  Download concluído: %s (tamanho: %s, tempo: %s, retries: %d)",
