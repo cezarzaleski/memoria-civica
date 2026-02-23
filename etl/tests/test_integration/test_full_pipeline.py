@@ -21,12 +21,15 @@ from sqlalchemy.orm import sessionmaker
 
 import src.classificacao.models
 import src.deputados.models
+import src.enriquecimento.models
 import src.proposicoes.models
 import src.votacoes.models  # noqa: F401
 from src.classificacao.etl import run_classificacao_etl
 from src.classificacao.models import CategoriaCivica, ProposicaoCategoria
 from src.deputados.etl import run_deputados_etl
 from src.deputados.models import Deputado
+from src.enriquecimento.etl import run_enriquecimento_etl
+from src.enriquecimento.models import EnriquecimentoLLM
 from src.proposicoes.etl import run_proposicoes_etl
 from src.proposicoes.models import Proposicao
 from src.shared.database import Base
@@ -88,6 +91,9 @@ def _run_full_pipeline(db, fixtures_dir: Path) -> dict:
 
     # Fase 3: Enriquecimento
     run_classificacao_etl(db)
+
+    # Step 4.2: Enriquecimento LLM (NÃO-CRÍTICO — skipped por padrão com LLM_ENABLED=False)
+    run_enriquecimento_etl(db)
 
     return {
         "deputados": db.query(Deputado).count(),
@@ -465,3 +471,201 @@ class TestPipelineLogging:
         assert "registros" in messages.lower() or "carregad" in messages.lower(), (
             "Nenhum log de contagem encontrado"
         )
+
+
+class TestEnriquecimentoLLMIntegration:
+    """Testes de integração do step 4.2: Enriquecimento LLM no pipeline."""
+
+    def test_enriquecimento_skipped_when_llm_disabled(self, pipeline_db, fixtures_dir, caplog):
+        """Test: Step 4.2 é pulado quando LLM_ENABLED=False (padrão).
+
+        O pipeline completo deve executar sem erros com LLM_ENABLED=False,
+        e nenhum enriquecimento deve ser criado.
+        """
+        with caplog.at_level(logging.INFO):
+            _run_full_pipeline(pipeline_db, fixtures_dir)
+
+        # Nenhum enriquecimento deve existir no banco
+        enriquecimentos = pipeline_db.query(EnriquecimentoLLM).count()
+        assert enriquecimentos == 0, "Nenhum enriquecimento deveria existir com LLM_ENABLED=False"
+
+        # Log de skip deve estar presente
+        assert "LLM_ENABLED=False" in caplog.text
+
+    def test_enriquecimento_executes_with_mocked_llm(self, pipeline_db, fixtures_dir, caplog):
+        """Test: Step 4.2 executa corretamente com LLM mockado.
+
+        Simula LLM_ENABLED=True com client mockado e verifica que
+        enriquecimentos são persistidos.
+        """
+        from unittest.mock import MagicMock
+
+        from src.enriquecimento.prompts import PROMPT_VERSION
+        from src.shared.llm_client import EnriquecimentoOutput, LLMResult
+
+        # Executar fases 1-3 normalmente
+        run_deputados_etl(str(fixtures_dir / "deputados.csv"), pipeline_db)
+        run_proposicoes_etl(str(fixtures_dir / "proposicoes.csv"), pipeline_db)
+        run_votacoes_etl(
+            str(fixtures_dir / "votacoes.csv"),
+            str(fixtures_dir / "votos.csv"),
+            pipeline_db,
+        )
+        run_votacoes_proposicoes_etl(
+            str(fixtures_dir / "votacoes_proposicoes.csv"),
+            pipeline_db,
+        )
+        run_orientacoes_etl(
+            str(fixtures_dir / "votacoesOrientacoes.csv"),
+            pipeline_db,
+        )
+        run_classificacao_etl(pipeline_db)
+
+        # Verificar que existem proposições no banco
+        total_proposicoes = pipeline_db.query(Proposicao).count()
+        assert total_proposicoes > 0, "Pré-condição: deve haver proposições"
+
+        # Mockar LLM para step 4.2
+        mock_result = LLMResult(
+            output=EnriquecimentoOutput(
+                headline="Título de teste",
+                resumo_simples="Resumo de teste",
+                impacto_cidadao=["Impacto 1"],
+                confianca=0.9,
+            ),
+            tokens_input=100,
+            tokens_output=50,
+        )
+
+        mock_client = MagicMock()
+        mock_client.model = "gpt-4o-mini"
+        mock_client.enriquecer_proposicao.return_value = mock_result
+
+        with patch("src.enriquecimento.etl.settings") as mock_settings, \
+             patch("src.enriquecimento.etl.OpenAIClient", return_value=mock_client), \
+             patch("src.enriquecimento.etl.time.sleep"), \
+             caplog.at_level(logging.INFO):
+            mock_settings.LLM_ENABLED = True
+            mock_settings.LLM_API_KEY = "test-key"
+            mock_settings.LLM_MODEL = "gpt-4o-mini"
+            mock_settings.LLM_BATCH_SIZE = 10
+            mock_settings.LLM_CONFIDENCE_THRESHOLD = 0.5
+
+            result = run_enriquecimento_etl(db=pipeline_db)
+
+        assert result > 0, "Deve ter enriquecido pelo menos 1 proposição"
+
+        # Verificar persistência
+        enriquecimentos = pipeline_db.query(EnriquecimentoLLM).count()
+        assert enriquecimentos > 0, "Enriquecimentos devem estar no banco"
+        assert enriquecimentos == result
+
+        # Verificar dados do primeiro enriquecimento
+        first = pipeline_db.query(EnriquecimentoLLM).first()
+        assert first.versao_prompt == PROMPT_VERSION
+        assert first.modelo == "gpt-4o-mini"
+        assert first.headline == "Título de teste"
+
+    def test_enriquecimento_failure_does_not_block_pipeline(self, pipeline_db, fixtures_dir, caplog):
+        """Test: Falha no step 4.2 não bloqueia o pipeline.
+
+        Simula falha catastrófica no enriquecimento e verifica que
+        dados de fases anteriores estão intactos.
+        """
+        # Executar fases 1-3 normalmente
+        run_deputados_etl(str(fixtures_dir / "deputados.csv"), pipeline_db)
+        run_proposicoes_etl(str(fixtures_dir / "proposicoes.csv"), pipeline_db)
+        run_votacoes_etl(
+            str(fixtures_dir / "votacoes.csv"),
+            str(fixtures_dir / "votos.csv"),
+            pipeline_db,
+        )
+        run_votacoes_proposicoes_etl(
+            str(fixtures_dir / "votacoes_proposicoes.csv"),
+            pipeline_db,
+        )
+        run_orientacoes_etl(
+            str(fixtures_dir / "votacoesOrientacoes.csv"),
+            pipeline_db,
+        )
+        run_classificacao_etl(pipeline_db)
+
+        # Simular falha catastrófica no step 4.2
+        with patch(
+            "src.enriquecimento.etl._run_enriquecimento_etl_impl",
+            side_effect=RuntimeError("LLM API indisponível"),
+        ), contextlib.suppress(RuntimeError):
+            run_enriquecimento_etl(pipeline_db)
+
+        # Dados das fases anteriores devem estar intactos
+        assert pipeline_db.query(Deputado).count() > 0
+        assert pipeline_db.query(Proposicao).count() > 0
+        assert pipeline_db.query(Votacao).count() > 0
+        assert pipeline_db.query(VotacaoProposicao).count() > 0
+        assert pipeline_db.query(Orientacao).count() > 0
+        assert pipeline_db.query(CategoriaCivica).count() == 9
+
+    def test_enriquecimento_idempotent_with_pipeline(self, pipeline_db, fixtures_dir):
+        """Test: Re-execução do pipeline não reprocessa enriquecimentos já existentes.
+
+        Executa o pipeline 2x com LLM mockado e verifica que proposições
+        já enriquecidas não são reprocessadas.
+        """
+        from unittest.mock import MagicMock
+
+        from src.shared.llm_client import EnriquecimentoOutput, LLMResult
+
+        # Executar fases 1-3
+        run_deputados_etl(str(fixtures_dir / "deputados.csv"), pipeline_db)
+        run_proposicoes_etl(str(fixtures_dir / "proposicoes.csv"), pipeline_db)
+        run_votacoes_etl(
+            str(fixtures_dir / "votacoes.csv"),
+            str(fixtures_dir / "votos.csv"),
+            pipeline_db,
+        )
+        run_votacoes_proposicoes_etl(
+            str(fixtures_dir / "votacoes_proposicoes.csv"),
+            pipeline_db,
+        )
+        run_orientacoes_etl(
+            str(fixtures_dir / "votacoesOrientacoes.csv"),
+            pipeline_db,
+        )
+        run_classificacao_etl(pipeline_db)
+
+        mock_result = LLMResult(
+            output=EnriquecimentoOutput(
+                headline="Título",
+                resumo_simples="Resumo",
+                impacto_cidadao=["Impacto"],
+                confianca=0.9,
+            ),
+            tokens_input=100,
+            tokens_output=50,
+        )
+
+        mock_client = MagicMock()
+        mock_client.model = "gpt-4o-mini"
+        mock_client.enriquecer_proposicao.return_value = mock_result
+
+        with patch("src.enriquecimento.etl.settings") as mock_settings, \
+             patch("src.enriquecimento.etl.OpenAIClient", return_value=mock_client), \
+             patch("src.enriquecimento.etl.time.sleep"):
+            mock_settings.LLM_ENABLED = True
+            mock_settings.LLM_API_KEY = "test-key"
+            mock_settings.LLM_MODEL = "gpt-4o-mini"
+            mock_settings.LLM_BATCH_SIZE = 10
+            mock_settings.LLM_CONFIDENCE_THRESHOLD = 0.5
+
+            # Primeira execução
+            result_1 = run_enriquecimento_etl(db=pipeline_db)
+
+            # Reset mock call count
+            mock_client.enriquecer_proposicao.reset_mock()
+
+            # Segunda execução — não deve reprocessar
+            result_2 = run_enriquecimento_etl(db=pipeline_db)
+
+        assert result_1 > 0, "Primeira execução deve processar proposições"
+        assert result_2 == 0, "Segunda execução não deve reprocessar"
+        mock_client.enriquecer_proposicao.assert_not_called()
