@@ -21,7 +21,7 @@ from .schemas import GastoCreate
 logger = logging.getLogger(__name__)
 
 CANONICAL_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
-    "idDeputado": ("idDeputado", "nuDeputadoId"),
+    "idDeputado": ("idDeputado", "ideCadastro"),
     "ano": ("ano", "numAno"),
     "mes": ("mes", "numMes"),
     "tipoDespesa": ("tipoDespesa", "txtDescricao"),
