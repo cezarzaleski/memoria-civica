@@ -4,6 +4,10 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Importar todos os models que participam de FKs para que Base.metadata.create_all funcione
+from src.deputados.models import Deputado  # noqa: F401
+from src.enriquecimento.models import EnriquecimentoLLM  # noqa: F401
+from src.proposicoes.models import Proposicao  # noqa: F401
 from src.shared.database import Base
 
 
