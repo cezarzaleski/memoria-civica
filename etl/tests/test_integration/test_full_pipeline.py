@@ -16,14 +16,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
-import src.classificacao.models
-import src.deputados.models
-import src.enriquecimento.models
-import src.proposicoes.models
-import src.votacoes.models  # noqa: F401
 from src.classificacao.etl import run_classificacao_etl
 from src.classificacao.models import CategoriaCivica, ProposicaoCategoria
 from src.deputados.etl import run_deputados_etl
@@ -32,7 +26,6 @@ from src.enriquecimento.etl import run_enriquecimento_etl
 from src.enriquecimento.models import EnriquecimentoLLM
 from src.proposicoes.etl import run_proposicoes_etl
 from src.proposicoes.models import Proposicao
-from src.shared.database import Base
 from src.votacoes.etl import (
     run_orientacoes_etl,
     run_votacoes_etl,
@@ -40,18 +33,19 @@ from src.votacoes.etl import (
 )
 from src.votacoes.models import Orientacao, Votacao, VotacaoProposicao, Voto
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
-def pipeline_db():
-    """Fixture que fornece banco de dados completo para testes de pipeline."""
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-    Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
+def pipeline_db(db_engine):
+    """Sessão PostgreSQL com rollback automático para testes de pipeline."""
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
     yield session
     session.close()
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
+    transaction.rollback()
+    connection.close()
 
 
 def _run_full_pipeline(db, fixtures_dir: Path) -> dict:

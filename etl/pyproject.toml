@@ -22,6 +22,7 @@ pytest = "^7.4"
 pytest-cov = "^3.0"
 pytest-mock = "^3.12"
 ruff = "^0.14.14"
+testcontainers = {extras = ["postgres"], version = "^4.0"}
 
 [build-system]
 requires = ["poetry-core"]
