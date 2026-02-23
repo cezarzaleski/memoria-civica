@@ -3,7 +3,6 @@ name = "memoria-civica"
 version = "0.1.0"
 description = "Fundação de dados para o Memória Cívica - tracking de votações da Câmara dos Deputados"
 authors = ["Memória Cívica Team"]
-readme = "README.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
