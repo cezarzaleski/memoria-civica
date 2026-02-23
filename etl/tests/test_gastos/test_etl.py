@@ -47,6 +47,7 @@ class TestHelpers:
         """Test: converte datas no formato ISO e dd/mm/yyyy."""
         assert str(parse_data_documento("2024-01-31")) == "2024-01-31"
         assert str(parse_data_documento("31/01/2024")) == "2024-01-31"
+        assert str(parse_data_documento("2024-01-31 15:45:10")) == "2024-01-31"
         assert parse_data_documento("data-invalida") is None
 
 
@@ -62,13 +63,32 @@ class TestExtractGastosCsv:
         assert isinstance(data[0], dict)
 
     def test_extract_has_expected_columns(self, gastos_csv_path):
-        """Test: extract preserva colunas contratuais do CSV CEAP."""
+        """Test: extract normaliza colunas da fonte cotas para contrato canônico."""
         data = extract_gastos_csv(gastos_csv_path)
         first_record = data[0]
 
-        assert "idDeputado" in first_record
-        assert "tipoDespesa" in first_record
-        assert "valorDocumento" in first_record
+        expected_columns = {
+            "idDeputado",
+            "ano",
+            "mes",
+            "tipoDespesa",
+            "tipoDocumento",
+            "dataDocumento",
+            "numDocumento",
+            "valorDocumento",
+            "valorLiquido",
+            "valorGlosa",
+            "nomeFornecedor",
+            "cnpjCpfFornecedor",
+            "urlDocumento",
+            "idDocumento",
+            "codLote",
+            "parcela",
+        }
+        assert set(first_record.keys()) == expected_columns
+        assert first_record["idDeputado"] == "1001"
+        assert first_record["tipoDespesa"] == "COMBUSTIVEL"
+        assert first_record["valorDocumento"] == "1.234,56"
 
     def test_extract_file_not_found(self):
         """Test: extract lança FileNotFoundError para arquivo inexistente."""
@@ -82,6 +102,28 @@ class TestExtractGastosCsv:
 
         with pytest.raises(ValueError, match="Colunas obrigatórias ausentes"):
             extract_gastos_csv(str(invalid_csv))
+
+    def test_extract_supports_legacy_column_contract(self, tmp_path: Path):
+        """Test: extract mantém compatibilidade com contrato legado idDeputado/ano."""
+        legacy_csv = tmp_path / "gastos_legado.csv"
+        legacy_csv.write_text(
+            (
+                "idDeputado;ano;mes;tipoDespesa;tipoDocumento;dataDocumento;numDocumento;"
+                "valorDocumento;valorLiquido;valorGlosa;nomeFornecedor;cnpjCpfFornecedor;"
+                "urlDocumento;idDocumento;codLote;parcela\n"
+                "1001;2024;1;COMBUSTIVEL;NOTA FISCAL;2024-01-10;DOC-001;"
+                "100,00;100,00;0,00;Fornecedor X;12345678000199;"
+                "https://example.com/doc;10001;9001;1\n"
+            ),
+            encoding="utf-8",
+        )
+
+        data = extract_gastos_csv(str(legacy_csv))
+
+        assert len(data) == 1
+        assert data[0]["idDeputado"] == "1001"
+        assert data[0]["ano"] == "2024"
+        assert data[0]["tipoDespesa"] == "COMBUSTIVEL"
 
 
 class TestTransformGastos:
@@ -194,6 +236,13 @@ class TestRunGastosEtl:
     def test_run_returns_one_on_failure(self, db_session):
         """Test: run_gastos_etl retorna 1 quando falha."""
         assert run_gastos_etl("/path/inexistente/gastos.csv", db_session) == 1
+
+    def test_run_returns_one_for_invalid_csv_contract(self, tmp_path: Path, db_session):
+        """Test: run retorna 1 quando CSV viola contrato obrigatório de colunas."""
+        invalid_csv = tmp_path / "gastos_contrato_invalido.csv"
+        invalid_csv.write_text("numAno;numMes\n2024;1\n", encoding="utf-8")
+
+        assert run_gastos_etl(str(invalid_csv), db_session) == 1
 
     def test_run_uses_get_db_when_session_is_none(self, gastos_csv_path, db_session, monkeypatch):
         """Test: run usa get_db quando `db=None`."""

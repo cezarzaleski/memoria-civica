@@ -2,6 +2,7 @@
 
 import csv
 import logging
+from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -19,23 +20,23 @@ from .schemas import GastoCreate
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_COLUMNS = {
-    "idDeputado",
-    "ano",
-    "mes",
-    "tipoDespesa",
-    "tipoDocumento",
-    "dataDocumento",
-    "numDocumento",
-    "valorDocumento",
-    "valorLiquido",
-    "valorGlosa",
-    "nomeFornecedor",
-    "cnpjCpfFornecedor",
-    "urlDocumento",
-    "idDocumento",
-    "codLote",
-    "parcela",
+CANONICAL_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    "idDeputado": ("idDeputado", "nuDeputadoId"),
+    "ano": ("ano", "numAno"),
+    "mes": ("mes", "numMes"),
+    "tipoDespesa": ("tipoDespesa", "txtDescricao"),
+    "tipoDocumento": ("tipoDocumento", "indTipoDocumento"),
+    "dataDocumento": ("dataDocumento", "datEmissao"),
+    "numDocumento": ("numDocumento", "txtNumero"),
+    "valorDocumento": ("valorDocumento", "vlrDocumento"),
+    "valorLiquido": ("valorLiquido", "vlrLiquido"),
+    "valorGlosa": ("valorGlosa", "vlrGlosa"),
+    "nomeFornecedor": ("nomeFornecedor", "txtFornecedor"),
+    "cnpjCpfFornecedor": ("cnpjCpfFornecedor", "txtCNPJCPF"),
+    "urlDocumento": ("urlDocumento",),
+    "idDocumento": ("idDocumento", "ideDocumento"),
+    "codLote": ("codLote", "numLote"),
+    "parcela": ("parcela", "numParcela"),
 }
 
 
@@ -95,7 +96,7 @@ def parse_data_documento(value: object) -> date | None:
     if normalized is None:
         return None
 
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
         try:
             return datetime.strptime(normalized, fmt).date()
         except ValueError:
@@ -108,6 +109,31 @@ def parse_data_documento(value: object) -> date | None:
         return None
 
 
+def _resolve_column_mapping(headers: set[str]) -> dict[str, str]:
+    """Resolve mapeamento de colunas CSV para o contrato canônico interno."""
+    missing_columns: list[str] = []
+    column_mapping: dict[str, str] = {}
+
+    for canonical_name, aliases in CANONICAL_COLUMN_ALIASES.items():
+        matched_column = next((column for column in aliases if column in headers), None)
+        if matched_column is None:
+            expected = " ou ".join(aliases)
+            missing_columns.append(f"{canonical_name} ({expected})")
+            continue
+        column_mapping[canonical_name] = matched_column
+
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"CSV de gastos inválido. Colunas obrigatórias ausentes: {missing}")
+
+    return column_mapping
+
+
+def _to_canonical_record(record: Mapping[str, object], mapping: Mapping[str, str]) -> dict[str, object]:
+    """Converte linha do CSV para o dicionário canônico esperado no transform."""
+    return {canonical_name: record.get(csv_column_name) for canonical_name, csv_column_name in mapping.items()}
+
+
 def extract_gastos_csv(csv_path: str) -> list[dict]:
     """Extrai registros do CSV CEAP e valida contrato de colunas."""
     path = Path(csv_path)
@@ -118,13 +144,12 @@ def extract_gastos_csv(csv_path: str) -> list[dict]:
     try:
         with open(path, encoding="utf-8-sig", newline="") as csv_file:
             reader = csv.DictReader(csv_file, delimiter=";")
-            headers = set(reader.fieldnames or [])
-            missing_columns = sorted(REQUIRED_COLUMNS - headers)
-            if missing_columns:
-                missing = ", ".join(missing_columns)
-                raise ValueError(f"CSV de gastos inválido. Colunas obrigatórias ausentes: {missing}")
+            fieldnames = [field.strip() for field in (reader.fieldnames or []) if field]
+            reader.fieldnames = fieldnames
+            headers = set(fieldnames)
+            mapping = _resolve_column_mapping(headers)
 
-            records = list(reader)
+            records = [_to_canonical_record(record, mapping) for record in reader]
             logger.info("Extraídos %d registros do CSV de gastos: %s", len(records), csv_path)
             return records
     except Exception as exc:
