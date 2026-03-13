@@ -29,6 +29,11 @@ class Settings(BaseSettings):
         CAMARA_ANO: Ano para download de proposições (arquivos são organizados por ano).
         TEMP_DOWNLOAD_DIR: Diretório temporário para downloads de arquivos CSV.
         WEBHOOK_URL: URL do webhook para notificações de erro (None desabilita notificações).
+        LLM_ENABLED: Feature flag para habilitar pipeline de enriquecimento LLM (padrão: False).
+        LLM_API_KEY: Chave de API do provider LLM (ex: OpenAI). None desabilita chamadas.
+        LLM_MODEL: Modelo LLM a utilizar (padrão: gpt-4o-mini).
+        LLM_BATCH_SIZE: Tamanho do lote de proposições processadas por batch (padrão: 10).
+        LLM_CONFIDENCE_THRESHOLD: Limiar de confiança abaixo do qual necessita_revisao=True (padrão: 0.5).
     """
 
     # Configurações do PostgreSQL (usadas para construir DATABASE_URL)
@@ -53,6 +58,13 @@ class Settings(BaseSettings):
 
     # Configuração de webhook para notificações de erro
     WEBHOOK_URL: Optional[str] = None  # noqa: UP045
+
+    # Configurações do pipeline de enriquecimento LLM
+    LLM_ENABLED: bool = False
+    LLM_API_KEY: Optional[str] = None  # noqa: UP045
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_BATCH_SIZE: int = 10
+    LLM_CONFIDENCE_THRESHOLD: float = 0.5
 
     model_config = SettingsConfigDict(
         env_file=".env",

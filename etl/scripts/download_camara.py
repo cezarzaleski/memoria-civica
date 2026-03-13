@@ -256,6 +256,13 @@ def download_single_file(
     Returns:
         True se o download foi bem-sucedido ou pulado, False se falhou
     """
+    if file_key not in FILE_CONFIGS:
+        error_msg = f"Arquivo desconhecido: {file_key}"
+        logger.error(error_msg)
+        stats.failed += 1
+        stats.errors.append(error_msg)
+        return False
+
     url = build_url(file_key)
     dest_path = get_dest_path(file_key, data_dir)
 

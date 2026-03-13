@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
+pytestmark = pytest.mark.integration
+
 # Caminhos para os scripts de migração
 MIGRATIONS_DIR = Path(__file__).parent.parent.parent / "alembic" / "versions"
 
