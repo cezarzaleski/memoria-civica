@@ -1,0 +1,18 @@
+status:
+  branch: main
+  modifiedFiles:
+    - .aiox-core/
+    - .antigravity/
+    - .claude/
+    - .codex/
+    - .cursor/
+  modifiedFilesTotalCount: 18
+  recentCommits:
+    - Initial commit - greenfield rebuild
+  currentEpic: null
+  currentStory: null
+  lastUpdate: '2026-03-28T19:25:05.320Z'
+  isGitRepo: true
+timestamp: 1774725905325
+ttl: 60
+gitFingerprint: 1774725609373.9072:1774725595596.9492
