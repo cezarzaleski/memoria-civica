@@ -35,6 +35,7 @@ Implementar a fundacao tecnica da V1 do Memoria Civica e iniciar o nucleo da Fas
 - [x] Endurecer `integrity` com screening oficial conservador via Transparencia
 - [x] Introduzir `response-assembler` minimo para `traffic_light` e `confidence`
 - [x] Substituir proxy de `coherence` por evidencia formal dedicada da Camara
+- [x] Explicitar no pipeline a limitacao atual de `coherence` sem autoria, relatoria ou voto nominal por deputado
 - [x] Validar quality gates
 
 ## File List

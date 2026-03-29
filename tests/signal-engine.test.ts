@@ -132,7 +132,7 @@ describe("SignalEngine", () => {
     expect(result.status).toBe("mixed");
     expect(result.evidence_ids).toEqual(["ev-4"]);
     expect(result.reasons).toEqual([
-      "Ha evidencia oficial da Camara, suficiente para uma leitura minima de coerencia."
+      "Ha evidencia oficial da Camara sobre atuacao formal, suficiente apenas para uma leitura minima de coerencia."
     ]);
   });
 

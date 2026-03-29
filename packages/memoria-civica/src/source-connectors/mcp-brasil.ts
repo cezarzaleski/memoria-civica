@@ -198,6 +198,12 @@ function summarizeRawResult(raw: string): string {
   return normalized.slice(0, 280);
 }
 
+function summarizeFormalActivityRecord(raw: string): string {
+  const summary = summarizeRawResult(raw);
+
+  return `${summary} Limitacao: o mcp-brasil atual ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado neste fluxo.`;
+}
+
 function parseInteger(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value)) {
     return value;
@@ -374,7 +380,7 @@ export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
       source_name: "camara",
       source_url: `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputadoId}`,
       strength: "strong_official",
-      summary: summarizeRawResult(raw)
+      summary: summarizeFormalActivityRecord(raw)
     };
   }
 

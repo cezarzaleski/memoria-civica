@@ -47,6 +47,8 @@ interface ConsultationResult {
 const NO_EVIDENCE_ALERT = "Nenhuma evidencia oficial foi coletada para a consulta.";
 const PARTIAL_EVIDENCE_ALERT =
   "Coleta oficial ainda insuficiente para conclusao final.";
+const COHERENCE_LIMITATION_ALERT =
+  "Coherence ainda depende de atuacao formal da Camara; autoria, relatoria e votos nominais por deputado ainda nao foram integrados.";
 
 function buildPlaceholderCandidate(name: string): ResolvedCandidate {
   return {
@@ -110,8 +112,23 @@ export class QueryOrchestrator {
       classifications
     );
     const integrity = this.signalEngine.assessIntegrity(evidence, classifications);
+    const alerts = [evidence.length > 0 ? PARTIAL_EVIDENCE_ALERT : NO_EVIDENCE_ALERT];
+
+    if (
+      candidate.office === "deputado_federal" &&
+      candidate.status === "incumbent" &&
+      evidence.some((record) => {
+        return (
+          record.signal_type === "coherence" &&
+          record.evidence_type === "formal_activity_record"
+        );
+      })
+    ) {
+      alerts.push(COHERENCE_LIMITATION_ALERT);
+    }
+
     const base = buildGrayResponse({
-      alerts: [evidence.length > 0 ? PARTIAL_EVIDENCE_ALERT : NO_EVIDENCE_ALERT],
+      alerts,
       candidate,
       reasons:
         evidence.length > 0

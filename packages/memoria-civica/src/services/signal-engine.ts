@@ -100,7 +100,9 @@ export class SignalEngine {
     if (coherenceEvidence.length === 0) {
       return {
         evidence_ids: [],
-        reasons: ["Nenhuma evidencia oficial da Camara foi encontrada para coerencia."],
+        reasons: [
+          "Nenhuma evidencia oficial da Camara foi encontrada para coerencia."
+        ],
         status: "insufficient"
       };
     }
@@ -109,7 +111,7 @@ export class SignalEngine {
       return {
         evidence_ids: coherenceEvidence.map((record) => record.evidence_id),
         reasons: [
-          `Ha ${coherenceEvidence.length} evidencias oficiais da Camara que sustentam uma leitura minima de coerencia.`
+          `Ha ${coherenceEvidence.length} evidencias oficiais da Camara sobre atuacao formal, mas ainda sem autoria, relatoria ou voto nominal por deputado neste fluxo.`
         ],
         status: "positive"
       };
@@ -118,7 +120,7 @@ export class SignalEngine {
     return {
       evidence_ids: coherenceEvidence.map((record) => record.evidence_id),
       reasons: [
-        "Ha evidencia oficial da Camara, suficiente para uma leitura minima de coerencia."
+        "Ha evidencia oficial da Camara sobre atuacao formal, suficiente apenas para uma leitura minima de coerencia."
       ],
       status: "mixed"
     };

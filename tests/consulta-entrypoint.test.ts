@@ -8,6 +8,8 @@ describe("consulta entrypoint", () => {
       parseConsultaCliArgs([
         "--candidate",
         "Tabata Amaral",
+        "--office",
+        "deputado_federal",
         "--uf",
         "sp",
         "--party",
@@ -19,6 +21,7 @@ describe("consulta entrypoint", () => {
       ])
     ).toEqual({
       candidate_name: "Tabata Amaral",
+      office: "deputado_federal",
       party: "psb",
       uf: "sp",
       user_priorities: ["educacao", "transparencia"]
@@ -29,7 +32,7 @@ describe("consulta entrypoint", () => {
     const write = vi.fn();
 
     await runConsultaEntrypoint(
-      ["--candidate", "Tabata Amaral"],
+      ["--candidate", "Tabata Amaral", "--office", "deputado_federal"],
       {
         stderr: { write: vi.fn() },
         stdout: { write }

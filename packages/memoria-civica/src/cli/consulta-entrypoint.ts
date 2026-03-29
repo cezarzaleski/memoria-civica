@@ -13,6 +13,7 @@ interface ConsoleStreams {
 interface ConsultPort {
   consult(input: {
     readonly candidate_name?: string;
+    readonly office?: "deputado_federal" | "deputado_distrital";
     readonly party?: string;
     readonly uf?: string;
     readonly user_priorities?: readonly string[];
@@ -40,12 +41,14 @@ function readFlagValue(args: readonly string[], index: number): string {
 
 export function parseConsultaCliArgs(args: readonly string[]): {
   readonly candidate_name?: string;
+  readonly office?: "deputado_federal" | "deputado_distrital";
   readonly party?: string;
   readonly uf?: string;
   readonly user_priorities?: readonly string[];
 } {
   const userPriorities: string[] = [];
   let candidateName: string | undefined;
+  let office: "deputado_federal" | "deputado_distrital" | undefined;
   let party: string | undefined;
   let uf: string | undefined;
 
@@ -64,6 +67,14 @@ export function parseConsultaCliArgs(args: readonly string[]): {
       continue;
     }
 
+    if (current === "--office") {
+      office = readFlagValue(args, index) as
+        | "deputado_federal"
+        | "deputado_distrital";
+      index += 1;
+      continue;
+    }
+
     if (current === "--party") {
       party = readFlagValue(args, index);
       index += 1;
@@ -78,6 +89,7 @@ export function parseConsultaCliArgs(args: readonly string[]): {
 
   return {
     candidate_name: candidateName,
+    office,
     party,
     uf,
     user_priorities: userPriorities

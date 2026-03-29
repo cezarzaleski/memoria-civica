@@ -236,12 +236,16 @@ describe("McpBrasilIdentitySource", () => {
     );
 
     const integrityEvidence = result.find((item) => item.signal_type === "integrity");
+    const coherenceEvidence = result.find((item) => item.signal_type === "coherence");
 
     expect(integrityEvidence).toMatchObject({
       source_url: "https://api.portaldatransparencia.gov.br/api-de-dados/ceis"
     });
     expect(integrityEvidence?.summary).toContain(
       "Limitacao: depende do nome informado"
+    );
+    expect(coherenceEvidence?.summary).toContain(
+      "ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado"
     );
   });
 });
