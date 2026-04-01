@@ -13,7 +13,8 @@
     "consultar-candidato": "node --import tsx ./bin/consultar-candidato.ts",
     "api:start": "node --import tsx ./apps/api/src/server.ts",
     "web:dev": "next dev ./apps/web",
-    "web:build": "next build ./apps/web"
+    "web:build": "next build ./apps/web",
+    "web:start": "next start ./apps/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.23.0",

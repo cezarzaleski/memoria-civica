@@ -14,37 +14,37 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 - [ ] o frontend `Next.js` publica com sucesso na Vercel
 - [ ] o backend HTTP publica com sucesso na VPS e responde externamente
 - [ ] a Vercel consegue encaminhar consultas para a API da VPS pelo proxy configurado
-- [ ] existe configuracao documentada de variaveis de ambiente para front e back
-- [ ] existe processo de execucao do backend documentado para a VPS
+- [x] existe configuracao documentada de variaveis de ambiente para front e back
+- [x] existe processo de execucao do backend documentado para a VPS
 - [ ] existe smoke test ponta a ponta em ambiente deployado cobrindo `health`, consulta valida e caso ambiguo
-- [ ] existe estrategia minima de observacao operacional via logs basicos no backend
-- [ ] a documentacao deixa claro o que ainda nao existe nesta primeira versao publica
-- [ ] `npm run lint` passa
-- [ ] `npm run typecheck` passa
-- [ ] `npm test` passa
+- [x] existe estrategia minima de observacao operacional via logs basicos no backend
+- [x] a documentacao deixa claro o que ainda nao existe nesta primeira versao publica
+- [x] `npm run lint` passa
+- [x] `npm run typecheck` passa
+- [x] `npm test` passa
 
 ## Checklist
 
-- [ ] configurar build e runtime do frontend para Vercel
-- [ ] configurar build e runtime do backend para VPS
-- [ ] documentar `envs`, URLs e fluxo de deploy
+- [x] configurar build e runtime do frontend para Vercel
+- [x] configurar build e runtime do backend para VPS
+- [x] documentar `envs`, URLs e fluxo de deploy
 - [ ] validar conectividade Vercel -> VPS
 - [ ] executar smoke tests do ambiente deployado
-- [ ] registrar limitacoes conhecidas da primeira versao publica
-- [ ] validar quality gates
+- [x] registrar limitacoes conhecidas da primeira versao publica
+- [x] validar quality gates
 
 ## File List
 
-- [ ] `docs/deploy-v1-vercel-vps.md`
-- [ ] `apps/web/vercel.json`
-- [ ] `apps/api/ecosystem.config.cjs`
-- [ ] `package.json`
+- [x] `docs/deploy-v1-vercel-vps.md`
+- [x] `apps/web/vercel.json`
+- [x] `apps/api/ecosystem.config.cjs`
+- [x] `package.json`
 
 ## Validation Evidence
 
-- [ ] `2026-04-01`: `npm run lint`
-- [ ] `2026-04-01`: `npm run typecheck`
-- [ ] `2026-04-01`: `npm test`
+- [x] `2026-04-01`: `npm run lint`
+- [x] `2026-04-01`: `npm run typecheck`
+- [x] `2026-04-01`: `npm test`
 - [ ] `2026-04-01`: smoke test ponta a ponta em ambiente deployado
 
 ## Notes
