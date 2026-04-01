@@ -21,16 +21,46 @@ Esta primeira rodada continua:
 - sem fila;
 - sem observabilidade externa dedicada.
 
+## 1.1 Orquestracao por GitHub Actions
+
+O fluxo recomendado passa a ser:
+
+- `ci.yml` para verificacao continua;
+- `deploy-staging.yml` para publicar staging em `push` na `main`;
+- `deploy-branch.yml` para publicar manualmente uma branch especifica em staging;
+- `deploy-vps-reusable.yml` como rotina reaproveitavel de release-based deploy na VPS.
+
 ## 2. Variaveis de Ambiente
 
 ### 2.1 Backend na VPS
 
+Segredos esperados no GitHub Environment `staging`:
+
+- `STAGING_VPS_HOST`
+- `STAGING_VPS_USER`
+- `STAGING_VPS_PORT`
+- `STAGING_VPS_SSH_KEY`
+- `STAGING_DEPLOY_PATH`
+- `STAGING_VPS_APP_PORT`
+- `STAGING_MCP_BRASIL_LOCAL_PATH`
+- `STAGING_API_PUBLIC_URL`
+
+Variaveis aplicadas no runtime:
+
 - `HOST=0.0.0.0`
-- `PORT=3000`
+- `PORT=3000` ou valor de `STAGING_VPS_APP_PORT`
 - `NODE_ENV=production`
 - `MCP_BRASIL_LOCAL_PATH=/opt/mcp-brasil`
 
 ### 2.2 Frontend na Vercel
+
+Segredos esperados no GitHub Environment `staging`:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+Variavel esperada dentro do projeto da Vercel:
 
 - `MEMORIA_CIVICA_API_BASE_URL=https://api.seu-dominio.com`
 
@@ -54,7 +84,7 @@ git clone <repo-mcp-brasil> /opt/mcp-brasil
 
 ### 3.2 Processo
 
-Usar o arquivo [ecosystem.config.cjs](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/apps/api/ecosystem.config.cjs):
+Usar o arquivo [ecosystem.config.cjs](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/apps/api/ecosystem.config.cjs). O deploy via Action publica releases em `releases/<sha>` e atualiza o symlink `current`.
 
 ```bash
 pm2 start apps/api/ecosystem.config.cjs
@@ -87,6 +117,17 @@ Na Vercel:
 5. publicar.
 
 O arquivo [vercel.json](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/apps/web/vercel.json) garante o install e build a partir da raiz do monorepo.
+
+## 4.2 Fluxo por Action
+
+- `deploy-staging.yml`: publica automaticamente o estado da `main` em staging
+- `deploy-branch.yml`: publica manualmente qualquer `ref` em staging
+
+Nos dois casos:
+
+- o frontend faz deploy `preview` na Vercel;
+- o backend publica release nova na VPS;
+- a pipeline executa smoke test da API e da URL web retornada pela Vercel.
 
 ## 5. Smoke Test Ponta a Ponta
 

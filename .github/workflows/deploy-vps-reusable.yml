@@ -1,0 +1,111 @@
+name: Deploy VPS Reusable
+
+on:
+  workflow_call:
+    inputs:
+      deploy_ref:
+        required: true
+        type: string
+      environment_name:
+        required: true
+        type: string
+    secrets:
+      API_PUBLIC_URL:
+        required: true
+      DEPLOY_PATH:
+        required: true
+      MCP_BRASIL_LOCAL_PATH:
+        required: false
+      VPS_APP_PORT:
+        required: false
+      VPS_HOST:
+        required: true
+      VPS_PORT:
+        required: true
+      VPS_SSH_KEY:
+        required: true
+      VPS_USER:
+        required: true
+
+jobs:
+  deploy-vps:
+    environment: ${{ inputs.environment_name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.deploy_ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release artifact
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=coverage \
+            -czf release.tar.gz .
+
+      - name: Upload artifact to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: release.tar.gz
+          target: /tmp
+          username: ${{ secrets.VPS_USER }}
+
+      - name: Deploy release on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          script: |
+            set -euo pipefail
+
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+            RELEASE_ID="${{ github.sha }}"
+            RELEASES_PATH="$DEPLOY_PATH/releases"
+            RELEASE_PATH="$RELEASES_PATH/$RELEASE_ID"
+            ARCHIVE_PATH="/tmp/release.tar.gz"
+            APP_PORT="${{ secrets.VPS_APP_PORT }}"
+
+            mkdir -p "$RELEASES_PATH"
+            rm -rf "$RELEASE_PATH"
+            mkdir -p "$RELEASE_PATH"
+
+            tar -xzf "$ARCHIVE_PATH" -C "$RELEASE_PATH"
+            cd "$RELEASE_PATH"
+            npm ci
+
+            ln -sfn "$RELEASE_PATH" "$DEPLOY_PATH/current"
+
+            export DEPLOY_PATH="$DEPLOY_PATH"
+            export HOST="0.0.0.0"
+            export NODE_ENV="production"
+            export PORT="${APP_PORT:-3000}"
+            export MCP_BRASIL_LOCAL_PATH="${{ secrets.MCP_BRASIL_LOCAL_PATH }}"
+
+            pm2 startOrReload "$DEPLOY_PATH/current/apps/api/ecosystem.config.cjs" --update-env
+            curl -fsS "http://127.0.0.1:${PORT}/health"
+
+      - name: Smoke test deployed API
+        run: |
+          curl -fsS "${{ secrets.API_PUBLIC_URL }}/health"
+          curl -fsS \
+            "${{ secrets.API_PUBLIC_URL }}/consultas" \
+            -H 'content-type: application/json' \
+            -d '{"candidate_name":"Tabata Amaral","uf":"SP"}'

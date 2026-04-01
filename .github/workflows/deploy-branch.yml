@@ -1,0 +1,115 @@
+name: Deploy Branch to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch ou ref para publicar em staging
+        required: true
+        type: string
+
+concurrency:
+  cancel-in-progress: true
+  group: deploy-branch-staging
+
+jobs:
+  verify:
+    environment: staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+  deploy-web:
+    environment: staging
+    needs: verify
+    outputs:
+      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pull Vercel environment
+        working-directory: apps/web
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel pull --yes --environment=preview --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build Vercel app
+        working-directory: apps/web
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel build --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - id: deploy
+        name: Deploy selected ref to Vercel preview
+        working-directory: apps/web
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          DEPLOYMENT_URL="$(npx vercel deploy --prebuilt --token="${{ secrets.VERCEL_TOKEN }}")"
+          echo "deployment_url=${DEPLOYMENT_URL}" >> "$GITHUB_OUTPUT"
+
+  deploy-vps:
+    needs: verify
+    uses: ./.github/workflows/deploy-vps-reusable.yml
+    with:
+      deploy_ref: ${{ inputs.ref }}
+      environment_name: staging
+    secrets:
+      API_PUBLIC_URL: ${{ secrets.STAGING_API_PUBLIC_URL }}
+      DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH }}
+      MCP_BRASIL_LOCAL_PATH: ${{ secrets.STAGING_MCP_BRASIL_LOCAL_PATH }}
+      VPS_APP_PORT: ${{ secrets.STAGING_VPS_APP_PORT }}
+      VPS_HOST: ${{ secrets.STAGING_VPS_HOST }}
+      VPS_PORT: ${{ secrets.STAGING_VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
+      VPS_USER: ${{ secrets.STAGING_VPS_USER }}
+
+  smoke-web:
+    environment: staging
+    needs:
+      - deploy-web
+      - deploy-vps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Smoke test web deployment
+        run: curl -fsS "${{ needs.deploy-web.outputs.deployment_url }}"

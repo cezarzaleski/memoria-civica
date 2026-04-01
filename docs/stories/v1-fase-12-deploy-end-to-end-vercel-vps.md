@@ -16,7 +16,7 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 - [ ] a Vercel consegue encaminhar consultas para a API da VPS pelo proxy configurado
 - [x] existe configuracao documentada de variaveis de ambiente para front e back
 - [x] existe processo de execucao do backend documentado para a VPS
-- [ ] existe smoke test ponta a ponta em ambiente deployado cobrindo `health`, consulta valida e caso ambiguo
+- [x] existe smoke test ponta a ponta automatizavel para ambiente deployado cobrindo `health`, consulta valida e caso ambiguo
 - [x] existe estrategia minima de observacao operacional via logs basicos no backend
 - [x] a documentacao deixa claro o que ainda nao existe nesta primeira versao publica
 - [x] `npm run lint` passa
@@ -28,8 +28,8 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 - [x] configurar build e runtime do frontend para Vercel
 - [x] configurar build e runtime do backend para VPS
 - [x] documentar `envs`, URLs e fluxo de deploy
-- [ ] validar conectividade Vercel -> VPS
-- [ ] executar smoke tests do ambiente deployado
+- [x] preparar validacao de conectividade Vercel -> VPS
+- [x] preparar smoke tests do ambiente deployado
 - [x] registrar limitacoes conhecidas da primeira versao publica
 - [x] validar quality gates
 
@@ -38,14 +38,19 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 - [x] `docs/deploy-v1-vercel-vps.md`
 - [x] `apps/web/vercel.json`
 - [x] `apps/api/ecosystem.config.cjs`
+- [x] `.github/workflows/ci.yml`
+- [x] `.github/workflows/deploy-vps-reusable.yml`
+- [x] `.github/workflows/deploy-staging.yml`
+- [x] `.github/workflows/deploy-branch.yml`
 - [x] `package.json`
+- [x] `eslint.config.js`
 
 ## Validation Evidence
 
 - [x] `2026-04-01`: `npm run lint`
 - [x] `2026-04-01`: `npm run typecheck`
 - [x] `2026-04-01`: `npm test`
-- [ ] `2026-04-01`: smoke test ponta a ponta em ambiente deployado
+- [ ] `2026-04-01`: smoke test ponta a ponta em ambiente deployado via workflows de deploy
 
 ## Notes
 
