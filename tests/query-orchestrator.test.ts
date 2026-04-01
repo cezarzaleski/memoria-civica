@@ -106,6 +106,20 @@ describe("QueryOrchestrator", () => {
     expect(result.response.signals.coherence.reasons).toEqual([
       "Ha cobertura oficial da Camara em 1 bloco de coerencia: formal_activity_record. Ainda faltam: voting_summary, propositions_summary."
     ]);
+    expect(result.response.observability?.coherence).toEqual({
+      collected_evidence_ids: ["ev-2"],
+      collected_types: ["formal_activity_record"],
+      expected_types: [
+        "formal_activity_record",
+        "voting_summary",
+        "propositions_summary"
+      ],
+      limitation:
+        "Coherence usa atuacao formal, proposicoes autorais e votos nominais recentes da Camara; relatoria ainda nao foi integrada e votos nominais seguem parciais.",
+      missing_types: ["voting_summary", "propositions_summary"],
+      scope: "camara",
+      status_basis: "mixed"
+    });
     expect(result.response.signals.integrity.status).toBe("insufficient");
     expect(result.execution.steps).toEqual([
       "request_validated",
@@ -160,6 +174,7 @@ describe("QueryOrchestrator", () => {
     expect(result.response.alerts).toContain(
       "Nenhuma evidencia oficial foi coletada para a consulta."
     );
+    expect(result.response.observability).toBeUndefined();
     expect(result.response.signals.evidence_level.status).toBe("insufficient");
     expect(result.response.signals.integrity.status).toBe("insufficient");
     expect(result.execution.status).toBe("completed");
@@ -223,6 +238,7 @@ describe("QueryOrchestrator", () => {
     expect(result.response.alerts).toContain(
       "Identidade ambigua. Informe uf e party para continuar."
     );
+    expect(result.response.observability).toBeUndefined();
     expect(result.execution.steps).toEqual([
       "request_validated",
       "identity_ambiguous",

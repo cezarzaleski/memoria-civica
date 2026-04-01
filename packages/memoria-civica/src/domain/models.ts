@@ -144,6 +144,20 @@ export interface SignalAssessment {
   readonly status: SignalStatus;
 }
 
+export interface CoherenceObservability {
+  readonly collected_evidence_ids: readonly string[];
+  readonly collected_types: readonly string[];
+  readonly expected_types: readonly string[];
+  readonly limitation: string;
+  readonly missing_types: readonly string[];
+  readonly scope: "camara";
+  readonly status_basis: SignalStatus;
+}
+
+export interface ConsultationObservability {
+  readonly coherence?: CoherenceObservability;
+}
+
 export interface ConsultationResponse {
   readonly alerts: readonly string[];
   readonly candidate: {
@@ -158,6 +172,7 @@ export interface ConsultationResponse {
     readonly uf?: string;
   };
   readonly confidence: ConfidenceLevel;
+  readonly observability?: ConsultationObservability;
   readonly reasons: readonly string[];
   readonly signals: Record<SignalName, SignalAssessment>;
   readonly sources: readonly string[];

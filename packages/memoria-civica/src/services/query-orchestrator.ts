@@ -3,6 +3,7 @@ import {
   validateConsultCandidateRequest
 } from "@/contracts/consultation";
 import type {
+  ConsultationObservability,
   ConsultationResponse,
   EvidenceRecord,
   QueryExecutionRecord,
@@ -26,7 +27,10 @@ import { CachedSignalService } from "@/services/cached-signal-service";
 import { EvidenceClassifier } from "@/services/evidence-classifier";
 import { CollectionPlanner } from "@/services/collection-planner";
 import { ResponseAssembler } from "@/services/response-assembler";
-import { SignalEngine } from "@/services/signal-engine";
+import {
+  EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES,
+  SignalEngine
+} from "@/services/signal-engine";
 import {
   McpBrasilEvidenceCollector,
   type OfficialEvidenceCollector,
@@ -53,6 +57,31 @@ const COHERENCE_LIMITATION_ALERT =
   "Coherence usa atuacao formal, proposicoes autorais e votos nominais recentes da Camara; relatoria ainda nao foi integrada e votos nominais seguem parciais.";
 const COHERENCE_COVERAGE_ALERT_PREFIX =
   "Cobertura atual de coherence na Camara";
+
+function buildCoherenceObservability(input: {
+  readonly candidate: ResolvedCandidate;
+  readonly coherence: ReturnType<CachedSignalService["compute"]>["coherence"];
+  readonly coherenceCoverage: ReturnType<CachedSignalService["compute"]>["coherenceCoverage"];
+}): ConsultationObservability | undefined {
+  if (
+    input.candidate.office !== "deputado_federal" ||
+    input.candidate.status !== "incumbent"
+  ) {
+    return undefined;
+  }
+
+  return {
+    coherence: {
+      collected_evidence_ids: input.coherence.evidence_ids,
+      collected_types: input.coherenceCoverage.collected_types,
+      expected_types: [...EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES],
+      limitation: COHERENCE_LIMITATION_ALERT,
+      missing_types: input.coherenceCoverage.missing_types,
+      scope: "camara",
+      status_basis: input.coherence.status
+    }
+  };
+}
 
 function buildPlaceholderCandidate(name: string): ResolvedCandidate {
   return {
@@ -119,6 +148,11 @@ export class QueryOrchestrator {
     const coherence = signalResult.coherence;
     const coherenceCoverage = signalResult.coherenceCoverage;
     const integrity = signalResult.integrity;
+    const observability = buildCoherenceObservability({
+      candidate,
+      coherence,
+      coherenceCoverage
+    });
     const alerts = [evidence.length > 0 ? PARTIAL_EVIDENCE_ALERT : NO_EVIDENCE_ALERT];
 
     if (
@@ -157,6 +191,7 @@ export class QueryOrchestrator {
           match_count: 1,
           resolution_kind: "resolved"
         },
+        observability,
         signals: {
         ...base.signals,
         coherence,

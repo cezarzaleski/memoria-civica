@@ -1,4 +1,5 @@
 import type {
+  ConsultationObservability,
   ConfidenceLevel,
   ConsultationResponse,
   ResolvedCandidate,
@@ -15,6 +16,7 @@ interface AssembleResponseInput {
     readonly requires?: ReadonlyArray<"uf" | "party">;
     readonly resolution_kind: "ambiguous" | "not_found" | "resolved";
   };
+  readonly observability?: ConsultationObservability;
   readonly signals: Record<SignalName, SignalAssessment>;
   readonly sources: readonly string[];
 }
@@ -95,6 +97,7 @@ export class ResponseAssembler {
         uf: input.candidate.uf
       },
       confidence,
+      observability: input.observability,
       reasons: buildReasons(input.signals),
       signals: input.signals,
       sources: input.sources,

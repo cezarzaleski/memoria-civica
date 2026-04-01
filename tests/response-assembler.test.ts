@@ -33,6 +33,7 @@ describe("ResponseAssembler", () => {
 
     expect(response.traffic_light).toBe("gray");
     expect(response.confidence).toBe("low");
+    expect(response.observability).toBeUndefined();
   });
 
   it("returns yellow when there is some evidence but no grave integrity alert", () => {
@@ -55,12 +56,30 @@ describe("ResponseAssembler", () => {
     const response = assembler.assemble({
       alerts: ["Coleta oficial ainda insuficiente para conclusao final."],
       candidate,
+      observability: {
+        coherence: {
+          collected_evidence_ids: ["ev-1"],
+          collected_types: ["formal_activity_record"],
+          expected_types: [
+            "formal_activity_record",
+            "voting_summary",
+            "propositions_summary"
+          ],
+          limitation: "Limitation",
+          missing_types: ["voting_summary", "propositions_summary"],
+          scope: "camara",
+          status_basis: "mixed"
+        }
+      },
       signals,
       sources: ["https://dadosabertos.camara.leg.br/api/v2/deputados/220639"]
     });
 
     expect(response.traffic_light).toBe("yellow");
     expect(response.confidence).toBe("medium");
+    expect(response.observability?.coherence?.collected_types).toEqual([
+      "formal_activity_record"
+    ]);
   });
 
   it("returns red when integrity has an official alert", () => {
