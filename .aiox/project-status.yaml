@@ -1,18 +1,25 @@
 status:
   branch: main
   modifiedFiles:
-    - docs/stories/v1-fase-0-fundacao-tecnica.md
-    - docs/stories/v1-fase-1-nucleo-do-mvp.md
+    - docs/stories/v1-fase-2-coherence-incremental-camara.md
+    - docs/plans/2026-04-01-coherence-incremental-design.md
+    - docs/superpowers/plans/2026-04-01-coherence-incremental.md
+    - packages/memoria-civica/src/services/collection-planner.ts
+    - packages/memoria-civica/src/services/query-orchestrator.ts
+    - packages/memoria-civica/src/services/signal-engine.ts
     - packages/memoria-civica/src/source-connectors/mcp-brasil.ts
+    - tests/collection-planner.test.ts
     - tests/mcp-brasil-source.test.ts
-  modifiedFilesTotalCount: 4
+    - tests/query-orchestrator.test.ts
+    - tests/signal-engine.test.ts
+  modifiedFilesTotalCount: 10
   recentCommits:
-    - feat(memoria-civica): accept office in consulta cli
-    - test(memoria-civica): cover phase 0 and phase 1 flows
+    - docs(memoria-civica): record phase 1 completion evidence
+    - feat(memoria-civica): refine candidate identity resolution flow
   currentEpic: v1
-  currentStory: docs/stories/v1-fase-1-nucleo-do-mvp.md
-  lastUpdate: '2026-03-31T21:42:00.000Z'
+  currentStory: docs/stories/v1-fase-2-coherence-incremental-camara.md
+  lastUpdate: '2026-04-01T11:06:00.000Z'
   isGitRepo: true
-timestamp: 1775004120000
+timestamp: 1775041560000
 ttl: 60
-gitFingerprint: 1775004120000:1775004120000
+gitFingerprint: 1775041560000:1775041560000
