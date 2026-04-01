@@ -2,20 +2,16 @@ status:
   branch: main
   modifiedFiles:
     - .aiox/project-status.yaml
-    - docs/stories/v1-fase-3-cache-seletivo-ttl.md
-    - packages/memoria-civica/src/services/cache-policy.ts
-    - packages/memoria-civica/src/services/query-orchestrator.ts
-    - tests/cache-store.test.ts
-    - tests/cached-evidence-collector.test.ts
-    - tests/cached-signal-service.test.ts
-  modifiedFilesTotalCount: 7
+    - docs/stories/v1-fase-4-regressao-deterministica-cli.md
+    - tests/consulta-entrypoint.test.ts
+  modifiedFilesTotalCount: 3
   recentCommits:
+    - af3e349 feat(memoria-civica): centralize selective cache policy by scope
     - eaaca8f feat(memoria-civica): add structured coherence observability
-    - 4b7e633 docs(memoria-civica): record propositions summary validation and relatoria spike
   currentEpic: v1
   currentStory: null
-  lastUpdate: '2026-04-01T15:10:00.000Z'
+  lastUpdate: '2026-04-01T15:30:00.000Z'
   isGitRepo: true
-timestamp: 1775056200000
+timestamp: 1775057400000
 ttl: 60
-gitFingerprint: 1775056200000:1775056200000
+gitFingerprint: 1775057400000:1775057400000
