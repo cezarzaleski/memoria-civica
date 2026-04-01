@@ -7,10 +7,11 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "lint": "eslint bin packages tests vitest.config.ts --ext .ts",
+    "lint": "eslint apps bin packages tests vitest.config.ts --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "consultar-candidato": "node --import tsx ./bin/consultar-candidato.ts"
+    "consultar-candidato": "node --import tsx ./bin/consultar-candidato.ts",
+    "api:start": "node --import tsx ./apps/api/src/server.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.23.0",
