@@ -48,7 +48,11 @@ export class CollectionPlanner {
                   camara_id: input.candidate.official_ids.camara_id,
                   name: input.candidate.canonical_name
                 }),
-                buildTask("camara", "coletar_votacoes_nominais", 3, {
+                buildTask("camara", "coletar_proposicoes_autorais", 3, {
+                  camara_id: input.candidate.official_ids.camara_id,
+                  name: input.candidate.canonical_name
+                }),
+                buildTask("camara", "coletar_votacoes_nominais", 4, {
                   camara_id: input.candidate.official_ids.camara_id,
                   name: input.candidate.canonical_name
                 })

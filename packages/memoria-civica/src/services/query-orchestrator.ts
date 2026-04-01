@@ -50,7 +50,7 @@ const NO_EVIDENCE_ALERT = "Nenhuma evidencia oficial foi coletada para a consult
 const PARTIAL_EVIDENCE_ALERT =
   "Coleta oficial ainda insuficiente para conclusao final.";
 const COHERENCE_LIMITATION_ALERT =
-  "Coherence usa atuacao formal e votos nominais recentes da Camara; autoria, relatoria e proposicoes por deputado ainda nao foram integradas.";
+  "Coherence usa atuacao formal, proposicoes autorais e votos nominais recentes da Camara; relatoria ainda nao foi integrada e votos nominais seguem parciais.";
 const COHERENCE_COVERAGE_ALERT_PREFIX =
   "Cobertura atual de coherence na Camara";
 

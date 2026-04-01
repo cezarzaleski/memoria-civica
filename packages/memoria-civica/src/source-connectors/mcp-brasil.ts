@@ -37,6 +37,7 @@ interface StdioMcpBrasilClientOptions {
 }
 
 const DEFAULT_MCP_BRASIL_COMMAND = "uvx";
+const LOCAL_MCP_BRASIL_COMMAND = "uv";
 const DEFAULT_MCP_BRASIL_ENTRYPOINT = [
   "--with",
   "truststore",
@@ -46,6 +47,37 @@ const DEFAULT_MCP_BRASIL_ENTRYPOINT = [
   "-c",
   "import truststore; truststore.inject_into_ssl(); import runpy; runpy.run_module('mcp_brasil.server', run_name='__main__')"
 ] as const;
+const LOCAL_MCP_BRASIL_ENTRYPOINT = (localPath: string) => [
+  "run",
+  "--project",
+  localPath,
+  "--with",
+  "truststore",
+  "python",
+  "-c",
+  "import truststore; truststore.inject_into_ssl(); import runpy; runpy.run_module('mcp_brasil.server', run_name='__main__')"
+] as const;
+
+function buildDefaultMcpBrasilOptions(
+  options: StdioMcpBrasilClientOptions
+): Required<Pick<StdioMcpBrasilClientOptions, "args" | "command" | "cwd">> {
+  const localPath =
+    options.env?.MCP_BRASIL_LOCAL_PATH ?? process.env.MCP_BRASIL_LOCAL_PATH;
+
+  if (localPath !== undefined && localPath.trim() !== "") {
+    return {
+      args: LOCAL_MCP_BRASIL_ENTRYPOINT(localPath),
+      command: LOCAL_MCP_BRASIL_COMMAND,
+      cwd: options.cwd ?? localPath
+    };
+  }
+
+  return {
+    args: DEFAULT_MCP_BRASIL_ENTRYPOINT,
+    command: DEFAULT_MCP_BRASIL_COMMAND,
+    cwd: options.cwd ?? process.cwd()
+  };
+}
 
 function readProperty(payload: object, key: string): unknown {
   return Reflect.get(payload, key) as unknown;
@@ -212,13 +244,19 @@ function summarizeRawResult(raw: string): string {
 function summarizeFormalActivityRecord(raw: string): string {
   const summary = summarizeRawResult(raw);
 
-  return `${summary} Limitacao: o mcp-brasil atual ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado neste fluxo.`;
+  return `${summary} Limitacao: este bloco cobre atuacao formal; proposicoes autorais e votos nominais dependem de coletas complementares, e relatoria ainda nao foi integrada.`;
 }
 
 function summarizeVotingSummary(name: string, raw: string): string {
   const summary = summarizeRawResult(raw);
 
   return `Participacao nominal recente identificada para ${name}. ${summary}`;
+}
+
+function summarizePropositionsSummary(name: string, raw: string): string {
+  const summary = summarizeRawResult(raw);
+
+  return `Proposicoes autorais recentes identificadas para ${name}. ${summary}`;
 }
 
 function parseInteger(value: unknown): number | null {
@@ -317,10 +355,13 @@ export class StdioMcpBrasilClient implements McpBrasilToolClient {
   private transport?: StdioClientTransport;
 
   public constructor(options: StdioMcpBrasilClientOptions = {}) {
+    const defaults = buildDefaultMcpBrasilOptions(options);
+
     this.options = {
       ...options,
-      args: options.args ?? DEFAULT_MCP_BRASIL_ENTRYPOINT,
-      command: options.command ?? DEFAULT_MCP_BRASIL_COMMAND
+      args: options.args ?? defaults.args,
+      command: options.command ?? defaults.command,
+      cwd: options.cwd ?? defaults.cwd
     };
   }
 
@@ -560,6 +601,37 @@ export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
     return null;
   }
 
+  private async collectPropositionsSummary(
+    candidate: ResolvedCandidate,
+    task: CollectionPlan["tasks"][number]
+  ): Promise<RawEvidence | null> {
+    const deputadoId = parseInteger(task.params.camara_id);
+
+    if (deputadoId === null) {
+      return null;
+    }
+
+    const raw = await this.client.callTool("camara_buscar_proposicao", {
+      id_deputado_autor: deputadoId,
+      pagina: 1
+    });
+
+    if (parseMarkdownTable(raw).length === 0) {
+      return null;
+    }
+
+    return {
+      collected_at: new Date().toISOString(),
+      evidence_type: "propositions_summary",
+      person_id: buildPersonId(candidate),
+      signal_type: "coherence",
+      source_name: "camara",
+      source_url: `https://dadosabertos.camara.leg.br/api/v2/proposicoes?idDeputadoAutor=${deputadoId}`,
+      strength: "strong_official",
+      summary: summarizePropositionsSummary(candidate.canonical_name, raw)
+    };
+  }
+
   public async collect(
     candidate: ResolvedCandidate,
     plan: CollectionPlan
@@ -572,6 +644,10 @@ export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
 
         if (task.objective === "coletar_votacoes_nominais") {
           return this.collectVotingSummary(candidate);
+        }
+
+        if (task.objective === "coletar_proposicoes_autorais") {
+          return this.collectPropositionsSummary(candidate, task);
         }
 
         return this.collectLegislativeProfile(candidate, task);

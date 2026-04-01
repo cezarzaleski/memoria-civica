@@ -27,11 +27,13 @@ describe("CollectionPlanner", () => {
       "camara",
       "camara",
       "camara",
+      "camara",
       "tse"
     ]);
     expect(plan.tasks.map((task) => task.objective)).toEqual([
       "confirmar_identidade_legislativa",
       "coletar_atuacao_formal",
+      "coletar_proposicoes_autorais",
       "coletar_votacoes_nominais",
       "enriquecer_identidade_eleitoral"
     ]);

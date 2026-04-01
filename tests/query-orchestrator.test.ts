@@ -91,7 +91,7 @@ describe("QueryOrchestrator", () => {
     expect(result.response.confidence).toBe("medium");
     expect(result.response.alerts).toContain("Coleta oficial ainda insuficiente para conclusao final.");
     expect(result.response.alerts).toContain(
-      "Coherence usa atuacao formal e votos nominais recentes da Camara; autoria, relatoria e proposicoes por deputado ainda nao foram integradas."
+      "Coherence usa atuacao formal, proposicoes autorais e votos nominais recentes da Camara; relatoria ainda nao foi integrada e votos nominais seguem parciais."
     );
     expect(result.response.alerts).toContain(
       "Cobertura atual de coherence na Camara: coletados=formal_activity_record; faltam=voting_summary, propositions_summary."

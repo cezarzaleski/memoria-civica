@@ -156,6 +156,12 @@ describe("McpBrasilIdentitySource", () => {
           );
         }
 
+        if (name === "camara_buscar_proposicao") {
+          return Promise.resolve(
+            "Proposições encontradas (página 1):\n\n| ID | Proposição | Ementa | Apresentação | Situação |\n| --- | --- | --- | --- | --- |\n| 2384362 | PL 4224/2023 | Garante direitos a casais homoafetivos. | 2023-08-30T15:21 | — |"
+          );
+        }
+
         if (name === "camara_votos_nominais") {
           return Promise.resolve(
             "Votos nominais:\n\n| Deputado | Partido | UF | Voto |\n| --- | --- | --- | --- |\n| Erika Hilton | PSOL | SP | Sim |"
@@ -209,12 +215,21 @@ describe("McpBrasilIdentitySource", () => {
           source: "camara"
         },
         {
-          objective: "coletar_votacoes_nominais",
+          objective: "coletar_proposicoes_autorais",
           params: {
             camara_id: "220639",
             name: "Erika Hilton"
           },
           priority: 3,
+          source: "camara"
+        },
+        {
+          objective: "coletar_votacoes_nominais",
+          params: {
+            camara_id: "220639",
+            name: "Erika Hilton"
+          },
+          priority: 4,
           source: "camara"
         }
       ]
@@ -228,6 +243,13 @@ describe("McpBrasilIdentitySource", () => {
     expect(client.callTool).toHaveBeenCalledWith("camara_buscar_deputado", {
       deputado_id: 220639
     });
+    expect(client.callTool).toHaveBeenCalledWith(
+      "camara_buscar_proposicao",
+      {
+        id_deputado_autor: 220639,
+        pagina: 1
+      }
+    );
     expect(client.callTool).toHaveBeenCalledWith(
       "camara_buscar_votacao",
       expect.objectContaining({
@@ -262,6 +284,12 @@ describe("McpBrasilIdentitySource", () => {
           strength: "strong_official"
         }),
         expect.objectContaining({
+          evidence_type: "propositions_summary",
+          signal_type: "coherence",
+          source_name: "camara",
+          strength: "strong_official"
+        }),
+        expect.objectContaining({
           evidence_type: "integrity_screening",
           signal_type: "integrity",
           source_name: "transparencia",
@@ -277,6 +305,9 @@ describe("McpBrasilIdentitySource", () => {
     const votingEvidence = result.find((item) => {
       return item.signal_type === "coherence" && item.evidence_type === "voting_summary";
     });
+    const propositionsEvidence = result.find((item) => {
+      return item.signal_type === "coherence" && item.evidence_type === "propositions_summary";
+    });
 
     expect(integrityEvidence).toMatchObject({
       source_url: "https://api.portaldatransparencia.gov.br/api-de-dados/ceis"
@@ -285,10 +316,13 @@ describe("McpBrasilIdentitySource", () => {
       "Limitacao: depende do nome informado"
     );
     expect(coherenceEvidence?.summary).toContain(
-      "ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado"
+      "este bloco cobre atuacao formal; proposicoes autorais e votos nominais dependem de coletas complementares, e relatoria ainda nao foi integrada"
     );
     expect(votingEvidence?.summary).toContain(
       "Participacao nominal recente identificada para Erika Hilton"
+    );
+    expect(propositionsEvidence?.summary).toContain(
+      "Proposicoes autorais recentes identificadas para Erika Hilton"
     );
   });
 });
@@ -315,5 +349,30 @@ describe("StdioMcpBrasilClient", () => {
     expect(
       ((client as unknown) as { options: { args: readonly string[] } }).options.args[6]
     ).toContain("runpy.run_module('mcp_brasil.server', run_name='__main__')");
+  });
+
+  it("can boot mcp-brasil from a local clone path for validation", () => {
+    const client = new StdioMcpBrasilClient({
+      env: {
+        MCP_BRASIL_LOCAL_PATH: "/tmp/mcp-brasil-local"
+      }
+    });
+
+    expect(client).toMatchObject({
+      options: {
+        args: [
+          "run",
+          "--project",
+          "/tmp/mcp-brasil-local",
+          "--with",
+          "truststore",
+          "python",
+          "-c",
+          expect.stringContaining("truststore.inject_into_ssl()")
+        ],
+        command: "uv",
+        cwd: "/tmp/mcp-brasil-local"
+      }
+    });
   });
 });
