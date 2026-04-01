@@ -1,0 +1,5 @@
+{
+  "name": "@memoria-civica/web",
+  "private": true,
+  "type": "module"
+}

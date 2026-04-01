@@ -354,6 +354,7 @@ describe("StdioMcpBrasilClient", () => {
   it("can boot mcp-brasil from a local clone path for validation", () => {
     const client = new StdioMcpBrasilClient({
       env: {
+        NODE_ENV: "test",
         MCP_BRASIL_LOCAL_PATH: "/tmp/mcp-brasil-local"
       }
     });

@@ -9,13 +9,14 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
-    files: ["**/*.ts"],
+    files: ["**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         project: "./tsconfig.json",
         tsconfigRootDir: import.meta.dirname
       },
       globals: {
+        ...globals.browser,
         ...globals.node
       }
     },
