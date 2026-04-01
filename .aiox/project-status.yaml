@@ -1,18 +1,18 @@
 status:
   branch: main
   modifiedFiles:
-    - .aiox-core/
-    - .antigravity/
-    - .claude/
-    - .codex/
-    - .cursor/
-  modifiedFilesTotalCount: 18
+    - docs/stories/v1-fase-0-fundacao-tecnica.md
+    - docs/stories/v1-fase-1-nucleo-do-mvp.md
+    - packages/memoria-civica/src/source-connectors/mcp-brasil.ts
+    - tests/mcp-brasil-source.test.ts
+  modifiedFilesTotalCount: 4
   recentCommits:
-    - Initial commit - greenfield rebuild
-  currentEpic: null
-  currentStory: null
-  lastUpdate: '2026-03-28T19:25:05.320Z'
+    - feat(memoria-civica): accept office in consulta cli
+    - test(memoria-civica): cover phase 0 and phase 1 flows
+  currentEpic: v1
+  currentStory: docs/stories/v1-fase-1-nucleo-do-mvp.md
+  lastUpdate: '2026-03-31T21:42:00.000Z'
   isGitRepo: true
-timestamp: 1774725905325
+timestamp: 1775004120000
 ttl: 60
-gitFingerprint: 1774725609373.9072:1774725595596.9492
+gitFingerprint: 1775004120000:1775004120000

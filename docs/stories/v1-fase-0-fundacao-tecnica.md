@@ -1,6 +1,6 @@
 ---
 title: V1 Fase 0 - Fundacao Tecnica
-status: In Progress
+status: Done
 date: 2026-03-29
 owner: dev
 ---
@@ -37,6 +37,7 @@ Implementar a fundacao tecnica da V1 do Memoria Civica e iniciar o nucleo da Fas
 - [x] Substituir proxy de `coherence` por evidencia formal dedicada da Camara
 - [x] Explicitar no pipeline a limitacao atual de `coherence` sem autoria, relatoria ou voto nominal por deputado
 - [x] Validar quality gates
+- [x] Validar o CLI com integracao real de `Camara`, `TSE` e `Transparencia` no ambiente com Zscaler
 
 ## File List
 
@@ -73,3 +74,11 @@ Implementar a fundacao tecnica da V1 do Memoria Civica e iniciar o nucleo da Fas
 - [x] `tests/consulta-entrypoint.test.ts`
 - [x] `tests/mcp-brasil-source.test.ts`
 - [x] `tests/tse-identity-strategy.test.ts`
+
+## Validation Evidence
+
+- [x] `2026-03-31`: `npm run lint`
+- [x] `2026-03-31`: `npm run typecheck`
+- [x] `2026-03-31`: `npm test`
+- [x] `2026-03-31`: `npm run consultar-candidato -- --candidate 'Tabata Amaral' --office deputado_federal --uf sp`
+- [x] `2026-03-31`: bootstrap do `mcp-brasil` endurecido com `truststore` para compatibilidade com ambiente corporativo usando Zscaler, mantendo verificacao TLS
