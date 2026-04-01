@@ -21,6 +21,7 @@ import {
   InMemoryEvidenceStore,
   type EvidenceStore
 } from "@/services/evidence-store";
+import { CachedEvidenceCollector } from "@/services/cached-evidence-collector";
 import { EvidenceClassifier } from "@/services/evidence-classifier";
 import { CollectionPlanner } from "@/services/collection-planner";
 import { ResponseAssembler } from "@/services/response-assembler";
@@ -83,7 +84,8 @@ export class QueryOrchestrator {
       cwd: process.cwd()
     });
     this.evidenceCollector =
-      options.evidenceCollector ?? new McpBrasilEvidenceCollector(client);
+      options.evidenceCollector ??
+      new CachedEvidenceCollector(new McpBrasilEvidenceCollector(client));
     this.evidenceStore = options.evidenceStore ?? new InMemoryEvidenceStore();
     this.evidenceClassifier = new EvidenceClassifier();
     this.identityResolver =
