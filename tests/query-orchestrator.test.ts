@@ -91,7 +91,7 @@ describe("QueryOrchestrator", () => {
     expect(result.response.confidence).toBe("medium");
     expect(result.response.alerts).toContain("Coleta oficial ainda insuficiente para conclusao final.");
     expect(result.response.alerts).toContain(
-      "Coherence ainda depende de atuacao formal da Camara; autoria, relatoria e votos nominais por deputado ainda nao foram integrados."
+      "Coherence usa atuacao formal e votos nominais recentes da Camara; autoria, relatoria e proposicoes por deputado ainda nao foram integradas."
     );
     expect(result.response.sources).toEqual([
       "https://dadosabertos.camara.leg.br/api/v2/deputados/220639"

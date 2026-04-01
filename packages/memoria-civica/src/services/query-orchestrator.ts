@@ -48,7 +48,7 @@ const NO_EVIDENCE_ALERT = "Nenhuma evidencia oficial foi coletada para a consult
 const PARTIAL_EVIDENCE_ALERT =
   "Coleta oficial ainda insuficiente para conclusao final.";
 const COHERENCE_LIMITATION_ALERT =
-  "Coherence ainda depende de atuacao formal da Camara; autoria, relatoria e votos nominais por deputado ainda nao foram integrados.";
+  "Coherence usa atuacao formal e votos nominais recentes da Camara; autoria, relatoria e proposicoes por deputado ainda nao foram integradas.";
 
 function buildPlaceholderCandidate(name: string): ResolvedCandidate {
   return {
@@ -118,10 +118,7 @@ export class QueryOrchestrator {
       candidate.office === "deputado_federal" &&
       candidate.status === "incumbent" &&
       evidence.some((record) => {
-        return (
-          record.signal_type === "coherence" &&
-          record.evidence_type === "formal_activity_record"
-        );
+        return record.signal_type === "coherence";
       })
     ) {
       alerts.push(COHERENCE_LIMITATION_ALERT);

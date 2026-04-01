@@ -136,6 +136,62 @@ describe("SignalEngine", () => {
     ]);
   });
 
+  it("returns positive coherence when an incumbent federal candidate has two distinct official Camara blocks", () => {
+    const engine = new SignalEngine();
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-03-29T12:00:00.000Z",
+        evidence_id: "ev-4",
+        evidence_type: "formal_activity_record",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/220639",
+        strength: "strong_official",
+        summary: "Perfil formal detalhado do deputado na Camara."
+      },
+      {
+        collected_at: "2026-03-29T12:00:01.000Z",
+        evidence_id: "ev-5",
+        evidence_type: "voting_summary",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/votacoes",
+        strength: "strong_official",
+        summary: "Participacao nominal recente em votacoes da Camara."
+      }
+    ];
+    const classifications: EvidenceClassificationRecord[] = [
+      {
+        classified_at: "2026-03-29T12:01:00.000Z",
+        classification_id: "cl-4",
+        confidence: "high",
+        evidence_id: "ev-4",
+        strength: "strong_official"
+      },
+      {
+        classified_at: "2026-03-29T12:01:01.000Z",
+        classification_id: "cl-5",
+        confidence: "high",
+        evidence_id: "ev-5",
+        strength: "strong_official"
+      }
+    ];
+
+    const result = engine.assessCoherence(
+      incumbentFederalCandidate,
+      evidence,
+      classifications
+    );
+
+    expect(result.status).toBe("positive");
+    expect(result.evidence_ids).toEqual(["ev-4", "ev-5"]);
+    expect(result.reasons).toEqual([
+      "Ha cobertura oficial da Camara em 2 blocos independentes de coerencia: formal_activity_record, voting_summary."
+    ]);
+  });
+
   it("returns insufficient integrity when no integrity evidence exists", () => {
     const engine = new SignalEngine();
 

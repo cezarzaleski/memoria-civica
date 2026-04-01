@@ -150,6 +150,18 @@ describe("McpBrasilIdentitySource", () => {
           );
         }
 
+        if (name === "camara_buscar_votacao") {
+          return Promise.resolve(
+            "Votacoes encontradas:\n\n| ID | Descricao | Data |\n| --- | --- | --- |\n| 2589912-41 | Requerimento de urgencia | 2026-03-15 |"
+          );
+        }
+
+        if (name === "camara_votos_nominais") {
+          return Promise.resolve(
+            "Votos nominais:\n\n| Deputado | Partido | UF | Voto |\n| --- | --- | --- | --- |\n| Erika Hilton | PSOL | SP | Sim |"
+          );
+        }
+
         if (name === "transparencia_buscar_sancoes") {
           return Promise.resolve(
             "Nenhuma sanção encontrada para 'Erika Hilton' nas bases: ceis, cnep."
@@ -195,6 +207,15 @@ describe("McpBrasilIdentitySource", () => {
           },
           priority: 2,
           source: "camara"
+        },
+        {
+          objective: "coletar_votacoes_nominais",
+          params: {
+            camara_id: "220639",
+            name: "Erika Hilton"
+          },
+          priority: 3,
+          source: "camara"
         }
       ]
     };
@@ -206,6 +227,15 @@ describe("McpBrasilIdentitySource", () => {
     });
     expect(client.callTool).toHaveBeenCalledWith("camara_buscar_deputado", {
       deputado_id: 220639
+    });
+    expect(client.callTool).toHaveBeenCalledWith(
+      "camara_buscar_votacao",
+      expect.objectContaining({
+        pagina: 1
+      })
+    );
+    expect(client.callTool).toHaveBeenCalledWith("camara_votos_nominais", {
+      votacao_id: "2589912-41"
     });
     expect(client.callTool).toHaveBeenCalledWith("transparencia_buscar_sancoes", {
       bases: ["ceis", "cnep"],
@@ -226,6 +256,12 @@ describe("McpBrasilIdentitySource", () => {
           strength: "strong_official"
         }),
         expect.objectContaining({
+          evidence_type: "voting_summary",
+          signal_type: "coherence",
+          source_name: "camara",
+          strength: "strong_official"
+        }),
+        expect.objectContaining({
           evidence_type: "integrity_screening",
           signal_type: "integrity",
           source_name: "transparencia",
@@ -235,7 +271,12 @@ describe("McpBrasilIdentitySource", () => {
     );
 
     const integrityEvidence = result.find((item) => item.signal_type === "integrity");
-    const coherenceEvidence = result.find((item) => item.signal_type === "coherence");
+    const coherenceEvidence = result.find((item) => {
+      return item.signal_type === "coherence" && item.evidence_type === "formal_activity_record";
+    });
+    const votingEvidence = result.find((item) => {
+      return item.signal_type === "coherence" && item.evidence_type === "voting_summary";
+    });
 
     expect(integrityEvidence).toMatchObject({
       source_url: "https://api.portaldatransparencia.gov.br/api-de-dados/ceis"
@@ -245,6 +286,9 @@ describe("McpBrasilIdentitySource", () => {
     );
     expect(coherenceEvidence?.summary).toContain(
       "ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado"
+    );
+    expect(votingEvidence?.summary).toContain(
+      "Participacao nominal recente identificada para Erika Hilton"
     );
   });
 });

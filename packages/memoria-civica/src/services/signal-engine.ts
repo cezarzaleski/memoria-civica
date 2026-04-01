@@ -6,6 +6,11 @@ import type {
 } from "@/domain/models";
 
 export class SignalEngine {
+  private static readonly CAMARA_COHERENCE_EVIDENCE_TYPES = [
+    "formal_activity_record",
+    "voting_summary"
+  ] as const;
+
   private filterStrongOfficialEvidence(
     evidence: readonly EvidenceRecord[],
     classifications: readonly EvidenceClassificationRecord[],
@@ -32,7 +37,10 @@ export class SignalEngine {
       evidence.filter((record) => {
         return (
           record.source_name === "camara" &&
-          record.evidence_type === "formal_activity_record"
+          SignalEngine.CAMARA_COHERENCE_EVIDENCE_TYPES.includes(
+            record.evidence_type as
+              (typeof SignalEngine.CAMARA_COHERENCE_EVIDENCE_TYPES)[number]
+          )
         );
       }),
       classifications,
@@ -107,11 +115,13 @@ export class SignalEngine {
       };
     }
 
-    if (coherenceEvidence.length >= 2) {
+    const coherenceTypes = [...new Set(coherenceEvidence.map((record) => record.evidence_type))];
+
+    if (coherenceTypes.length >= 2) {
       return {
         evidence_ids: coherenceEvidence.map((record) => record.evidence_id),
         reasons: [
-          `Ha ${coherenceEvidence.length} evidencias oficiais da Camara sobre atuacao formal, mas ainda sem autoria, relatoria ou voto nominal por deputado neste fluxo.`
+          `Ha cobertura oficial da Camara em ${coherenceTypes.length} blocos independentes de coerencia: ${coherenceTypes.join(", ")}.`
         ],
         status: "positive"
       };

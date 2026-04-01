@@ -215,6 +215,12 @@ function summarizeFormalActivityRecord(raw: string): string {
   return `${summary} Limitacao: o mcp-brasil atual ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado neste fluxo.`;
 }
 
+function summarizeVotingSummary(name: string, raw: string): string {
+  const summary = summarizeRawResult(raw);
+
+  return `Participacao nominal recente identificada para ${name}. ${summary}`;
+}
+
 function parseInteger(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value)) {
     return value;
@@ -229,6 +235,51 @@ function parseInteger(value: unknown): number | null {
 
 function hasNoSanctionsMatch(raw: string): boolean {
   return /nenhuma san[cç][aã]o encontrada/i.test(raw);
+}
+
+function formatIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildRecentVotingWindow(days: number): { readonly data_fim: string; readonly data_inicio: string } {
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - days);
+
+  return {
+    data_fim: formatIsoDate(end),
+    data_inicio: formatIsoDate(start)
+  };
+}
+
+function parseVotingIds(raw: string): readonly string[] {
+  return parseMarkdownTable(raw)
+    .map((row) => readCell(row, ["id", "id votacao", "votacao_id"]))
+    .filter((value): value is string => typeof value === "string" && value.trim() !== "");
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+function buildCandidateNameVariants(candidate: ResolvedCandidate): readonly string[] {
+  return [
+    candidate.canonical_name,
+    ...(candidate.aliases ?? [])
+  ]
+    .map((item) => item.trim())
+    .filter((item, index, array) => item !== "" && array.indexOf(item) === index);
+}
+
+function includesCandidateName(raw: string, candidate: ResolvedCandidate): boolean {
+  const normalizedRaw = normalizeSearchText(raw);
+
+  return buildCandidateNameVariants(candidate).some((variant) => {
+    return normalizedRaw.includes(normalizeSearchText(variant));
+  });
 }
 
 function mapTseRowToCandidate(
@@ -371,6 +422,8 @@ export class McpBrasilIdentitySource implements OfficialIdentitySource {
 }
 
 export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
+  private static readonly MAX_NOMINAL_VOTING_CHECKS = 3;
+
   public constructor(private readonly client: McpBrasilToolClient) {}
 
   private async collectLegislativeProfile(
@@ -469,6 +522,44 @@ export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
     };
   }
 
+  private async collectVotingSummary(
+    candidate: ResolvedCandidate
+  ): Promise<RawEvidence | null> {
+    const window = buildRecentVotingWindow(30);
+    const rawVotingList = await this.client.callTool("camara_buscar_votacao", {
+      data_fim: window.data_fim,
+      data_inicio: window.data_inicio,
+      pagina: 1
+    });
+    const votingIds = parseVotingIds(rawVotingList).slice(
+      0,
+      McpBrasilEvidenceCollector.MAX_NOMINAL_VOTING_CHECKS
+    );
+
+    for (const votingId of votingIds) {
+      const rawNominalVotes = await this.client.callTool("camara_votos_nominais", {
+        votacao_id: votingId
+      });
+
+      if (!includesCandidateName(rawNominalVotes, candidate)) {
+        continue;
+      }
+
+      return {
+        collected_at: new Date().toISOString(),
+        evidence_type: "voting_summary",
+        person_id: buildPersonId(candidate),
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/votacoes",
+        strength: "strong_official",
+        summary: summarizeVotingSummary(candidate.canonical_name, rawNominalVotes)
+      };
+    }
+
+    return null;
+  }
+
   public async collect(
     candidate: ResolvedCandidate,
     plan: CollectionPlan
@@ -477,6 +568,10 @@ export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
       if (task.source === "camara") {
         if (task.objective === "coletar_atuacao_formal") {
           return this.collectFormalActivityRecord(candidate, task);
+        }
+
+        if (task.objective === "coletar_votacoes_nominais") {
+          return this.collectVotingSummary(candidate);
         }
 
         return this.collectLegislativeProfile(candidate, task);
