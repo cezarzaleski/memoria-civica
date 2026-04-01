@@ -69,6 +69,16 @@ export class CollectionPlanner {
         profile: "former_parliamentarian",
         requested_signals: input.requested_signals,
         tasks: [
+          ...(input.candidate.official_ids.camara_id !== undefined
+            ? [
+                buildTask("camara", "confirmar_historico_legislativo", 1, {
+                  camara_id: input.candidate.official_ids.camara_id,
+                  name: input.candidate.canonical_name,
+                  party: input.candidate.party,
+                  uf: input.candidate.uf
+                })
+              ]
+            : []),
           buildTask("tse", "resolver_identidade_eleitoral", 1, {
             name: input.candidate.canonical_name,
             office: input.candidate.office,

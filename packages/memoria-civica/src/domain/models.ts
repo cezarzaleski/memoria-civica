@@ -149,8 +149,11 @@ export interface ConsultationResponse {
   readonly candidate: {
     readonly ambiguity_level?: AmbiguityLevel;
     readonly canonical_name: string;
+    readonly match_count?: number;
     readonly official_ids: OfficialIds;
     readonly party?: string;
+    readonly requires?: ReadonlyArray<"uf" | "party">;
+    readonly resolution_kind?: IdentityResolution["kind"];
     readonly status: CandidateStatus;
     readonly uf?: string;
   };

@@ -23,6 +23,11 @@ interface ConsultCandidateRequestInput {
 interface GrayResponseInput {
   readonly alerts: readonly string[];
   readonly candidate: ResolvedCandidate;
+  readonly identity_metadata?: {
+    readonly match_count: number;
+    readonly requires?: ReadonlyArray<"uf" | "party">;
+    readonly resolution_kind: "ambiguous" | "not_found" | "resolved";
+  };
   readonly reasons?: readonly string[];
   readonly summary?: string;
 }
@@ -88,8 +93,11 @@ export function buildGrayResponse(
     candidate: {
       ambiguity_level: input.candidate.ambiguity_level,
       canonical_name: input.candidate.canonical_name,
+      match_count: input.identity_metadata?.match_count,
       official_ids: input.candidate.official_ids,
       party: input.candidate.party,
+      requires: input.identity_metadata?.requires,
+      resolution_kind: input.identity_metadata?.resolution_kind,
       status: input.candidate.status,
       uf: input.candidate.uf
     },

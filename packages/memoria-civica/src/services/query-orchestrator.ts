@@ -144,6 +144,10 @@ export class QueryOrchestrator {
       ...this.responseAssembler.assemble({
         alerts: base.alerts,
         candidate,
+        identity_metadata: {
+          match_count: 1,
+          resolution_kind: "resolved"
+        },
         signals: {
         ...base.signals,
         coherence,
@@ -223,6 +227,11 @@ export class QueryOrchestrator {
     const response = buildGrayResponse({
       alerts,
       candidate: buildPlaceholderCandidate(request.candidate_name),
+      identity_metadata: {
+        match_count: identity.match_count,
+        requires: identity.kind === "ambiguous" ? identity.requires : undefined,
+        resolution_kind: identity.kind
+      },
       reasons:
         identity.kind === "ambiguous"
           ? ["A consulta precisa de mais contexto para desambiguar o nome informado."]

@@ -10,6 +10,11 @@ import type {
 interface AssembleResponseInput {
   readonly alerts: readonly string[];
   readonly candidate: ResolvedCandidate;
+  readonly identity_metadata?: {
+    readonly match_count: number;
+    readonly requires?: ReadonlyArray<"uf" | "party">;
+    readonly resolution_kind: "ambiguous" | "not_found" | "resolved";
+  };
   readonly signals: Record<SignalName, SignalAssessment>;
   readonly sources: readonly string[];
 }
@@ -81,8 +86,11 @@ export class ResponseAssembler {
       candidate: {
         ambiguity_level: input.candidate.ambiguity_level,
         canonical_name: input.candidate.canonical_name,
+        match_count: input.identity_metadata?.match_count ?? 1,
         official_ids: input.candidate.official_ids,
         party: input.candidate.party,
+        requires: input.identity_metadata?.requires,
+        resolution_kind: input.identity_metadata?.resolution_kind ?? "resolved",
         status: input.candidate.status,
         uf: input.candidate.uf
       },

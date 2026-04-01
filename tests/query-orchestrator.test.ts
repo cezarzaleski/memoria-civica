@@ -159,4 +159,68 @@ describe("QueryOrchestrator", () => {
     expect(result.execution.status).toBe("completed");
     expect(result.execution.steps).toContain("evidence_collected");
   });
+
+  it("returns explicit identity metadata when the name remains ambiguous", async () => {
+    const evidenceCollector = {
+      collect: vi.fn()
+    };
+    const evidenceStore = {
+      save: vi.fn()
+    };
+    const orchestrator = new QueryOrchestrator({
+      evidenceCollector,
+      evidenceStore,
+      identityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          ambiguity_level: "strong",
+          candidates: [
+            {
+              ambiguity_level: "none",
+              canonical_name: "Joao Silva",
+              office: "deputado_federal",
+              official_ids: {
+                tse_id: "222"
+              },
+              party: "PT",
+              status: "former",
+              uf: "SP"
+            },
+            {
+              ambiguity_level: "none",
+              canonical_name: "Joao Silva",
+              office: "deputado_federal",
+              official_ids: {
+                tse_id: "333"
+              },
+              party: "MDB",
+              status: "challenger",
+              uf: "MG"
+            }
+          ],
+          kind: "ambiguous",
+          match_count: 2,
+          requires: ["uf", "party"]
+        } satisfies IdentityResolution)
+      }
+    });
+
+    const result = await orchestrator.consult({
+      candidate_name: "Joao Silva"
+    });
+
+    expect(evidenceCollector.collect).not.toHaveBeenCalled();
+    expect(evidenceStore.save).not.toHaveBeenCalled();
+    expect(result.response.candidate.ambiguity_level).toBe("strong");
+    expect(result.response.candidate.match_count).toBe(2);
+    expect(result.response.candidate.requires).toEqual(["uf", "party"]);
+    expect(result.response.candidate.resolution_kind).toBe("ambiguous");
+    expect(result.response.alerts).toContain(
+      "Identidade ambigua. Informe uf e party para continuar."
+    );
+    expect(result.execution.steps).toEqual([
+      "request_validated",
+      "identity_ambiguous",
+      "response_assembled"
+    ]);
+  });
 });

@@ -201,10 +201,8 @@ describe("McpBrasilIdentitySource", () => {
 
     const result = await collector.collect(candidate, plan);
 
-    expect(client.callTool).toHaveBeenCalledWith("camara_listar_deputados", {
-      nome: "Erika Hilton",
-      sigla_partido: "PSOL",
-      sigla_uf: "SP"
+    expect(client.callTool).toHaveBeenCalledWith("camara_buscar_deputado", {
+      deputado_id: 220639
     });
     expect(client.callTool).toHaveBeenCalledWith("camara_buscar_deputado", {
       deputado_id: 220639

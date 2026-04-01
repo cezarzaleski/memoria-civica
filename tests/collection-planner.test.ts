@@ -83,4 +83,30 @@ describe("CollectionPlanner", () => {
       }
     });
   });
+
+  it("keeps a former parliamentarian on a historic legislative trail before TSE", () => {
+    const plan = planner.plan({
+      candidate: {
+        ambiguity_level: "none",
+        canonical_name: "Joao Silva",
+        office: "deputado_federal",
+        official_ids: {
+          camara_id: "220000",
+          tse_id: "222"
+        },
+        party: "PT",
+        status: "former",
+        uf: "SP"
+      },
+      requested_signals: ["evidence_level"],
+      user_priorities: []
+    });
+
+    expect(plan.profile).toBe("former_parliamentarian");
+    expect(plan.tasks.map((task) => task.source)).toEqual(["camara", "tse"]);
+    expect(plan.tasks.map((task) => task.objective)).toEqual([
+      "confirmar_historico_legislativo",
+      "resolver_identidade_eleitoral"
+    ]);
+  });
 });

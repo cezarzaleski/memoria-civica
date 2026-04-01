@@ -373,6 +373,46 @@ export class McpBrasilIdentitySource implements OfficialIdentitySource {
 export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
   public constructor(private readonly client: McpBrasilToolClient) {}
 
+  private async collectLegislativeProfile(
+    candidate: ResolvedCandidate,
+    task: CollectionPlan["tasks"][number]
+  ): Promise<RawEvidence | null> {
+    const deputadoId = parseInteger(task.params.camara_id);
+
+    const raw =
+      deputadoId === null
+        ? await this.client.callTool("camara_listar_deputados", {
+            nome: task.params.name,
+            sigla_partido: task.params.party,
+            sigla_uf: task.params.uf
+          })
+        : await this.client.callTool("camara_buscar_deputado", {
+            deputado_id: deputadoId
+          });
+
+    if (raw.trim() === "") {
+      return null;
+    }
+
+    if (deputadoId === null && parseMarkdownTable(raw).length === 0) {
+      return null;
+    }
+
+    return {
+      collected_at: new Date().toISOString(),
+      evidence_type: "legislative_profile",
+      person_id: buildPersonId(candidate),
+      signal_type: "evidence_level",
+      source_name: "camara",
+      source_url:
+        deputadoId === null
+          ? "https://dadosabertos.camara.leg.br/api/v2/deputados"
+          : `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputadoId}`,
+      strength: "strong_official",
+      summary: summarizeRawResult(raw)
+    } satisfies RawEvidence;
+  }
+
   private async collectFormalActivityRecord(
     candidate: ResolvedCandidate,
     task: CollectionPlan["tasks"][number]
@@ -439,28 +479,7 @@ export class McpBrasilEvidenceCollector implements OfficialEvidenceCollector {
           return this.collectFormalActivityRecord(candidate, task);
         }
 
-        const raw = await this.client.callTool("camara_listar_deputados", {
-          nome: task.params.name,
-          sigla_partido: task.params.party,
-          sigla_uf: task.params.uf
-        });
-
-        if (parseMarkdownTable(raw).length === 0) {
-          return null;
-        }
-
-        return {
-          collected_at: new Date().toISOString(),
-          evidence_type: "legislative_profile",
-          person_id: buildPersonId(candidate),
-          signal_type: "evidence_level",
-          source_name: "camara",
-          source_url: candidate.official_ids.camara_id
-            ? `https://dadosabertos.camara.leg.br/api/v2/deputados/${candidate.official_ids.camara_id}`
-            : "https://dadosabertos.camara.leg.br/api/v2/deputados",
-          strength: "strong_official",
-          summary: summarizeRawResult(raw)
-        } satisfies RawEvidence;
+        return this.collectLegislativeProfile(candidate, task);
       }
 
       const raw = await this.client.callTool("tse_resultado_por_estado", {
