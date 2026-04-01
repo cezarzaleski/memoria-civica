@@ -15,13 +15,18 @@ import {
   startQueryExecution
 } from "@/observability/query-execution";
 import {
+  type CacheStore,
+  InMemoryCacheStore
+} from "@/services/cache-store";
+import {
+  type CacheTtlPolicy,
+  DEFAULT_CACHE_TTL_POLICY
+} from "@/services/cache-policy";
+import {
   InMemoryIdentityResolver,
   type IdentityResolver
 } from "@/services/identity-resolver";
-import {
-  InMemoryEvidenceStore,
-  type EvidenceStore
-} from "@/services/evidence-store";
+import { InMemoryEvidenceStore, type EvidenceStore } from "@/services/evidence-store";
 import { CachedEvidenceCollector } from "@/services/cached-evidence-collector";
 import { CachedSignalService } from "@/services/cached-signal-service";
 import { EvidenceClassifier } from "@/services/evidence-classifier";
@@ -39,6 +44,8 @@ import {
 } from "@/source-connectors/mcp-brasil";
 
 interface QueryOrchestratorOptions {
+  readonly cachePolicy?: CacheTtlPolicy;
+  readonly cacheStore?: CacheStore;
   readonly collectionPlanner?: CollectionPlanner;
   readonly evidenceCollector?: OfficialEvidenceCollector;
   readonly evidenceStore?: EvidenceStore;
@@ -112,17 +119,24 @@ export class QueryOrchestrator {
 
   public constructor(options: QueryOrchestratorOptions = {}) {
     this.collectionPlanner = options.collectionPlanner ?? new CollectionPlanner();
+    const cachePolicy = options.cachePolicy ?? DEFAULT_CACHE_TTL_POLICY;
+    const cacheStore = options.cacheStore ?? new InMemoryCacheStore();
     const client = new StdioMcpBrasilClient({
       cwd: process.cwd()
     });
     this.evidenceCollector =
       options.evidenceCollector ??
-      new CachedEvidenceCollector(new McpBrasilEvidenceCollector(client));
+      new CachedEvidenceCollector(new McpBrasilEvidenceCollector(client), {
+        cacheStore,
+        ttlMs: cachePolicy.evidence_ms
+      });
     this.evidenceStore = options.evidenceStore ?? new InMemoryEvidenceStore();
     this.evidenceClassifier = new EvidenceClassifier();
     this.identityResolver =
       options.identityResolver ??
       new InMemoryIdentityResolver({
+        cacheStore,
+        cacheTtlMs: cachePolicy.identity_ms,
         sources: [
           new McpBrasilIdentitySource(
             client
@@ -131,7 +145,10 @@ export class QueryOrchestrator {
     });
     this.responseAssembler = new ResponseAssembler();
     this.signalEngine = new SignalEngine();
-    this.signalService = new CachedSignalService(this.signalEngine);
+    this.signalService = new CachedSignalService(this.signalEngine, {
+      cacheStore,
+      ttlMs: cachePolicy.signal_ms
+    });
   }
 
   private buildCollectedGrayResponse(

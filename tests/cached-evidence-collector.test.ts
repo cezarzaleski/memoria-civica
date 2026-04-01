@@ -62,4 +62,39 @@ describe("CachedEvidenceCollector", () => {
     expect(second).toEqual(delegateEvidence);
     expect(first).not.toBe(second);
   });
+
+  it("expires cached evidence after ttl", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-01T12:00:00.000Z"));
+
+    try {
+      const delegateEvidence: RawEvidence[] = [
+        {
+          collected_at: "2026-04-01T12:00:00.000Z",
+          evidence_type: "legislative_profile",
+          person_id: "camara:220639",
+          signal_type: "evidence_level",
+          source_name: "camara",
+          source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/220639",
+          strength: "strong_official",
+          summary: "Cadastro oficial."
+        }
+      ];
+      const delegate = {
+        collect: vi.fn().mockResolvedValue(delegateEvidence)
+      };
+      const collector = new CachedEvidenceCollector(delegate, {
+        cacheStore: new InMemoryCacheStore(),
+        ttlMs: 1_000
+      });
+
+      await collector.collect(candidate, plan);
+      await vi.advanceTimersByTimeAsync(1_500);
+      await collector.collect(candidate, plan);
+
+      expect(delegate.collect).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
