@@ -1,8 +1,13 @@
 import type {
+  CacheEntryRecord,
   IdentityQuery,
   IdentityResolution,
   ResolvedCandidate
 } from "@/domain/models";
+import {
+  InMemoryCacheStore,
+  type CacheStore
+} from "@/services/cache-store";
 import type { OfficialIdentitySource } from "@/source-connectors/mcp-brasil";
 
 export interface IdentityResolver {
@@ -10,6 +15,8 @@ export interface IdentityResolver {
 }
 
 interface InMemoryIdentityResolverOptions {
+  readonly cacheStore?: CacheStore;
+  readonly cacheTtlMs?: number;
   readonly catalog?: readonly ResolvedCandidate[];
   readonly sources?: readonly OfficialIdentitySource[];
 }
@@ -146,17 +153,43 @@ async function collectFromSources(
   return allCandidates.flat();
 }
 
+function buildIdentityCacheKey(query: IdentityQuery): string {
+  return JSON.stringify({
+    name: normalizeToken(query.name),
+    office: query.office,
+    party: normalizeOptionalToken(query.party) ?? null,
+    uf: normalizeOptionalToken(query.uf) ?? null
+  });
+}
+
+function cloneIdentityResolution(resolution: IdentityResolution): IdentityResolution {
+  return JSON.parse(JSON.stringify(resolution)) as IdentityResolution;
+}
+
 export class InMemoryIdentityResolver implements IdentityResolver {
+  private readonly cacheStore: CacheStore;
+
+  private readonly cacheTtlMs: number;
+
   private readonly catalog: readonly ResolvedCandidate[];
 
   private readonly sources: readonly OfficialIdentitySource[];
 
   public constructor(options: InMemoryIdentityResolverOptions = {}) {
+    this.cacheStore = options.cacheStore ?? new InMemoryCacheStore();
+    this.cacheTtlMs = options.cacheTtlMs ?? 5 * 60 * 1000;
     this.catalog = options.catalog ?? [];
     this.sources = options.sources ?? [];
   }
 
   public async resolve(query: IdentityQuery): Promise<IdentityResolution> {
+    const cacheKey = buildIdentityCacheKey(query);
+    const cached = this.cacheStore.get("identity", cacheKey);
+
+    if (cached !== null) {
+      return cloneIdentityResolution(cached.payload.resolution as IdentityResolution);
+    }
+
     const normalizedName = normalizeToken(query.name);
     const sourcedCandidates = await collectFromSources(this.sources, query);
     const combinedCatalog = [...this.catalog, ...sourcedCandidates];
@@ -166,16 +199,27 @@ export class InMemoryIdentityResolver implements IdentityResolver {
     const narrowedMatches = filterByHints(namedMatches, query);
 
     if (narrowedMatches.length === 1) {
-      return {
+      const resolution: IdentityResolution = {
         ambiguity_level: "none",
         candidate: narrowedMatches[0],
         kind: "resolved",
         match_count: 1
       };
+
+      this.cacheStore.set({
+        cache_key: cacheKey,
+        expires_at: new Date(Date.now() + this.cacheTtlMs).toISOString(),
+        payload: {
+          resolution: cloneIdentityResolution(resolution)
+        },
+        scope: "identity",
+        stored_at: new Date().toISOString()
+      } satisfies CacheEntryRecord);
+      return resolution;
     }
 
     if (narrowedMatches.length > 1) {
-      return {
+      const resolution: IdentityResolution = {
         ambiguity_level: "strong",
         candidates: narrowedMatches,
         kind: "ambiguous",
@@ -185,10 +229,21 @@ export class InMemoryIdentityResolver implements IdentityResolver {
           ...(query.party === undefined ? (["party"] as const) : [])
         ]
       };
+
+      this.cacheStore.set({
+        cache_key: cacheKey,
+        expires_at: new Date(Date.now() + this.cacheTtlMs).toISOString(),
+        payload: {
+          resolution: cloneIdentityResolution(resolution)
+        },
+        scope: "identity",
+        stored_at: new Date().toISOString()
+      } satisfies CacheEntryRecord);
+      return resolution;
     }
 
     if (namedMatches.length > 1) {
-      return {
+      const resolution: IdentityResolution = {
         ambiguity_level: "strong",
         candidates: namedMatches,
         kind: "ambiguous",
@@ -198,12 +253,34 @@ export class InMemoryIdentityResolver implements IdentityResolver {
           ...(query.party === undefined ? (["party"] as const) : [])
         ]
       };
+
+      this.cacheStore.set({
+        cache_key: cacheKey,
+        expires_at: new Date(Date.now() + this.cacheTtlMs).toISOString(),
+        payload: {
+          resolution: cloneIdentityResolution(resolution)
+        },
+        scope: "identity",
+        stored_at: new Date().toISOString()
+      } satisfies CacheEntryRecord);
+      return resolution;
     }
 
-    return {
+    const resolution: IdentityResolution = {
       ambiguity_level: "strong",
       kind: "not_found",
       match_count: 0
     };
+
+    this.cacheStore.set({
+      cache_key: cacheKey,
+      expires_at: new Date(Date.now() + this.cacheTtlMs).toISOString(),
+      payload: {
+        resolution: cloneIdentityResolution(resolution)
+      },
+      scope: "identity",
+      stored_at: new Date().toISOString()
+    } satisfies CacheEntryRecord);
+    return resolution;
   }
 }

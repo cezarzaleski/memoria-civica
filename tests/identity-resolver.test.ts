@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import type { CacheEntryRecord } from "@/domain/models";
 import { InMemoryIdentityResolver } from "@/services/identity-resolver";
 
 describe("InMemoryIdentityResolver", () => {
@@ -131,5 +132,141 @@ describe("InMemoryIdentityResolver", () => {
       tse_id: "999"
     });
     expect(result.candidate.aliases).toEqual(["Tabata Amaral de Pontes"]);
+  });
+
+  it("reuses cached source results for repeated identity queries", async () => {
+    const source = {
+      source_name: "mcp-brasil",
+      searchCandidates: vi.fn().mockResolvedValue([
+        {
+          ambiguity_level: "none",
+          canonical_name: "Erika Hilton",
+          office: "deputado_federal",
+          official_ids: {
+            camara_id: "220639"
+          },
+          party: "PSOL",
+          status: "incumbent",
+          uf: "SP"
+        }
+      ])
+    };
+
+    const cachedResolver = new InMemoryIdentityResolver({
+      cacheTtlMs: 60_000,
+      sources: [source]
+    });
+
+    const first = await cachedResolver.resolve({
+      name: "Erika Hilton",
+      office: "deputado_federal",
+      uf: "SP"
+    });
+    const second = await cachedResolver.resolve({
+      name: "Erika Hilton",
+      office: "deputado_federal",
+      uf: "SP"
+    });
+
+    expect(first.kind).toBe("resolved");
+    expect(second.kind).toBe("resolved");
+    expect(source.searchCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it("expires cached identity results after ttl", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-01T12:00:00.000Z"));
+
+    try {
+      const source = {
+        source_name: "mcp-brasil",
+        searchCandidates: vi.fn().mockResolvedValue([
+          {
+            ambiguity_level: "none",
+            canonical_name: "Erika Hilton",
+            office: "deputado_federal",
+            official_ids: {
+              camara_id: "220639"
+            },
+            party: "PSOL",
+            status: "incumbent",
+            uf: "SP"
+          }
+        ])
+      };
+
+      const cachedResolver = new InMemoryIdentityResolver({
+        cacheTtlMs: 1_000,
+        sources: [source]
+      });
+
+      await cachedResolver.resolve({
+        name: "Erika Hilton",
+        office: "deputado_federal",
+        uf: "SP"
+      });
+
+      await vi.advanceTimersByTimeAsync(1_500);
+
+      await cachedResolver.resolve({
+        name: "Erika Hilton",
+        office: "deputado_federal",
+        uf: "SP"
+      });
+
+      expect(source.searchCandidates).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("accepts an injected cache backend", async () => {
+    const cacheRecords = new Map<string, CacheEntryRecord>();
+    const cacheStore = {
+      get: vi.fn((scope: CacheEntryRecord["scope"], key: string) => {
+        return cacheRecords.get(`${scope}:${key}`) ?? null;
+      }),
+      set: vi.fn((entry: CacheEntryRecord) => {
+        cacheRecords.set(`${entry.scope}:${entry.cache_key}`, entry);
+      })
+    };
+    const source = {
+      source_name: "mcp-brasil",
+      searchCandidates: vi.fn().mockResolvedValue([
+        {
+          ambiguity_level: "none",
+          canonical_name: "Erika Hilton",
+          office: "deputado_federal",
+          official_ids: {
+            camara_id: "220639"
+          },
+          party: "PSOL",
+          status: "incumbent",
+          uf: "SP"
+        }
+      ])
+    };
+
+    const resolverWithInjectedCache = new InMemoryIdentityResolver({
+      cacheStore,
+      cacheTtlMs: 60_000,
+      sources: [source]
+    });
+
+    await resolverWithInjectedCache.resolve({
+      name: "Erika Hilton",
+      office: "deputado_federal",
+      uf: "SP"
+    });
+
+    await resolverWithInjectedCache.resolve({
+      name: "Erika Hilton",
+      office: "deputado_federal",
+      uf: "SP"
+    });
+
+    expect(cacheStore.set).toHaveBeenCalledTimes(1);
+    expect(cacheStore.get).toHaveBeenCalledTimes(2);
+    expect(source.searchCandidates).toHaveBeenCalledTimes(1);
   });
 });
