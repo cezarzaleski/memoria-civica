@@ -22,6 +22,7 @@ import {
   type EvidenceStore
 } from "@/services/evidence-store";
 import { CachedEvidenceCollector } from "@/services/cached-evidence-collector";
+import { CachedSignalService } from "@/services/cached-signal-service";
 import { EvidenceClassifier } from "@/services/evidence-classifier";
 import { CollectionPlanner } from "@/services/collection-planner";
 import { ResponseAssembler } from "@/services/response-assembler";
@@ -78,6 +79,8 @@ export class QueryOrchestrator {
 
   private readonly signalEngine: SignalEngine;
 
+  private readonly signalService: CachedSignalService;
+
   public constructor(options: QueryOrchestratorOptions = {}) {
     this.collectionPlanner = options.collectionPlanner ?? new CollectionPlanner();
     const client = new StdioMcpBrasilClient({
@@ -96,9 +99,10 @@ export class QueryOrchestrator {
             client
           )
         ]
-      });
+    });
     this.responseAssembler = new ResponseAssembler();
     this.signalEngine = new SignalEngine();
+    this.signalService = new CachedSignalService(this.signalEngine);
   }
 
   private buildCollectedGrayResponse(
@@ -106,21 +110,15 @@ export class QueryOrchestrator {
     evidence: readonly EvidenceRecord[]
   ): ConsultationResponse {
     const classifications = this.evidenceClassifier.classify(evidence);
-    const evidenceLevel = this.signalEngine.assessEvidenceLevel(
-      evidence,
-      classifications
-    );
-    const coherence = this.signalEngine.assessCoherence(
+    const signalResult = this.signalService.compute(
       candidate,
       evidence,
       classifications
     );
-    const coherenceCoverage = this.signalEngine.describeCoherenceCoverage(
-      candidate,
-      evidence,
-      classifications
-    );
-    const integrity = this.signalEngine.assessIntegrity(evidence, classifications);
+    const evidenceLevel = signalResult.evidence_level;
+    const coherence = signalResult.coherence;
+    const coherenceCoverage = signalResult.coherenceCoverage;
+    const integrity = signalResult.integrity;
     const alerts = [evidence.length > 0 ? PARTIAL_EVIDENCE_ALERT : NO_EVIDENCE_ALERT];
 
     if (
