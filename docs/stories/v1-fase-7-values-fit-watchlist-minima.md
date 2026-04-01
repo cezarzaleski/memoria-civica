@@ -1,6 +1,6 @@
 ---
 title: V1 Fase 7 - values_fit com watchlist minima auditavel
-status: Ready
+status: Ready for Review
 date: 2026-04-01
 owner: sm
 ---
@@ -11,42 +11,43 @@ Materializar a primeira versao operacional de `values_fit` no Memoria Civica usa
 
 ## Acceptance Criteria
 
-- [ ] `editorial-config` passa a carregar uma watchlist minima de 3 a 5 temas, usando apenas regras publicas ja documentadas em `docs/arquitetura-watchlist-tematica-v1.md` e `docs/watchlist-tematica-v1-operacional.md`
-- [ ] prioridades do usuario passam a ser normalizadas apenas para os temas suportados nessa watchlist minima, sem inferir temas fora do conjunto congelado
-- [ ] `values_fit` deixa de ser sempre `insufficient` quando houver prioridade do usuario compatível com tema congelado e base suficiente de evidencia permitida
-- [ ] o sinal so sobe acima de `insufficient` quando houver pelo menos um item forte ou combinacao suficiente de itens medios coerentes entre si, conforme a regra de confianca da arquitetura da watchlist
-- [ ] evidencia fraca, manchete isolada ou jornalismo sem ato formal associado nao carregam `values_fit` sozinhos
-- [ ] a resposta continua auditavel, com razoes e limitacoes legiveis sobre o tema avaliado, a evidencia aceita e o que ficou de fora
-- [ ] testes cobrem pelo menos um caso com alinhamento observavel, um caso de aderencia parcial e um caso de evidencia insuficiente no tema
-- [ ] `npm run lint` passa
-- [ ] `npm run typecheck` passa
-- [ ] `npm test` passa
+- [x] `editorial-config` passa a carregar uma watchlist minima de 3 a 5 temas, usando apenas regras publicas ja documentadas em `docs/arquitetura-watchlist-tematica-v1.md` e `docs/watchlist-tematica-v1-operacional.md`
+- [x] prioridades do usuario passam a ser normalizadas apenas para os temas suportados nessa watchlist minima, sem inferir temas fora do conjunto congelado
+- [x] `values_fit` deixa de ser sempre `insufficient` quando houver prioridade do usuario compatível com tema congelado e base suficiente de evidencia permitida
+- [x] o sinal so sobe acima de `insufficient` quando houver pelo menos um item forte ou combinacao suficiente de itens medios coerentes entre si, conforme a regra de confianca da arquitetura da watchlist
+- [x] evidencia fraca, manchete isolada ou jornalismo sem ato formal associado nao carregam `values_fit` sozinhos
+- [x] a resposta continua auditavel, com razoes e limitacoes legiveis sobre o tema avaliado, a evidencia aceita e o que ficou de fora
+- [x] testes cobrem pelo menos um caso com alinhamento observavel, um caso de aderencia parcial e um caso de evidencia insuficiente no tema
+- [x] `npm run lint` passa
+- [x] `npm run typecheck` passa
+- [x] `npm test` passa
 
 ## Checklist
 
-- [ ] introduzir `editorial-config` minimo para watchlist tematica da V1
-- [ ] limitar a watchlist inicial a temas ja documentados e em quantidade compativel com o recorte da V1
-- [ ] plugar regras de watchlist no calculo de `values_fit`
-- [ ] normalizar prioridades do usuario apenas para temas suportados
-- [ ] restringir `values_fit` a tipos de evidencia aceitos pela arquitetura editorial
-- [ ] preservar `values_fit` como `insufficient` quando a base nao sustentar inferencia honesta
-- [ ] cobrir os estados `positive` ou `mixed` e `insufficient` com testes dedicados
-- [ ] validar quality gates
+- [x] introduzir `editorial-config` minimo para watchlist tematica da V1
+- [x] limitar a watchlist inicial a temas ja documentados e em quantidade compativel com o recorte da V1
+- [x] plugar regras de watchlist no calculo de `values_fit`
+- [x] normalizar prioridades do usuario apenas para temas suportados
+- [x] restringir `values_fit` a tipos de evidencia aceitos pela arquitetura editorial
+- [x] preservar `values_fit` como `insufficient` quando a base nao sustentar inferencia honesta
+- [x] cobrir os estados `positive` ou `mixed` e `insufficient` com testes dedicados
+- [x] validar quality gates
 
 ## File List
 
-- [ ] `packages/memoria-civica/src/services/editorial-config.ts`
-- [ ] `packages/memoria-civica/src/services/signal-engine.ts`
-- [ ] `packages/memoria-civica/src/services/query-orchestrator.ts`
-- [ ] `packages/memoria-civica/src/domain/models.ts`
-- [ ] `tests/signal-engine.test.ts`
-- [ ] `tests/query-orchestrator.test.ts`
+- [x] `packages/memoria-civica/src/services/editorial-config.ts`
+- [x] `packages/memoria-civica/src/services/signal-engine.ts`
+- [x] `packages/memoria-civica/src/services/cached-signal-service.ts`
+- [x] `packages/memoria-civica/src/services/query-orchestrator.ts`
+- [x] `packages/memoria-civica/src/services/response-assembler.ts`
+- [x] `tests/signal-engine.test.ts`
+- [x] `tests/query-orchestrator.test.ts`
 
 ## Validation Evidence
 
-- [ ] `2026-04-01`: `npm run lint`
-- [ ] `2026-04-01`: `npm run typecheck`
-- [ ] `2026-04-01`: `npm test`
+- [x] `2026-04-01`: `npm run lint`
+- [x] `2026-04-01`: `npm run typecheck`
+- [x] `2026-04-01`: `npm test`
 
 ## Notes
 

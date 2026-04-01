@@ -136,6 +136,64 @@ describe("QueryOrchestrator", () => {
     ]);
   });
 
+  it("propagates a positive values_fit signal for a supported priority theme", async () => {
+    const candidate: ResolvedCandidate = {
+      ambiguity_level: "none",
+      canonical_name: "Erika Hilton",
+      office: "deputado_federal",
+      official_ids: {
+        camara_id: "220639"
+      },
+      party: "PSOL",
+      status: "incumbent",
+      uf: "SP"
+    };
+
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T12:00:00.000Z",
+        evidence_id: "ev-values-fit-1",
+        evidence_type: "propositions_summary",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/proposicoes?idDeputadoAutor=220639",
+        strength: "strong_official",
+        summary:
+          "Proposicoes autorais recentes sobre renda, emprego e custo de vida."
+      }
+    ];
+
+    const orchestrator = new QueryOrchestrator({
+      evidenceCollector: {
+        collect: vi.fn().mockResolvedValue(evidence)
+      },
+      evidenceStore: {
+        save: vi.fn().mockResolvedValue(evidence)
+      },
+      identityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          ambiguity_level: "none",
+          candidate,
+          kind: "resolved",
+          match_count: 1
+        } satisfies IdentityResolution)
+      }
+    });
+
+    const result = await orchestrator.consult({
+      candidate_name: "Erika Hilton",
+      uf: "SP",
+      user_priorities: ["custo de vida"]
+    });
+
+    expect(result.response.signals.values_fit.status).toBe("positive");
+    expect(result.response.signals.values_fit.evidence_ids).toEqual([
+      "ev-values-fit-1"
+    ]);
+    expect(result.response.reasons.join(" ")).toContain("Economia e Custo de Vida");
+  });
+
   it("keeps a gray response when no evidence is collected", async () => {
     const candidate: ResolvedCandidate = {
       ambiguity_level: "none",

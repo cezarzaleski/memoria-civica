@@ -24,11 +24,17 @@ interface AssembleResponseInput {
 function buildReasons(
   signals: Record<SignalName, SignalAssessment>
 ): readonly string[] {
-  return [
+  const reasons = [
     ...signals.evidence_level.reasons,
     ...signals.integrity.reasons,
     ...signals.coherence.reasons
-  ].slice(0, 3);
+  ];
+
+  if (signals.values_fit.status !== "insufficient") {
+    reasons.push(...signals.values_fit.reasons);
+  }
+
+  return reasons.slice(0, 4);
 }
 
 function deriveConfidence(

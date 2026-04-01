@@ -9,6 +9,7 @@ import {
   InMemoryCacheStore,
   type CacheStore
 } from "@/services/cache-store";
+import { normalizeSupportedPriorities } from "@/services/editorial-config";
 import { SignalEngine } from "@/services/signal-engine";
 
 interface CachedSignalServiceOptions {
@@ -21,17 +22,22 @@ interface CachedSignalResult {
   readonly coherenceCoverage: ReturnType<SignalEngine["describeCoherenceCoverage"]>;
   readonly evidence_level: SignalAssessment;
   readonly integrity: SignalAssessment;
+  readonly values_fit: SignalAssessment;
 }
 
 function buildSignalCacheKey(
   candidate: ResolvedCandidate,
-  evidence: readonly EvidenceRecord[]
+  evidence: readonly EvidenceRecord[],
+  userPriorities: readonly string[]
 ): string {
+  const normalizedPriorities = normalizeSupportedPriorities(userPriorities);
+
   return JSON.stringify({
     canonical_name: candidate.canonical_name,
     office: candidate.office,
     official_ids: candidate.official_ids,
-    evidence_ids: evidence.map((record) => record.evidence_id).sort()
+    evidence_ids: evidence.map((record) => record.evidence_id).sort(),
+    user_priorities: [...normalizedPriorities].sort()
   });
 }
 
@@ -58,9 +64,10 @@ export class CachedSignalService {
   public compute(
     candidate: ResolvedCandidate,
     evidence: readonly EvidenceRecord[],
-    classifications: readonly EvidenceClassificationRecord[]
+    classifications: readonly EvidenceClassificationRecord[],
+    userPriorities: readonly string[] = []
   ): CachedSignalResult {
-    const cacheKey = buildSignalCacheKey(candidate, evidence);
+    const cacheKey = buildSignalCacheKey(candidate, evidence, userPriorities);
     const cached = this.cacheStore.get("signal", cacheKey);
 
     if (cached !== null) {
@@ -82,7 +89,13 @@ export class CachedSignalService {
         evidence,
         classifications
       ),
-      integrity: this.signalEngine.assessIntegrity(evidence, classifications)
+      integrity: this.signalEngine.assessIntegrity(evidence, classifications),
+      values_fit: this.signalEngine.assessValuesFit(
+        candidate,
+        evidence,
+        classifications,
+        userPriorities
+      )
     } satisfies CachedSignalResult;
 
     this.cacheStore.set({

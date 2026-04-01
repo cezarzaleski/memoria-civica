@@ -271,4 +271,150 @@ describe("SignalEngine", () => {
     expect(result.status).toBe("negative");
     expect(result.evidence_ids).toEqual(["ev-3"]);
   });
+
+  it("returns positive values_fit when a supported theme has a strong official match", () => {
+    const engine = new SignalEngine();
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T12:00:00.000Z",
+        evidence_id: "ev-values-1",
+        evidence_type: "propositions_summary",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/proposicoes?idDeputadoAutor=220639",
+        strength: "strong_official",
+        summary:
+          "Proposicoes autorais recentes sobre custo de vida, renda e emprego foram identificadas."
+      }
+    ];
+    const classifications: EvidenceClassificationRecord[] = [
+      {
+        classified_at: "2026-04-01T12:01:00.000Z",
+        classification_id: "cl-values-1",
+        confidence: "high",
+        evidence_id: "ev-values-1",
+        strength: "strong_official"
+      }
+    ];
+
+    const result = engine.assessValuesFit(
+      incumbentFederalCandidate,
+      evidence,
+      classifications,
+      ["custo de vida", "educacao"]
+    );
+
+    expect(result.status).toBe("positive");
+    expect(result.evidence_ids).toEqual(["ev-values-1"]);
+    expect(result.reasons[0]).toContain("Economia e Custo de Vida");
+  });
+
+  it("returns mixed values_fit when a supported theme has only partial official matches", () => {
+    const engine = new SignalEngine();
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T12:00:00.000Z",
+        evidence_id: "ev-values-2",
+        evidence_type: "propositions_summary",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/proposicoes?idDeputadoAutor=220639",
+        strength: "official_partial",
+        summary: "Proposicoes autorais sobre direitos das mulheres em fase inicial."
+      },
+      {
+        collected_at: "2026-04-01T12:00:01.000Z",
+        evidence_id: "ev-values-3",
+        evidence_type: "formal_activity_record",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/220639",
+        strength: "official_partial",
+        summary: "Atuacao formal relacionada a direitos das mulheres."
+      }
+    ];
+    const classifications: EvidenceClassificationRecord[] = [
+      {
+        classified_at: "2026-04-01T12:01:00.000Z",
+        classification_id: "cl-values-2",
+        confidence: "low",
+        evidence_id: "ev-values-2",
+        strength: "official_partial"
+      },
+      {
+        classified_at: "2026-04-01T12:01:01.000Z",
+        classification_id: "cl-values-3",
+        confidence: "low",
+        evidence_id: "ev-values-3",
+        strength: "official_partial"
+      }
+    ];
+
+    const result = engine.assessValuesFit(
+      incumbentFederalCandidate,
+      evidence,
+      classifications,
+      ["direitos das mulheres"]
+    );
+
+    expect(result.status).toBe("mixed");
+    expect(result.evidence_ids).toEqual(["ev-values-2", "ev-values-3"]);
+  });
+
+  it("returns insufficient values_fit when the evidence is weak or unsupported", () => {
+    const engine = new SignalEngine();
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T12:00:00.000Z",
+        evidence_id: "ev-values-4",
+        evidence_type: "news_screening",
+        person_id: "camara:220639",
+        signal_type: "values_fit",
+        source_name: "jornal-local",
+        source_url: "https://jornal.local/reportagem/1",
+        strength: "complementary",
+        summary: "Cobertura jornalistica sobre tema economico."
+      },
+      {
+        collected_at: "2026-04-01T12:00:01.000Z",
+        evidence_id: "ev-values-5",
+        evidence_type: "legislative_profile",
+        person_id: "camara:220639",
+        signal_type: "evidence_level",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/220639",
+        strength: "weak",
+        summary: "Perfil sem conexao tematica suficiente."
+      }
+    ];
+    const classifications: EvidenceClassificationRecord[] = [
+      {
+        classified_at: "2026-04-01T12:01:00.000Z",
+        classification_id: "cl-values-4",
+        confidence: "low",
+        evidence_id: "ev-values-4",
+        strength: "complementary"
+      },
+      {
+        classified_at: "2026-04-01T12:01:01.000Z",
+        classification_id: "cl-values-5",
+        confidence: "low",
+        evidence_id: "ev-values-5",
+        strength: "weak"
+      }
+    ];
+
+    const result = engine.assessValuesFit(
+      incumbentFederalCandidate,
+      evidence,
+      classifications,
+      ["transparencia"]
+    );
+
+    expect(result.status).toBe("insufficient");
+    expect(result.reasons[0]).toContain("watchlist minima");
+  });
 });

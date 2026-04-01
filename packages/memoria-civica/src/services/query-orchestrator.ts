@@ -276,18 +276,21 @@ export class QueryOrchestrator {
   private buildCollectedGrayResponse(
     candidate: ResolvedCandidate,
     evidence: readonly EvidenceRecord[],
-    signalService: CachedSignalService
+    signalService: CachedSignalService,
+    userPriorities: readonly string[]
   ): ConsultationResponse {
     const classifications = this.evidenceClassifier.classify(evidence);
     const signalResult = signalService.compute(
       candidate,
       evidence,
-      classifications
+      classifications,
+      userPriorities
     );
     const evidenceLevel = signalResult.evidence_level;
     const coherence = signalResult.coherence;
     const coherenceCoverage = signalResult.coherenceCoverage;
     const integrity = signalResult.integrity;
+    const valuesFit = signalResult.values_fit;
     const observability = buildCoherenceObservability({
       candidate,
       coherence,
@@ -336,7 +339,8 @@ export class QueryOrchestrator {
           ...base.signals,
           coherence,
           integrity,
-          evidence_level: evidenceLevel
+          evidence_level: evidenceLevel,
+          values_fit: valuesFit
         },
         sources: [...new Set(evidence.map((item) => item.source_url))]
       }),
@@ -344,7 +348,8 @@ export class QueryOrchestrator {
         ...base.signals,
         coherence,
         integrity,
-        evidence_level: evidenceLevel
+        evidence_level: evidenceLevel,
+        values_fit: valuesFit
       }
     };
   }
@@ -400,7 +405,8 @@ export class QueryOrchestrator {
       const response = this.buildCollectedGrayResponse(
         identity.candidate,
         evidence,
-        signalService
+        signalService,
+        request.user_priorities
       );
 
       execution = appendExecutionStep(execution, "response_assembled");
