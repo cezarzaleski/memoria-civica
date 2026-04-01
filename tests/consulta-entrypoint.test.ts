@@ -246,6 +246,88 @@ describe("consulta entrypoint", () => {
     expect(payload.observability).toBeUndefined();
   });
 
+  it("exposes a concise disambiguation payload for ambiguous identities", async () => {
+    const stderrWrite = vi.fn();
+    const write = vi.fn();
+
+    await runConsultaEntrypoint(
+      ["--candidate", "Joao Silva", "--office", "deputado_federal"],
+      {
+        stderr: { write: stderrWrite },
+        stdout: { write }
+      },
+      {
+        consult: vi.fn().mockResolvedValue({
+          execution: {
+            duration_ms: 2,
+            started_at: "2026-04-01T00:00:00.000Z",
+            status: "completed",
+            steps: [
+              "request_validated",
+              "identity_ambiguous",
+              "response_assembled"
+            ],
+            trace_id: "trace-ambiguity-1"
+          },
+          response: {
+            alerts: [
+              "Faltou contexto para identificar a pessoa certa. Informe UF e o partido para continuar."
+            ],
+            candidate: {
+              ambiguity_level: "strong",
+              canonical_name: "Joao Silva",
+              match_count: 2,
+              official_ids: {},
+              requires: ["uf", "party"],
+              resolution_kind: "ambiguous",
+              status: "challenger"
+            },
+            confidence: "low",
+            reasons: [
+              "Faltou contexto para identificar a pessoa certa. Informe UF e o partido para continuar."
+            ],
+            signals: {
+              coherence: { evidence_ids: [], reasons: [], status: "insufficient" },
+              evidence_level: {
+                evidence_ids: [],
+                reasons: [
+                  "Faltou contexto para identificar a pessoa certa. Informe UF e o partido para continuar."
+                ],
+                status: "insufficient"
+              },
+              integrity: { evidence_ids: [], reasons: [], status: "insufficient" },
+              values_fit: { evidence_ids: [], reasons: [], status: "insufficient" }
+            },
+            sources: [],
+            summary:
+              "A consulta parou na etapa de identidade porque faltou contexto para identificar a pessoa certa.",
+            traffic_light: "gray"
+          }
+        })
+      }
+    );
+
+    expect(write).toHaveBeenCalledOnce();
+    expect(stderrWrite.mock.calls[0]?.[0]).toContain(
+      "[trace=trace-ambiguity-1] status=completed duration_ms=2"
+    );
+
+    const payload = parsePayload(write.mock.calls[0]?.[0]);
+
+    expect(payload.candidate).toMatchObject({
+      canonical_name: "Joao Silva",
+      requires: ["uf", "party"],
+      resolution_kind: "ambiguous"
+    });
+    expect(payload.summary).toBe(
+      "A consulta parou na etapa de identidade porque faltou contexto para identificar a pessoa certa."
+    );
+    expect(payload.alerts).toEqual([
+      "Faltou contexto para identificar a pessoa certa. Informe UF e o partido para continuar."
+    ]);
+    expect(payload.traffic_light).toBe("gray");
+  });
+
   it("does not leak review queue metadata into the functional stdout payload", async () => {
     const stderrWrite = vi.fn();
     const write = vi.fn();

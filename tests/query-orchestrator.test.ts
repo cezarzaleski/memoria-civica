@@ -297,8 +297,14 @@ describe("QueryOrchestrator", () => {
     expect(result.response.candidate.requires).toEqual(["uf", "party"]);
     expect(result.response.candidate.resolution_kind).toBe("ambiguous");
     expect(result.response.alerts).toContain(
-      "Identidade ambigua. Informe uf e party para continuar."
+      "Faltou contexto para identificar a pessoa certa. Informe UF e o partido para continuar."
     );
+    expect(result.response.summary).toBe(
+      "A consulta parou na etapa de identidade porque faltou contexto para identificar a pessoa certa."
+    );
+    expect(result.response.reasons).toEqual([
+      "Faltou contexto para identificar a pessoa certa. Informe UF e o partido para continuar."
+    ]);
     expect(result.response.observability).toBeUndefined();
     expect(result.execution.observability?.review_queue).toEqual([
       {
@@ -312,6 +318,64 @@ describe("QueryOrchestrator", () => {
       "identity_ambiguous",
       "response_assembled"
     ]);
+  });
+
+  it("continues when a single hint is enough to resolve the identity", async () => {
+    const candidate: ResolvedCandidate = {
+      ambiguity_level: "none",
+      canonical_name: "Joana Silva",
+      office: "deputado_federal",
+      official_ids: {
+        tse_id: "444"
+      },
+      party: "PT",
+      status: "former",
+      uf: "SP"
+    };
+
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T08:00:00.000Z",
+        evidence_id: "ev-single-hint-1",
+        evidence_type: "formal_activity_record",
+        person_id: "tse:444",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/444",
+        strength: "strong_official",
+        summary: "Historico legislativo suficiente para a consulta."
+      }
+    ];
+
+    const evidenceCollector = {
+      collect: vi.fn().mockResolvedValue(evidence)
+    };
+    const evidenceStore = {
+      save: vi.fn().mockResolvedValue(evidence)
+    };
+    const orchestrator = new QueryOrchestrator({
+      evidenceCollector,
+      evidenceStore,
+      identityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          ambiguity_level: "none",
+          candidate,
+          kind: "resolved",
+          match_count: 1
+        } satisfies IdentityResolution)
+      }
+    });
+
+    const result = await orchestrator.consult({
+      candidate_name: "Joana Silva",
+      uf: "SP"
+    });
+
+    expect(evidenceCollector.collect).toHaveBeenCalledTimes(1);
+    expect(evidenceStore.save).toHaveBeenCalledTimes(1);
+    expect(result.response.candidate.resolution_kind).toBe("resolved");
+    expect(result.response.candidate.requires).toBeUndefined();
+    expect(result.execution.steps).toContain("evidence_collected");
   });
 
   it("records review queue metadata for sensitive integrity evidence", async () => {

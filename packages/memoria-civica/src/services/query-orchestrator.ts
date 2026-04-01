@@ -97,6 +97,30 @@ function normalizeForMatch(value: string): string {
     .toLowerCase();
 }
 
+function formatIdentityRequirement(requirement: "uf" | "party"): string {
+  return requirement === "uf" ? "UF" : "o partido";
+}
+
+function formatIdentityDisambiguationMessage(
+  requires: readonly ("uf" | "party")[]
+): string {
+  if (requires.length === 0) {
+    return "Faltou contexto para identificar a pessoa certa.";
+  }
+
+  const formattedRequirements = requires.map(formatIdentityRequirement);
+
+  if (formattedRequirements.length === 1) {
+    return `Faltou contexto para identificar a pessoa certa. Informe ${formattedRequirements[0]} para continuar.`;
+  }
+
+  if (formattedRequirements.length === 2) {
+    return `Faltou contexto para identificar a pessoa certa. Informe ${formattedRequirements[0]} e ${formattedRequirements[1]} para continuar.`;
+  }
+
+  return `Faltou contexto para identificar a pessoa certa. Informe ${formattedRequirements.join(", ")} para continuar.`;
+}
+
 function isSensitiveIntegrityEvidence(record: EvidenceRecord): boolean {
   if (record.signal_type !== "integrity") {
     return false;
@@ -419,9 +443,7 @@ export class QueryOrchestrator {
 
     const alerts =
       identity.kind === "ambiguous"
-        ? [
-            `Identidade ambigua. Informe ${identity.requires.join(" e ")} para continuar.`
-          ]
+        ? [formatIdentityDisambiguationMessage(identity.requires)]
         : ["Nenhuma identidade oficial foi encontrada para a consulta informada."];
 
     execution = appendExecutionStep(
@@ -448,11 +470,11 @@ export class QueryOrchestrator {
       },
       reasons:
         identity.kind === "ambiguous"
-          ? ["A consulta precisa de mais contexto para desambiguar o nome informado."]
+          ? [formatIdentityDisambiguationMessage(identity.requires)]
           : ["Nao foi possivel resolver a identidade do candidato com seguranca."],
       summary:
         identity.kind === "ambiguous"
-          ? "A consulta parou na etapa de identidade por ambiguidade forte."
+          ? "A consulta parou na etapa de identidade porque faltou contexto para identificar a pessoa certa."
           : "A consulta parou porque nenhuma identidade oficial foi localizada."
     });
 
