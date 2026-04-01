@@ -1,7 +1,8 @@
 import type {
   CacheScope,
   CacheTelemetryStatus,
-  QueryExecutionRecord
+  QueryExecutionRecord,
+  ReviewQueueEntry
 } from "@/domain/models";
 
 interface MutableExecutionState {
@@ -53,6 +54,24 @@ export function recordExecutionCacheTelemetry(
           ...state.record.observability?.cache,
           [scope]: status
         }
+      }
+    }
+  };
+}
+
+export function appendExecutionReviewQueueEntry(
+  state: MutableExecutionState,
+  entry: ReviewQueueEntry
+): MutableExecutionState {
+  return {
+    record: {
+      ...state.record,
+      observability: {
+        ...state.record.observability,
+        review_queue: [
+          ...(state.record.observability?.review_queue ?? []),
+          entry
+        ]
       }
     }
   };

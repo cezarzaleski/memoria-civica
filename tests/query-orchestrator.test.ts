@@ -242,11 +242,189 @@ describe("QueryOrchestrator", () => {
       "Identidade ambigua. Informe uf e party para continuar."
     );
     expect(result.response.observability).toBeUndefined();
+    expect(result.execution.observability?.review_queue).toEqual([
+      {
+        message: "Consulta parada por ambiguidade forte de identidade; revisao humana necessaria.",
+        reason: "identity_ambiguity",
+        requires: ["uf", "party"]
+      }
+    ]);
     expect(result.execution.steps).toEqual([
       "request_validated",
       "identity_ambiguous",
       "response_assembled"
     ]);
+  });
+
+  it("records review queue metadata for sensitive integrity evidence", async () => {
+    const candidate: ResolvedCandidate = {
+      ambiguity_level: "none",
+      canonical_name: "Candidato Sensivel",
+      office: "deputado_federal",
+      official_ids: {
+        tse_id: "987654321"
+      },
+      status: "former",
+      uf: "SP"
+    };
+
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T10:00:00.000Z",
+        evidence_id: "ev-integrity-alert",
+        evidence_type: "integrity_alert",
+        person_id: "tse:987654321",
+        signal_type: "integrity",
+        source_name: "tre-sp",
+        source_url: "https://tre-sp.jus.br/caso/987654321",
+        strength: "strong_official",
+        summary: "Processo eleitoral com representacao formal em andamento."
+      }
+    ];
+
+    const orchestrator = new QueryOrchestrator({
+      evidenceCollector: {
+        collect: vi.fn().mockResolvedValue(evidence)
+      },
+      evidenceStore: {
+        save: vi.fn().mockResolvedValue(evidence)
+      },
+      identityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          ambiguity_level: "none",
+          candidate,
+          kind: "resolved",
+          match_count: 1
+        } satisfies IdentityResolution)
+      }
+    });
+
+    const result = await orchestrator.consult({
+      candidate_name: "Candidato Sensivel",
+      uf: "SP"
+    });
+
+    expect(result.response.traffic_light).toBe("red");
+    expect(result.execution.observability?.review_queue).toEqual([
+      {
+        evidence_ids: ["ev-integrity-alert"],
+        message:
+          "Consulta marcada para revisao por caso sensivel de integridade detectado nas evidencias coletadas.",
+        reason: "integrity_sensitive_case"
+      }
+    ]);
+  });
+
+  it("records review queue metadata when complementary journalism is used", async () => {
+    const candidate: ResolvedCandidate = {
+      ambiguity_level: "none",
+      canonical_name: "Candidata Editorial",
+      office: "deputado_federal",
+      official_ids: {
+        tse_id: "555"
+      },
+      status: "challenger",
+      uf: "RJ"
+    };
+
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T11:00:00.000Z",
+        evidence_id: "ev-journalism-1",
+        evidence_type: "news_screening",
+        person_id: "tse:555",
+        signal_type: "values_fit",
+        source_name: "jornal-local",
+        source_url: "https://jornal.local/reportagem/1",
+        strength: "complementary",
+        summary: "Cobertura jornalistica complementar usada como contexto tematico."
+      }
+    ];
+
+    const orchestrator = new QueryOrchestrator({
+      evidenceCollector: {
+        collect: vi.fn().mockResolvedValue(evidence)
+      },
+      evidenceStore: {
+        save: vi.fn().mockResolvedValue(evidence)
+      },
+      identityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          ambiguity_level: "none",
+          candidate,
+          kind: "resolved",
+          match_count: 1
+        } satisfies IdentityResolution)
+      }
+    });
+
+    const result = await orchestrator.consult({
+      candidate_name: "Candidata Editorial",
+      uf: "RJ",
+      user_priorities: ["transparencia"]
+    });
+
+    expect(result.execution.observability?.review_queue).toEqual([
+      {
+        evidence_ids: ["ev-journalism-1"],
+        message:
+          "Consulta marcada para revisao editorial por uso de evidencia complementar como apoio de sinal.",
+        reason: "complementary_journalism"
+      }
+    ]);
+    expect(result.response.signals.values_fit.status).toBe("insufficient");
+  });
+
+  it("does not mark review queue for complementary non-journalistic evidence", async () => {
+    const candidate: ResolvedCandidate = {
+      ambiguity_level: "none",
+      canonical_name: "Candidato Fonte Complementar",
+      office: "deputado_federal",
+      official_ids: {
+        tse_id: "777"
+      },
+      status: "challenger",
+      uf: "BA"
+    };
+
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-04-01T12:00:00.000Z",
+        evidence_id: "ev-complementary-1",
+        evidence_type: "external_dataset",
+        person_id: "tse:777",
+        signal_type: "values_fit",
+        source_name: "instituto-parceiro",
+        source_url: "https://dados.parceiro.org/base/1",
+        strength: "complementary",
+        summary: "Base complementar de contexto tematico sem origem jornalistica."
+      }
+    ];
+
+    const orchestrator = new QueryOrchestrator({
+      evidenceCollector: {
+        collect: vi.fn().mockResolvedValue(evidence)
+      },
+      evidenceStore: {
+        save: vi.fn().mockResolvedValue(evidence)
+      },
+      identityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          ambiguity_level: "none",
+          candidate,
+          kind: "resolved",
+          match_count: 1
+        } satisfies IdentityResolution)
+      }
+    });
+
+    const result = await orchestrator.consult({
+      candidate_name: "Candidato Fonte Complementar",
+      uf: "BA",
+      user_priorities: ["educacao"]
+    });
+
+    expect(result.execution.observability?.review_queue).toBeUndefined();
   });
 
   it("records cache telemetry by scope across repeated identical consultations", async () => {

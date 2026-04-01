@@ -245,4 +245,78 @@ describe("consulta entrypoint", () => {
     expect(payload.traffic_light).toBe("gray");
     expect(payload.observability).toBeUndefined();
   });
+
+  it("does not leak review queue metadata into the functional stdout payload", async () => {
+    const stderrWrite = vi.fn();
+    const write = vi.fn();
+
+    await runConsultaEntrypoint(
+      ["--candidate", "Nome Sensivel", "--office", "deputado_federal"],
+      {
+        stderr: { write: stderrWrite },
+        stdout: { write }
+      },
+      {
+        consult: vi.fn().mockResolvedValue({
+          execution: {
+            duration_ms: 3,
+            started_at: "2026-04-01T00:00:00.000Z",
+            status: "completed",
+            steps: [
+              "request_validated",
+              "identity_resolved",
+              "evidence_collected",
+              "response_assembled"
+            ],
+            trace_id: "trace-review-1",
+            observability: {
+              review_queue: [
+                {
+                  evidence_ids: ["ev-1"],
+                  message:
+                    "Consulta marcada para revisao por caso sensivel de integridade detectado nas evidencias coletadas.",
+                  reason: "integrity_sensitive_case"
+                }
+              ]
+            }
+          },
+          response: {
+            alerts: ["Coleta oficial ainda insuficiente para conclusao final."],
+            candidate: {
+              canonical_name: "Nome Sensivel",
+              official_ids: {},
+              status: "former"
+            },
+            confidence: "low",
+            reasons: ["Foram coletadas 1 evidencias oficiais iniciais."],
+            signals: {
+              coherence: { evidence_ids: [], reasons: [], status: "insufficient" },
+              evidence_level: {
+                evidence_ids: ["ev-1"],
+                reasons: ["Foram coletadas 1 evidencias oficiais iniciais."],
+                status: "mixed"
+              },
+              integrity: {
+                evidence_ids: ["ev-1"],
+                reasons: ["Ha registro oficial relacionado a integridade."],
+                status: "negative"
+              },
+              values_fit: { evidence_ids: [], reasons: [], status: "insufficient" }
+            },
+            sources: ["https://tre.example/caso/1"],
+            summary: "A consulta encontrou alerta oficial de integridade para Nome Sensivel.",
+            traffic_light: "red"
+          }
+        })
+      }
+    );
+
+    const payload = parsePayload(write.mock.calls[0]?.[0]);
+
+    expect(payload.observability).toBeUndefined();
+    expect("review_queue" in payload).toBe(false);
+    expect(stderrWrite.mock.calls[0]?.[0]).toContain(
+      "[trace=trace-review-1] status=completed duration_ms=3"
+    );
+  });
 });

@@ -117,8 +117,21 @@ export interface QueryExecutionCacheTelemetry {
   readonly signal?: CacheTelemetryStatus;
 }
 
+export type ReviewQueueReason =
+  | "identity_ambiguity"
+  | "integrity_sensitive_case"
+  | "complementary_journalism";
+
+export interface ReviewQueueEntry {
+  readonly evidence_ids?: readonly string[];
+  readonly message: string;
+  readonly reason: ReviewQueueReason;
+  readonly requires?: ReadonlyArray<"uf" | "party">;
+}
+
 export interface QueryExecutionObservability {
   readonly cache?: QueryExecutionCacheTelemetry;
+  readonly review_queue?: readonly ReviewQueueEntry[];
 }
 
 export interface QueryExecutionRecord {

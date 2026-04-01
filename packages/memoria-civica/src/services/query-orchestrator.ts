@@ -7,9 +7,11 @@ import type {
   ConsultationResponse,
   EvidenceRecord,
   QueryExecutionRecord,
-  ResolvedCandidate
+  ResolvedCandidate,
+  ReviewQueueEntry
 } from "@/domain/models";
 import {
+  appendExecutionReviewQueueEntry,
   appendExecutionStep,
   finishQueryExecution,
   recordExecutionCacheTelemetry,
@@ -72,6 +74,89 @@ const COHERENCE_LIMITATION_ALERT =
   "Coherence usa atuacao formal, proposicoes autorais e votos nominais recentes da Camara; relatoria ainda nao foi integrada e votos nominais seguem parciais.";
 const COHERENCE_COVERAGE_ALERT_PREFIX =
   "Cobertura atual de coherence na Camara";
+const INTEGRITY_SENSITIVE_TERMS = [
+  "sancao",
+  "processo",
+  "controversia",
+  "representacao"
+] as const;
+const JOURNALISM_MARKERS = [
+  "jornal",
+  "noticia",
+  "noticias",
+  "news",
+  "reportagem",
+  "midia",
+  "media"
+] as const;
+
+function normalizeForMatch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+function isSensitiveIntegrityEvidence(record: EvidenceRecord): boolean {
+  if (record.signal_type !== "integrity") {
+    return false;
+  }
+
+  if (record.evidence_type === "integrity_alert") {
+    return true;
+  }
+
+  const haystack = normalizeForMatch(
+    `${record.evidence_type} ${record.summary}`
+  );
+
+  return INTEGRITY_SENSITIVE_TERMS.some((term) => {
+    return haystack.includes(term);
+  });
+}
+
+function usesComplementaryJournalism(record: EvidenceRecord): boolean {
+  const haystack = normalizeForMatch(
+    `${record.evidence_type} ${record.source_name} ${record.source_url}`
+  );
+
+  return (
+    record.strength === "complementary" &&
+    (record.signal_type === "integrity" || record.signal_type === "values_fit") &&
+    JOURNALISM_MARKERS.some((marker) => {
+      return haystack.includes(marker);
+    })
+  );
+}
+
+function buildResolvedReviewQueueEntries(
+  evidence: readonly EvidenceRecord[]
+): readonly ReviewQueueEntry[] {
+  const entries: ReviewQueueEntry[] = [];
+  const sensitiveIntegrityEvidence = evidence.filter(isSensitiveIntegrityEvidence);
+
+  if (sensitiveIntegrityEvidence.length > 0) {
+    entries.push({
+      evidence_ids: sensitiveIntegrityEvidence.map((record) => record.evidence_id),
+      message:
+        "Consulta marcada para revisao por caso sensivel de integridade detectado nas evidencias coletadas.",
+      reason: "integrity_sensitive_case"
+    });
+  }
+
+  const complementaryEvidence = evidence.filter(usesComplementaryJournalism);
+
+  if (complementaryEvidence.length > 0) {
+    entries.push({
+      evidence_ids: complementaryEvidence.map((record) => record.evidence_id),
+      message:
+        "Consulta marcada para revisao editorial por uso de evidencia complementar como apoio de sinal.",
+      reason: "complementary_journalism"
+    });
+  }
+
+  return entries;
+}
 
 function buildCoherenceObservability(input: {
   readonly candidate: ResolvedCandidate;
@@ -306,6 +391,9 @@ export class QueryOrchestrator {
       execution = appendExecutionStep(execution, "evidence_collected");
       const evidence = await this.evidenceStore.save(rawEvidence);
       execution = appendExecutionStep(execution, "evidence_stored");
+      for (const entry of buildResolvedReviewQueueEntries(evidence)) {
+        execution = appendExecutionReviewQueueEntry(execution, entry);
+      }
       execution = appendExecutionStep(execution, "evidence_classified");
       execution = appendExecutionStep(execution, "signals_computed");
 
@@ -334,6 +422,15 @@ export class QueryOrchestrator {
       execution,
       identity.kind === "ambiguous" ? "identity_ambiguous" : "identity_not_found"
     );
+
+    if (identity.kind === "ambiguous") {
+      execution = appendExecutionReviewQueueEntry(execution, {
+        message:
+          "Consulta parada por ambiguidade forte de identidade; revisao humana necessaria.",
+        reason: "identity_ambiguity",
+        requires: identity.requires
+      });
+    }
 
     const response = buildGrayResponse({
       alerts,
