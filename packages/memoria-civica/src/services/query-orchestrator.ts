@@ -12,9 +12,11 @@ import type {
 import {
   appendExecutionStep,
   finishQueryExecution,
+  recordExecutionCacheTelemetry,
   startQueryExecution
 } from "@/observability/query-execution";
 import {
+  ObservedCacheStore,
   type CacheStore,
   InMemoryCacheStore
 } from "@/services/cache-store";
@@ -39,6 +41,7 @@ import {
 import {
   McpBrasilEvidenceCollector,
   type OfficialEvidenceCollector,
+  type OfficialIdentitySource,
   McpBrasilIdentitySource,
   StdioMcpBrasilClient
 } from "@/source-connectors/mcp-brasil";
@@ -49,7 +52,12 @@ interface QueryOrchestratorOptions {
   readonly collectionPlanner?: CollectionPlanner;
   readonly evidenceCollector?: OfficialEvidenceCollector;
   readonly evidenceStore?: EvidenceStore;
+  readonly identityCatalog?: readonly ResolvedCandidate[];
   readonly identityResolver?: IdentityResolver;
+  readonly identitySources?: readonly OfficialIdentitySource[];
+  readonly mcpBrasilClient?: StdioMcpBrasilClient;
+  readonly rawEvidenceCollector?: OfficialEvidenceCollector;
+  readonly signalEngine?: SignalEngine;
 }
 
 interface ConsultationResult {
@@ -101,62 +109,92 @@ function buildPlaceholderCandidate(name: string): ResolvedCandidate {
 }
 
 export class QueryOrchestrator {
+  private readonly cachePolicy: CacheTtlPolicy;
+
+  private readonly cacheStore: CacheStore;
+
+  private readonly client: StdioMcpBrasilClient;
+
   private readonly collectionPlanner: CollectionPlanner;
 
-  private readonly evidenceCollector: OfficialEvidenceCollector;
+  private readonly evidenceCollector?: OfficialEvidenceCollector;
 
   private readonly evidenceStore: EvidenceStore;
 
   private readonly evidenceClassifier: EvidenceClassifier;
 
-  private readonly identityResolver: IdentityResolver;
+  private readonly identityResolver?: IdentityResolver;
+
+  private readonly identityCatalog: readonly ResolvedCandidate[];
+
+  private readonly identitySources?: readonly OfficialIdentitySource[];
+
+  private readonly rawEvidenceCollector?: OfficialEvidenceCollector;
 
   private readonly responseAssembler: ResponseAssembler;
 
   private readonly signalEngine: SignalEngine;
 
-  private readonly signalService: CachedSignalService;
-
   public constructor(options: QueryOrchestratorOptions = {}) {
     this.collectionPlanner = options.collectionPlanner ?? new CollectionPlanner();
-    const cachePolicy = options.cachePolicy ?? DEFAULT_CACHE_TTL_POLICY;
-    const cacheStore = options.cacheStore ?? new InMemoryCacheStore();
-    const client = new StdioMcpBrasilClient({
-      cwd: process.cwd()
-    });
-    this.evidenceCollector =
-      options.evidenceCollector ??
-      new CachedEvidenceCollector(new McpBrasilEvidenceCollector(client), {
-        cacheStore,
-        ttlMs: cachePolicy.evidence_ms
+    this.cachePolicy = options.cachePolicy ?? DEFAULT_CACHE_TTL_POLICY;
+    this.cacheStore = options.cacheStore ?? new InMemoryCacheStore();
+    this.client =
+      options.mcpBrasilClient ??
+      new StdioMcpBrasilClient({
+        cwd: process.cwd()
       });
+    this.evidenceCollector = options.evidenceCollector;
     this.evidenceStore = options.evidenceStore ?? new InMemoryEvidenceStore();
     this.evidenceClassifier = new EvidenceClassifier();
-    this.identityResolver =
-      options.identityResolver ??
-      new InMemoryIdentityResolver({
-        cacheStore,
-        cacheTtlMs: cachePolicy.identity_ms,
-        sources: [
-          new McpBrasilIdentitySource(
-            client
-          )
-        ]
-    });
+    this.identityResolver = options.identityResolver;
+    this.identityCatalog = options.identityCatalog ?? [];
+    this.identitySources = options.identitySources;
+    this.rawEvidenceCollector = options.rawEvidenceCollector;
     this.responseAssembler = new ResponseAssembler();
-    this.signalEngine = new SignalEngine();
-    this.signalService = new CachedSignalService(this.signalEngine, {
+    this.signalEngine = options.signalEngine ?? new SignalEngine();
+  }
+
+  private buildEvidenceCollector(cacheStore: CacheStore): OfficialEvidenceCollector {
+    return (
+      this.evidenceCollector ??
+      new CachedEvidenceCollector(
+        this.rawEvidenceCollector ?? new McpBrasilEvidenceCollector(this.client),
+        {
+          cacheStore,
+          ttlMs: this.cachePolicy.evidence_ms
+        }
+      )
+    );
+  }
+
+  private buildIdentityResolver(cacheStore: CacheStore): IdentityResolver {
+    return (
+      this.identityResolver ??
+      new InMemoryIdentityResolver({
+        catalog: this.identityCatalog,
+        cacheStore,
+        cacheTtlMs: this.cachePolicy.identity_ms,
+        sources:
+          this.identitySources ?? [new McpBrasilIdentitySource(this.client)]
+      })
+    );
+  }
+
+  private buildSignalService(cacheStore: CacheStore): CachedSignalService {
+    return new CachedSignalService(this.signalEngine, {
       cacheStore,
-      ttlMs: cachePolicy.signal_ms
+      ttlMs: this.cachePolicy.signal_ms
     });
   }
 
   private buildCollectedGrayResponse(
     candidate: ResolvedCandidate,
-    evidence: readonly EvidenceRecord[]
+    evidence: readonly EvidenceRecord[],
+    signalService: CachedSignalService
   ): ConsultationResponse {
     const classifications = this.evidenceClassifier.classify(evidence);
-    const signalResult = this.signalService.compute(
+    const signalResult = signalService.compute(
       candidate,
       evidence,
       classifications
@@ -210,11 +248,11 @@ export class QueryOrchestrator {
         },
         observability,
         signals: {
-        ...base.signals,
-        coherence,
-        integrity,
-        evidence_level: evidenceLevel
-      },
+          ...base.signals,
+          coherence,
+          integrity,
+          evidence_level: evidenceLevel
+        },
         sources: [...new Set(evidence.map((item) => item.source_url))]
       }),
       signals: {
@@ -236,8 +274,16 @@ export class QueryOrchestrator {
     const request = validateConsultCandidateRequest(input);
     let execution = startQueryExecution(request.candidate_name);
     execution = appendExecutionStep(execution, "request_validated");
+    const observedCacheStore = new ObservedCacheStore(this.cacheStore, {
+      onGet: (scope, status) => {
+        execution = recordExecutionCacheTelemetry(execution, scope, status);
+      }
+    });
+    const identityResolver = this.buildIdentityResolver(observedCacheStore);
+    const evidenceCollector = this.buildEvidenceCollector(observedCacheStore);
+    const signalService = this.buildSignalService(observedCacheStore);
 
-    const identity = await this.identityResolver.resolve({
+    const identity = await identityResolver.resolve({
       name: request.candidate_name,
       office: request.office,
       party: request.party,
@@ -253,7 +299,7 @@ export class QueryOrchestrator {
       });
       execution = appendExecutionStep(execution, "collection_planned");
 
-      const rawEvidence = await this.evidenceCollector.collect(
+      const rawEvidence = await evidenceCollector.collect(
         identity.candidate,
         plan
       );
@@ -263,7 +309,11 @@ export class QueryOrchestrator {
       execution = appendExecutionStep(execution, "evidence_classified");
       execution = appendExecutionStep(execution, "signals_computed");
 
-      const response = this.buildCollectedGrayResponse(identity.candidate, evidence);
+      const response = this.buildCollectedGrayResponse(
+        identity.candidate,
+        evidence,
+        signalService
+      );
 
       execution = appendExecutionStep(execution, "response_assembled");
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { InMemoryCacheStore } from "@/services/cache-store";
+import { InMemoryCacheStore, ObservedCacheStore } from "@/services/cache-store";
 
 describe("InMemoryCacheStore", () => {
   it("keeps entries isolated by scope", () => {
@@ -61,6 +61,36 @@ describe("InMemoryCacheStore", () => {
       vi.setSystemTime(new Date("2026-04-01T12:00:02.000Z"));
 
       expect(store.get("signal", "ttl-key")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports hit and miss events through the observed wrapper", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-01T12:00:00.000Z"));
+
+    try {
+      const baseStore = new InMemoryCacheStore();
+      const onGet = vi.fn();
+      const store = new ObservedCacheStore(baseStore, {
+        onGet
+      });
+
+      baseStore.set({
+        cache_key: "known-key",
+        expires_at: "2026-04-01T12:05:00.000Z",
+        payload: {
+          value: "cached"
+        },
+        scope: "identity",
+        stored_at: "2026-04-01T12:00:00.000Z"
+      });
+
+      expect(store.get("identity", "known-key")).not.toBeNull();
+      expect(store.get("signal", "unknown-key")).toBeNull();
+      expect(onGet).toHaveBeenNthCalledWith(1, "identity", "hit");
+      expect(onGet).toHaveBeenNthCalledWith(2, "signal", "miss");
     } finally {
       vi.useRealTimers();
     }

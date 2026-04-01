@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { QueryOrchestrator } from "@/services/query-orchestrator";
 import type {
   EvidenceRecord,
+  RawEvidence,
   IdentityResolution,
   ResolvedCandidate
 } from "@/domain/models";
+import type { CacheStore } from "@/services/cache-store";
+import { InMemoryCacheStore } from "@/services/cache-store";
 
 describe("QueryOrchestrator", () => {
   it("coordinates identity resolution, persists raw evidence and returns a stable assembled payload", async () => {
@@ -244,6 +247,62 @@ describe("QueryOrchestrator", () => {
       "identity_ambiguous",
       "response_assembled"
     ]);
+  });
+
+  it("records cache telemetry by scope across repeated identical consultations", async () => {
+    const candidate: ResolvedCandidate = {
+      ambiguity_level: "none",
+      canonical_name: "Tabata Amaral",
+      office: "deputado_federal",
+      official_ids: {
+        camara_id: "204534"
+      },
+      party: "PSB",
+      status: "incumbent",
+      uf: "SP"
+    };
+    const cacheStore: CacheStore = new InMemoryCacheStore();
+    const rawEvidenceCollector = {
+      collect: vi.fn().mockResolvedValue([
+        {
+          collected_at: "2026-04-01T12:00:00.000Z",
+          evidence_type: "formal_activity_record",
+          person_id: "camara:204534",
+          signal_type: "coherence",
+          source_name: "camara",
+          source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/204534",
+          strength: "strong_official",
+          summary: "Perfil formal na Camara."
+        }
+      ] satisfies RawEvidence[])
+    };
+    const orchestrator = new QueryOrchestrator({
+      cacheStore,
+      identityCatalog: [candidate],
+      identitySources: [],
+      rawEvidenceCollector
+    });
+
+    const firstResult = await orchestrator.consult({
+      candidate_name: "Tabata Amaral",
+      uf: "SP"
+    });
+    const secondResult = await orchestrator.consult({
+      candidate_name: "Tabata Amaral",
+      uf: "SP"
+    });
+
+    expect(rawEvidenceCollector.collect).toHaveBeenCalledTimes(1);
+    expect(firstResult.execution.observability?.cache).toEqual({
+      evidence: "miss",
+      identity: "miss",
+      signal: "miss"
+    });
+    expect(secondResult.execution.observability?.cache).toEqual({
+      evidence: "hit",
+      identity: "hit",
+      signal: "hit"
+    });
   });
 
 });

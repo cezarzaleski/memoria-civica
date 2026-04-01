@@ -107,9 +107,24 @@ export interface EvidenceClassificationRecord {
   readonly strength: EvidenceStrength;
 }
 
+export type CacheScope = "identity" | "evidence" | "signal";
+
+export type CacheTelemetryStatus = "hit" | "miss";
+
+export interface QueryExecutionCacheTelemetry {
+  readonly evidence?: CacheTelemetryStatus;
+  readonly identity?: CacheTelemetryStatus;
+  readonly signal?: CacheTelemetryStatus;
+}
+
+export interface QueryExecutionObservability {
+  readonly cache?: QueryExecutionCacheTelemetry;
+}
+
 export interface QueryExecutionRecord {
   readonly duration_ms: number;
   readonly finished_at?: string;
+  readonly observability?: QueryExecutionObservability;
   readonly request_fingerprint: string;
   readonly started_at: string;
   readonly status: "completed" | "failed";
@@ -134,7 +149,7 @@ export interface CacheEntryRecord {
   readonly cache_key: string;
   readonly expires_at: string;
   readonly payload: Record<string, unknown>;
-  readonly scope: "identity" | "evidence" | "signal";
+  readonly scope: CacheScope;
   readonly stored_at: string;
 }
 

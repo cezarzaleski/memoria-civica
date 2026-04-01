@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { parseConsultaCliArgs, runConsultaEntrypoint } from "@/cli/consulta-entrypoint";
+import type { ConsultationResponse } from "@/domain/models";
+
+function parsePayload(raw: unknown): ConsultationResponse {
+  return JSON.parse(typeof raw === "string" ? raw : "{}") as ConsultationResponse;
+}
 
 describe("consulta entrypoint", () => {
   it("parses CLI flags into the canonical request shape", () => {
@@ -135,7 +140,7 @@ describe("consulta entrypoint", () => {
     expect(write).toHaveBeenCalledOnce();
     expect(stderrWrite).toHaveBeenCalledOnce();
 
-    const payload = JSON.parse(write.mock.calls[0]?.[0] ?? "{}");
+    const payload = parsePayload(write.mock.calls[0]?.[0]);
 
     expect(payload).toMatchObject({
       candidate: {
@@ -235,7 +240,7 @@ describe("consulta entrypoint", () => {
       "[trace=trace-2] status=completed duration_ms=2"
     );
 
-    const payload = JSON.parse(write.mock.calls[0]?.[0] ?? "{}");
+    const payload = parsePayload(write.mock.calls[0]?.[0]);
 
     expect(payload.traffic_light).toBe("gray");
     expect(payload.observability).toBeUndefined();

@@ -1,4 +1,8 @@
-import type { QueryExecutionRecord } from "@/domain/models";
+import type {
+  CacheScope,
+  CacheTelemetryStatus,
+  QueryExecutionRecord
+} from "@/domain/models";
 
 interface MutableExecutionState {
   readonly record: QueryExecutionRecord;
@@ -31,6 +35,25 @@ export function appendExecutionStep(
     record: {
       ...state.record,
       steps: [...state.record.steps, step]
+    }
+  };
+}
+
+export function recordExecutionCacheTelemetry(
+  state: MutableExecutionState,
+  scope: CacheScope,
+  status: CacheTelemetryStatus
+): MutableExecutionState {
+  return {
+    record: {
+      ...state.record,
+      observability: {
+        ...state.record.observability,
+        cache: {
+          ...state.record.observability?.cache,
+          [scope]: status
+        }
+      }
     }
   };
 }

@@ -1,24 +1,22 @@
-import type { CacheEntryRecord } from "@/domain/models";
+import type {
+  CacheEntryRecord,
+  CacheScope,
+  CacheTelemetryStatus
+} from "@/domain/models";
 
 export interface CacheStore {
-  get(scope: CacheEntryRecord["scope"], key: string): CacheEntryRecord | null;
+  get(scope: CacheScope, key: string): CacheEntryRecord | null;
   set(entry: CacheEntryRecord): void;
 }
 
 export class InMemoryCacheStore implements CacheStore {
   private readonly records = new Map<string, CacheEntryRecord>();
 
-  private buildScopedKey(
-    scope: CacheEntryRecord["scope"],
-    key: string
-  ): string {
+  private buildScopedKey(scope: CacheScope, key: string): string {
     return `${scope}:${key}`;
   }
 
-  public get(
-    scope: CacheEntryRecord["scope"],
-    key: string
-  ): CacheEntryRecord | null {
+  public get(scope: CacheScope, key: string): CacheEntryRecord | null {
     const record = this.records.get(this.buildScopedKey(scope, key));
 
     if (record === undefined) {
@@ -41,5 +39,28 @@ export class InMemoryCacheStore implements CacheStore {
       ...entry,
       payload: JSON.parse(JSON.stringify(entry.payload)) as Record<string, unknown>
     });
+  }
+}
+
+interface ObservedCacheStoreOptions {
+  readonly onGet?: (scope: CacheScope, status: CacheTelemetryStatus) => void;
+}
+
+export class ObservedCacheStore implements CacheStore {
+  public constructor(
+    private readonly delegate: CacheStore,
+    private readonly options: ObservedCacheStoreOptions = {}
+  ) {}
+
+  public get(scope: CacheScope, key: string): CacheEntryRecord | null {
+    const record = this.delegate.get(scope, key);
+
+    this.options.onGet?.(scope, record === null ? "miss" : "hit");
+
+    return record;
+  }
+
+  public set(entry: CacheEntryRecord): void {
+    this.delegate.set(entry);
   }
 }

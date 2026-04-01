@@ -2,16 +2,22 @@ status:
   branch: main
   modifiedFiles:
     - .aiox/project-status.yaml
-    - docs/stories/v1-fase-4-regressao-deterministica-cli.md
+    - docs/stories/v1-fase-5-telemetria-estrutural-cache-e-coleta.md
+    - packages/memoria-civica/src/domain/models.ts
+    - packages/memoria-civica/src/observability/query-execution.ts
+    - packages/memoria-civica/src/services/cache-store.ts
+    - packages/memoria-civica/src/services/query-orchestrator.ts
+    - tests/cache-store.test.ts
     - tests/consulta-entrypoint.test.ts
-  modifiedFilesTotalCount: 3
+    - tests/query-orchestrator.test.ts
+  modifiedFilesTotalCount: 9
   recentCommits:
+    - 7c2411b test(memoria-civica): harden deterministic CLI regression coverage
     - af3e349 feat(memoria-civica): centralize selective cache policy by scope
-    - eaaca8f feat(memoria-civica): add structured coherence observability
   currentEpic: v1
-  currentStory: null
-  lastUpdate: '2026-04-01T15:30:00.000Z'
+  currentStory: v1-fase-5-telemetria-estrutural-cache-e-coleta
+  lastUpdate: '2026-04-01T17:45:00.000Z'
   isGitRepo: true
-timestamp: 1775057400000
+timestamp: 1775065500000
 ttl: 60
-gitFingerprint: 1775057400000:1775057400000
+gitFingerprint: 1775065500000:1775065500000
