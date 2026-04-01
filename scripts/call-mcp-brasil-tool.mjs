@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { MCP_BRASIL_ARGS, MCP_BRASIL_COMMAND } from "./mcp-brasil-transport.mjs";
 
 const [toolName, rawArguments = "{}"] = process.argv.slice(2);
 
@@ -12,8 +13,8 @@ if (!toolName) {
 const args = JSON.parse(rawArguments);
 
 const transport = new StdioClientTransport({
-  command: "uvx",
-  args: ["--from", "mcp-brasil", "python", "-m", "mcp_brasil.server"],
+  command: MCP_BRASIL_COMMAND,
+  args: MCP_BRASIL_ARGS,
   cwd: process.cwd(),
   env: { ...process.env },
   stderr: "pipe"
