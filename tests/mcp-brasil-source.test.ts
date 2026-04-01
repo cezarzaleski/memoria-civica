@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  StdioMcpBrasilClient,
   McpBrasilEvidenceCollector,
   McpBrasilIdentitySource
 } from "@/source-connectors/mcp-brasil";
@@ -247,5 +248,30 @@ describe("McpBrasilIdentitySource", () => {
     expect(coherenceEvidence?.summary).toContain(
       "ainda nao vincula autoria, relatoria ou voto nominal diretamente ao deputado"
     );
+  });
+});
+
+describe("StdioMcpBrasilClient", () => {
+  it("boots mcp-brasil with truststore injected by default", () => {
+    const client = new StdioMcpBrasilClient();
+
+    expect(client).toMatchObject({
+      options: {
+        args: [
+          "--with",
+          "truststore",
+          "--from",
+          "mcp-brasil",
+          "python",
+          "-c",
+          expect.stringContaining("truststore.inject_into_ssl()")
+        ],
+        command: "uvx"
+      }
+    });
+
+    expect(
+      ((client as unknown) as { options: { args: readonly string[] } }).options.args[6]
+    ).toContain("runpy.run_module('mcp_brasil.server', run_name='__main__')");
   });
 });

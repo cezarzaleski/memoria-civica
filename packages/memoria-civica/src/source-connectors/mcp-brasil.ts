@@ -36,6 +36,17 @@ interface StdioMcpBrasilClientOptions {
   readonly env?: NodeJS.ProcessEnv;
 }
 
+const DEFAULT_MCP_BRASIL_COMMAND = "uvx";
+const DEFAULT_MCP_BRASIL_ENTRYPOINT = [
+  "--with",
+  "truststore",
+  "--from",
+  "mcp-brasil",
+  "python",
+  "-c",
+  "import truststore; truststore.inject_into_ssl(); import runpy; runpy.run_module('mcp_brasil.server', run_name='__main__')"
+] as const;
+
 function readProperty(payload: object, key: string): unknown {
   return Reflect.get(payload, key) as unknown;
 }
@@ -250,9 +261,17 @@ function mapTseRowToCandidate(
 export class StdioMcpBrasilClient implements McpBrasilToolClient {
   private client?: Client;
 
+  private readonly options: StdioMcpBrasilClientOptions;
+
   private transport?: StdioClientTransport;
 
-  public constructor(private readonly options: StdioMcpBrasilClientOptions = {}) {}
+  public constructor(options: StdioMcpBrasilClientOptions = {}) {
+    this.options = {
+      ...options,
+      args: options.args ?? DEFAULT_MCP_BRASIL_ENTRYPOINT,
+      command: options.command ?? DEFAULT_MCP_BRASIL_COMMAND
+    };
+  }
 
   private async connect(): Promise<Client> {
     if (this.client) {
@@ -260,8 +279,8 @@ export class StdioMcpBrasilClient implements McpBrasilToolClient {
     }
 
     this.transport = new StdioClientTransport({
-      args: [...(this.options.args ?? ["--from", "mcp-brasil", "python", "-m", "mcp_brasil.server"])],
-      command: this.options.command ?? "uvx",
+      args: [...(this.options.args ?? DEFAULT_MCP_BRASIL_ENTRYPOINT)],
+      command: this.options.command ?? DEFAULT_MCP_BRASIL_COMMAND,
       cwd: this.options.cwd,
       env: {
         ...toStringRecord(process.env),
