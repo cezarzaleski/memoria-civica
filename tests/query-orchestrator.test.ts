@@ -93,6 +93,9 @@ describe("QueryOrchestrator", () => {
     expect(result.response.alerts).toContain(
       "Coherence usa atuacao formal e votos nominais recentes da Camara; autoria, relatoria e proposicoes por deputado ainda nao foram integradas."
     );
+    expect(result.response.alerts).toContain(
+      "Cobertura atual de coherence na Camara: coletados=formal_activity_record; faltam=voting_summary, propositions_summary."
+    );
     expect(result.response.sources).toEqual([
       "https://dadosabertos.camara.leg.br/api/v2/deputados/220639"
     ]);
@@ -100,6 +103,9 @@ describe("QueryOrchestrator", () => {
     expect(result.response.signals.evidence_level.evidence_ids).toEqual(["ev-1"]);
     expect(result.response.signals.coherence.status).toBe("mixed");
     expect(result.response.signals.coherence.evidence_ids).toEqual(["ev-2"]);
+    expect(result.response.signals.coherence.reasons).toEqual([
+      "Ha cobertura oficial da Camara em 1 bloco de coerencia: formal_activity_record. Ainda faltam: voting_summary, propositions_summary."
+    ]);
     expect(result.response.signals.integrity.status).toBe("insufficient");
     expect(result.execution.steps).toEqual([
       "request_validated",

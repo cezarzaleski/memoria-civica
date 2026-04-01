@@ -5,12 +5,19 @@ import type {
   SignalAssessment
 } from "@/domain/models";
 
-export class SignalEngine {
-  private static readonly CAMARA_COHERENCE_EVIDENCE_TYPES = [
-    "formal_activity_record",
-    "voting_summary"
-  ] as const;
+export const EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES = [
+  "formal_activity_record",
+  "voting_summary",
+  "propositions_summary"
+] as const;
 
+interface CoherenceCoverage {
+  readonly collected_types: readonly string[];
+  readonly evidence: readonly EvidenceRecord[];
+  readonly missing_types: readonly string[];
+}
+
+export class SignalEngine {
   private filterStrongOfficialEvidence(
     evidence: readonly EvidenceRecord[],
     classifications: readonly EvidenceClassificationRecord[],
@@ -37,15 +44,43 @@ export class SignalEngine {
       evidence.filter((record) => {
         return (
           record.source_name === "camara" &&
-          SignalEngine.CAMARA_COHERENCE_EVIDENCE_TYPES.includes(
+          EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES.includes(
             record.evidence_type as
-              (typeof SignalEngine.CAMARA_COHERENCE_EVIDENCE_TYPES)[number]
+              (typeof EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES)[number]
           )
         );
       }),
       classifications,
       "coherence"
     );
+  }
+
+  public describeCoherenceCoverage(
+    candidate: Pick<ResolvedCandidate, "office" | "status">,
+    evidence: readonly EvidenceRecord[],
+    classifications: readonly EvidenceClassificationRecord[]
+  ): CoherenceCoverage {
+    if (candidate.office !== "deputado_federal" || candidate.status !== "incumbent") {
+      return {
+        collected_types: [],
+        evidence: [],
+        missing_types: []
+      };
+    }
+
+    const coherenceEvidence = this.filterStrongOfficialCamaraEvidence(
+      evidence,
+      classifications
+    );
+    const collectedTypes = [...new Set(coherenceEvidence.map((record) => record.evidence_type))];
+
+    return {
+      collected_types: collectedTypes,
+      evidence: coherenceEvidence,
+      missing_types: EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES.filter((type) => {
+        return !collectedTypes.includes(type);
+      })
+    };
   }
 
   public assessEvidenceLevel(
@@ -100,22 +135,24 @@ export class SignalEngine {
       };
     }
 
-    const coherenceEvidence = this.filterStrongOfficialCamaraEvidence(
+    const coherenceCoverage = this.describeCoherenceCoverage(
+      candidate,
       evidence,
       classifications
     );
+    const coherenceEvidence = coherenceCoverage.evidence;
 
     if (coherenceEvidence.length === 0) {
       return {
         evidence_ids: [],
         reasons: [
-          "Nenhuma evidencia oficial da Camara foi encontrada para coerencia."
+          `Nenhuma evidencia oficial da Camara foi encontrada para coerencia. Blocos esperados nesta trilha: ${EXPECTED_CAMARA_COHERENCE_EVIDENCE_TYPES.join(", ")}.`
         ],
         status: "insufficient"
       };
     }
 
-    const coherenceTypes = [...new Set(coherenceEvidence.map((record) => record.evidence_type))];
+    const coherenceTypes = coherenceCoverage.collected_types;
 
     if (coherenceTypes.length >= 2) {
       return {
@@ -130,7 +167,7 @@ export class SignalEngine {
     return {
       evidence_ids: coherenceEvidence.map((record) => record.evidence_id),
       reasons: [
-        "Ha evidencia oficial da Camara sobre atuacao formal, suficiente apenas para uma leitura minima de coerencia."
+        `Ha cobertura oficial da Camara em 1 bloco de coerencia: ${coherenceTypes[0]}. Ainda faltam: ${coherenceCoverage.missing_types.join(", ")}.`
       ],
       status: "mixed"
     };

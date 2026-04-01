@@ -49,6 +49,8 @@ const PARTIAL_EVIDENCE_ALERT =
   "Coleta oficial ainda insuficiente para conclusao final.";
 const COHERENCE_LIMITATION_ALERT =
   "Coherence usa atuacao formal e votos nominais recentes da Camara; autoria, relatoria e proposicoes por deputado ainda nao foram integradas.";
+const COHERENCE_COVERAGE_ALERT_PREFIX =
+  "Cobertura atual de coherence na Camara";
 
 function buildPlaceholderCandidate(name: string): ResolvedCandidate {
   return {
@@ -111,6 +113,11 @@ export class QueryOrchestrator {
       evidence,
       classifications
     );
+    const coherenceCoverage = this.signalEngine.describeCoherenceCoverage(
+      candidate,
+      evidence,
+      classifications
+    );
     const integrity = this.signalEngine.assessIntegrity(evidence, classifications);
     const alerts = [evidence.length > 0 ? PARTIAL_EVIDENCE_ALERT : NO_EVIDENCE_ALERT];
 
@@ -122,6 +129,11 @@ export class QueryOrchestrator {
       })
     ) {
       alerts.push(COHERENCE_LIMITATION_ALERT);
+      alerts.push(
+        `${COHERENCE_COVERAGE_ALERT_PREFIX}: coletados=${
+          coherenceCoverage.collected_types.join(", ") || "nenhum"
+        }; faltam=${coherenceCoverage.missing_types.join(", ") || "nenhum"}.`
+      );
     }
 
     const base = buildGrayResponse({

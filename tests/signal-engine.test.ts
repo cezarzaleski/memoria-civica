@@ -132,7 +132,7 @@ describe("SignalEngine", () => {
     expect(result.status).toBe("mixed");
     expect(result.evidence_ids).toEqual(["ev-4"]);
     expect(result.reasons).toEqual([
-      "Ha evidencia oficial da Camara sobre atuacao formal, suficiente apenas para uma leitura minima de coerencia."
+      "Ha cobertura oficial da Camara em 1 bloco de coerencia: formal_activity_record. Ainda faltam: voting_summary, propositions_summary."
     ]);
   });
 
@@ -189,6 +189,44 @@ describe("SignalEngine", () => {
     expect(result.evidence_ids).toEqual(["ev-4", "ev-5"]);
     expect(result.reasons).toEqual([
       "Ha cobertura oficial da Camara em 2 blocos independentes de coerencia: formal_activity_record, voting_summary."
+    ]);
+  });
+
+  it("describes missing coherence blocks for incumbents", () => {
+    const engine = new SignalEngine();
+    const evidence: EvidenceRecord[] = [
+      {
+        collected_at: "2026-03-29T12:00:00.000Z",
+        evidence_id: "ev-4",
+        evidence_type: "formal_activity_record",
+        person_id: "camara:220639",
+        signal_type: "coherence",
+        source_name: "camara",
+        source_url: "https://dadosabertos.camara.leg.br/api/v2/deputados/220639",
+        strength: "strong_official",
+        summary: "Perfil formal detalhado do deputado na Camara."
+      }
+    ];
+    const classifications: EvidenceClassificationRecord[] = [
+      {
+        classified_at: "2026-03-29T12:01:00.000Z",
+        classification_id: "cl-4",
+        confidence: "high",
+        evidence_id: "ev-4",
+        strength: "strong_official"
+      }
+    ];
+
+    const coverage = engine.describeCoherenceCoverage(
+      incumbentFederalCandidate,
+      evidence,
+      classifications
+    );
+
+    expect(coverage.collected_types).toEqual(["formal_activity_record"]);
+    expect(coverage.missing_types).toEqual([
+      "voting_summary",
+      "propositions_summary"
     ]);
   });
 
