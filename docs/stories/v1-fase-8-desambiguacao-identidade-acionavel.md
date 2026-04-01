@@ -32,10 +32,7 @@ Tornar a desambiguacao de identidade da V1 mais acionavel e compreensivel para u
 
 ## File List
 
-- [x] `packages/memoria-civica/src/contracts/consultation.ts`
 - [x] `packages/memoria-civica/src/services/query-orchestrator.ts`
-- [x] `packages/memoria-civica/src/services/response-assembler.ts`
-- [x] `packages/memoria-civica/src/cli/consulta-entrypoint.ts`
 - [x] `tests/query-orchestrator.test.ts`
 - [x] `tests/consulta-entrypoint.test.ts`
 
