@@ -94,14 +94,14 @@ jobs:
       deploy_ref: ${{ inputs.ref }}
       environment_name: staging
     secrets:
-      API_PUBLIC_URL: ${{ secrets.STAGING_API_PUBLIC_URL }}
-      DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH }}
-      MCP_BRASIL_LOCAL_PATH: ${{ secrets.STAGING_MCP_BRASIL_LOCAL_PATH }}
-      VPS_APP_PORT: ${{ secrets.STAGING_VPS_APP_PORT }}
-      VPS_HOST: ${{ secrets.STAGING_VPS_HOST }}
-      VPS_PORT: ${{ secrets.STAGING_VPS_PORT }}
-      VPS_SSH_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
-      VPS_USER: ${{ secrets.STAGING_VPS_USER }}
+      API_PUBLIC_URL: ${{ secrets.API_PUBLIC_URL }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      MCP_BRASIL_LOCAL_PATH: ${{ secrets.MCP_BRASIL_LOCAL_PATH }}
+      VPS_APP_PORT: ${{ secrets.VPS_APP_PORT }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_USER: ${{ secrets.VPS_USER }}
 
   smoke-web:
     environment: staging

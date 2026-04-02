@@ -36,19 +36,19 @@ O fluxo recomendado passa a ser:
 
 Segredos esperados no GitHub Environment `staging`:
 
-- `STAGING_VPS_HOST`
-- `STAGING_VPS_USER`
-- `STAGING_VPS_PORT`
-- `STAGING_VPS_SSH_KEY`
-- `STAGING_DEPLOY_PATH`
-- `STAGING_VPS_APP_PORT`
-- `STAGING_MCP_BRASIL_LOCAL_PATH`
-- `STAGING_API_PUBLIC_URL`
+- `VPS_HOST`
+- `VPS_USER`
+- `VPS_PORT`
+- `VPS_SSH_KEY`
+- `DEPLOY_PATH`
+- `VPS_APP_PORT`
+- `MCP_BRASIL_LOCAL_PATH`
+- `API_PUBLIC_URL`
 
 Variaveis aplicadas no runtime:
 
 - `HOST=0.0.0.0`
-- `PORT=3000` ou valor de `STAGING_VPS_APP_PORT`
+- `PORT=3000` ou valor de `VPS_APP_PORT`
 - `NODE_ENV=production`
 - `MCP_BRASIL_LOCAL_PATH=/opt/mcp-brasil`
 
