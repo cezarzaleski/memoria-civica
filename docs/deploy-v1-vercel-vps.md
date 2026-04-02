@@ -52,6 +52,11 @@ Variaveis aplicadas no runtime:
 - `NODE_ENV=production`
 - `MCP_BRASIL_LOCAL_PATH=/opt/mcp-brasil`
 
+Variaveis adicionais uteis para a trilha com Docker Compose:
+
+- `VPS_APP_PORT` para mapear a porta publica da API na VPS
+- `MCP_BRASIL_LOCAL_PATH` para informar o clone local do `mcp-brasil` ao container
+
 ### 2.2 Frontend na Vercel
 
 Segredos esperados no GitHub Environment `staging`:
@@ -91,6 +96,30 @@ pm2 start apps/api/ecosystem.config.cjs
 pm2 save
 pm2 status
 ```
+
+### 3.2.1 Alternativa com Docker Compose
+
+Tambem existe uma trilha minima de containerizacao do backend com:
+
+- [Dockerfile](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/apps/api/Dockerfile)
+- [docker-compose.backend.yml](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/docker-compose.backend.yml)
+
+Uso esperado na VPS:
+
+```bash
+cd /opt/memoria-civica/current
+docker compose -f docker-compose.backend.yml up -d --build
+```
+
+Se quiser parametrizar sem editar o arquivo:
+
+```bash
+export VPS_APP_PORT=3000
+export MCP_BRASIL_LOCAL_PATH=/opt/mcp-brasil
+docker compose -f docker-compose.backend.yml up -d --build
+```
+
+Essa opcao e util se voce preferir padronizar o runtime da API no servidor, mas ela ainda nao substitui os workflows atuais de release via SSH. Hoje ela entra como base pronta para a proxima iteracao de deploy.
 
 ### 3.3 Health Check
 
@@ -176,6 +205,13 @@ Nesta primeira versao:
 - usar logs de processo do PM2 para o backend;
 - usar logs nativos da Vercel para o frontend e proxy.
 
+Se o backend estiver rodando por container:
+
+```bash
+docker compose -f docker-compose.backend.yml logs -f
+docker compose -f docker-compose.backend.yml ps
+```
+
 Comandos uteis:
 
 ```bash
@@ -190,4 +226,5 @@ pm2 status
 - nao existe persistencia de consultas;
 - nao existe monitoramento externo estruturado;
 - o backend depende da disponibilidade operacional das fontes e do `mcp-brasil`;
+- a trilha com Docker Compose do backend existe, mas ainda nao esta acoplada ao workflow de deploy automatizado;
 - a publicacao real ainda depende de URL da VPS, DNS e credenciais da Vercel.

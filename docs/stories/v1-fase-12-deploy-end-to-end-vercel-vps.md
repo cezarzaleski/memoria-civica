@@ -42,6 +42,9 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 - [x] `.github/workflows/deploy-vps-reusable.yml`
 - [x] `.github/workflows/deploy-staging.yml`
 - [x] `.github/workflows/deploy-branch.yml`
+- [x] `apps/api/Dockerfile`
+- [x] `docker-compose.backend.yml`
+- [x] `.dockerignore`
 - [x] `package.json`
 - [x] `eslint.config.js`
 
