@@ -47,13 +47,10 @@ jobs:
 
       - name: Build release artifact
         run: |
-          tar \
-            --exclude=.git \
-            --exclude=node_modules \
-            --exclude=.next \
-            --exclude=coverage \
-            --exclude=release.tar.gz \
-            -czf release.tar.gz .
+          git archive \
+            --format=tar.gz \
+            --output=release.tar.gz \
+            "${{ inputs.deploy_ref }}"
 
       - name: Upload artifact to VPS
         uses: appleboy/scp-action@v0.1.7
