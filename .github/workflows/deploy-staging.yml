@@ -10,8 +10,79 @@ concurrency:
   group: deploy-staging
 
 jobs:
-  verify:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      web: ${{ steps.filter.outputs.web }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        name: Detect changed slices
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - '.github/workflows/deploy-staging.yml'
+              - '.github/workflows/deploy-branch.yml'
+            backend:
+              - 'apps/api/**'
+              - 'packages/**'
+              - 'bin/**'
+              - 'apps/api/Dockerfile'
+              - 'docker-compose.backend.yml'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - '.github/workflows/deploy-vps-reusable.yml'
+              - '.github/workflows/deploy-staging.yml'
+              - '.github/workflows/deploy-branch.yml'
+
+  verify-web:
     environment: staging
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    needs: changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build web app
+        run: npm run web:build
+
+  verify-vps:
+    environment: staging
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    needs: changes
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +109,10 @@ jobs:
 
   deploy-web:
     environment: staging
-    needs: verify
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    needs:
+      - changes
+      - verify-web
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
     runs-on: ubuntu-latest
@@ -78,7 +152,10 @@ jobs:
           echo "deployment_url=${DEPLOYMENT_URL}" >> "$GITHUB_OUTPUT"
 
   deploy-vps:
-    needs: verify
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    needs:
+      - changes
+      - verify-vps
     uses: ./.github/workflows/deploy-vps-reusable.yml
     with:
       deploy_ref: ${{ github.sha }}
@@ -99,6 +176,7 @@ jobs:
     needs:
       - deploy-web
       - deploy-vps
+    if: ${{ needs.deploy-web.result == 'success' && (needs.deploy-vps.result == 'success' || needs.deploy-vps.result == 'skipped') }}
     runs-on: ubuntu-latest
 
     steps:
