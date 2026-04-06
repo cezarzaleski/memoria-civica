@@ -376,4 +376,27 @@ describe("StdioMcpBrasilClient", () => {
       }
     });
   });
+
+  it("can boot a preinstalled mcp-brasil module for container builds", () => {
+    const client = new StdioMcpBrasilClient({
+      env: {
+        NODE_ENV: "test",
+        MCP_BRASIL_RUNTIME: "python"
+      }
+    });
+
+    expect(client).toMatchObject({
+      options: {
+        args: [
+          "-c",
+          expect.stringContaining("truststore.inject_into_ssl()")
+        ],
+        command: "python3"
+      }
+    });
+
+    expect(
+      ((client as unknown) as { options: { args: readonly string[] } }).options.args[1]
+    ).toContain("runpy.run_module('mcp_brasil.server', run_name='__main__')");
+  });
 });

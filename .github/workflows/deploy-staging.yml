@@ -89,7 +89,6 @@ jobs:
     secrets:
       API_PUBLIC_URL: ${{ secrets.API_PUBLIC_URL }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      MCP_BRASIL_LOCAL_PATH: ${{ secrets.MCP_BRASIL_LOCAL_PATH }}
       VPS_APP_PORT: ${{ secrets.VPS_APP_PORT }}
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_PORT: ${{ secrets.VPS_PORT }}

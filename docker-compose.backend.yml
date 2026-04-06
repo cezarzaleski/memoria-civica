@@ -6,9 +6,9 @@ services:
     container_name: memoria-civica-api
     environment:
       HOST: 0.0.0.0
+      MCP_BRASIL_RUNTIME: python
       NODE_ENV: production
       PORT: 3000
-      MCP_BRASIL_LOCAL_PATH: ${MCP_BRASIL_LOCAL_PATH:-/opt/mcp-brasil}
     ports:
       - "${VPS_APP_PORT:-3000}:3000"
     restart: unless-stopped

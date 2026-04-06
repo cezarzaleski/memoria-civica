@@ -37,7 +37,10 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 
 - [x] `docs/deploy-v1-vercel-vps.md`
 - [x] `apps/web/vercel.json`
+- [x] `apps/web/next-env.d.ts`
+- [x] `apps/web/tsconfig.json`
 - [x] `apps/api/ecosystem.config.cjs`
+- [x] `apps/api/README.md`
 - [x] `.github/workflows/ci.yml`
 - [x] `.github/workflows/deploy-vps-reusable.yml`
 - [x] `.github/workflows/deploy-staging.yml`
@@ -45,14 +48,18 @@ Publicar a primeira versao navegavel do Memoria Civica com frontend na Vercel e 
 - [x] `apps/api/Dockerfile`
 - [x] `docker-compose.backend.yml`
 - [x] `.dockerignore`
+- [x] `.gitignore`
 - [x] `package.json`
 - [x] `eslint.config.js`
+- [x] `packages/memoria-civica/src/source-connectors/mcp-brasil.ts`
+- [x] `tests/mcp-brasil-source.test.ts`
 
 ## Validation Evidence
 
 - [x] `2026-04-01`: `npm run lint`
 - [x] `2026-04-01`: `npm run typecheck`
 - [x] `2026-04-01`: `npm test`
+- [x] `2026-04-02`: `npm run build`
 - [ ] `2026-04-01`: smoke test ponta a ponta em ambiente deployado via workflows de deploy
 
 ## Notes

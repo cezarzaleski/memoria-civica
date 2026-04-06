@@ -38,6 +38,7 @@ interface StdioMcpBrasilClientOptions {
 
 const DEFAULT_MCP_BRASIL_COMMAND = "uvx";
 const LOCAL_MCP_BRASIL_COMMAND = "uv";
+const PYTHON_MCP_BRASIL_COMMAND = "python3";
 const DEFAULT_MCP_BRASIL_ENTRYPOINT = [
   "--with",
   "truststore",
@@ -57,18 +58,34 @@ const LOCAL_MCP_BRASIL_ENTRYPOINT = (localPath: string) => [
   "-c",
   "import truststore; truststore.inject_into_ssl(); import runpy; runpy.run_module('mcp_brasil.server', run_name='__main__')"
 ] as const;
+const PYTHON_MCP_BRASIL_ENTRYPOINT = [
+  "-c",
+  "import truststore; truststore.inject_into_ssl(); import runpy; runpy.run_module('mcp_brasil.server', run_name='__main__')"
+] as const;
 
 function buildDefaultMcpBrasilOptions(
   options: StdioMcpBrasilClientOptions
 ): Required<Pick<StdioMcpBrasilClientOptions, "args" | "command" | "cwd">> {
-  const localPath =
-    options.env?.MCP_BRASIL_LOCAL_PATH ?? process.env.MCP_BRASIL_LOCAL_PATH;
+  const env = {
+    ...process.env,
+    ...options.env
+  };
+  const localPath = env.MCP_BRASIL_LOCAL_PATH;
+  const runtime = env.MCP_BRASIL_RUNTIME;
 
   if (localPath !== undefined && localPath.trim() !== "") {
     return {
       args: LOCAL_MCP_BRASIL_ENTRYPOINT(localPath),
       command: LOCAL_MCP_BRASIL_COMMAND,
       cwd: options.cwd ?? localPath
+    };
+  }
+
+  if (runtime === "python") {
+    return {
+      args: PYTHON_MCP_BRASIL_ENTRYPOINT,
+      command: PYTHON_MCP_BRASIL_COMMAND,
+      cwd: options.cwd ?? process.cwd()
     };
   }
 

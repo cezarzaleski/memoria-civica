@@ -14,8 +14,6 @@ on:
         required: true
       DEPLOY_PATH:
         required: true
-      MCP_BRASIL_LOCAL_PATH:
-        required: false
       VPS_APP_PORT:
         required: false
       VPS_HOST:
@@ -88,19 +86,22 @@ jobs:
             mkdir -p "$RELEASE_PATH"
 
             tar -xzf "$ARCHIVE_PATH" -C "$RELEASE_PATH"
-            cd "$RELEASE_PATH"
-            npm ci
-
             ln -sfn "$RELEASE_PATH" "$DEPLOY_PATH/current"
 
-            export DEPLOY_PATH="$DEPLOY_PATH"
-            export HOST="0.0.0.0"
-            export NODE_ENV="production"
-            export PORT="${APP_PORT:-3000}"
-            export MCP_BRASIL_LOCAL_PATH="${{ secrets.MCP_BRASIL_LOCAL_PATH }}"
+            export VPS_APP_PORT="${APP_PORT:-3000}"
 
-            pm2 startOrReload "$DEPLOY_PATH/current/apps/api/ecosystem.config.cjs" --update-env
-            curl -fsS "http://127.0.0.1:${PORT}/health"
+            docker compose -f "$DEPLOY_PATH/current/docker-compose.backend.yml" up -d --build
+
+            for attempt in $(seq 1 30); do
+              if curl -fsS "http://127.0.0.1:${VPS_APP_PORT}/health"; then
+                exit 0
+              fi
+
+              sleep 2
+            done
+
+            docker compose -f "$DEPLOY_PATH/current/docker-compose.backend.yml" logs --tail=100
+            exit 1
 
       - name: Smoke test deployed API
         run: |

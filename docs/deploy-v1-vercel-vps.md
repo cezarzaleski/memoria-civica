@@ -28,7 +28,7 @@ O fluxo recomendado passa a ser:
 - `ci.yml` para verificacao continua;
 - `deploy-staging.yml` para publicar staging em `push` na `main`;
 - `deploy-branch.yml` para publicar manualmente uma branch especifica em staging;
-- `deploy-vps-reusable.yml` como rotina reaproveitavel de release-based deploy na VPS.
+- `deploy-vps-reusable.yml` como rotina reaproveitavel de release-based deploy na VPS com `docker compose`.
 
 ## 2. Variaveis de Ambiente
 
@@ -42,20 +42,16 @@ Segredos esperados no GitHub Environment `staging`:
 - `VPS_SSH_KEY`
 - `DEPLOY_PATH`
 - `VPS_APP_PORT`
-- `MCP_BRASIL_LOCAL_PATH`
 - `API_PUBLIC_URL`
 
 Variaveis aplicadas no runtime:
 
-- `HOST=0.0.0.0`
-- `PORT=3000` ou valor de `VPS_APP_PORT`
-- `NODE_ENV=production`
-- `MCP_BRASIL_LOCAL_PATH=/opt/mcp-brasil`
+- `VPS_APP_PORT=3000` ou outro mapeamento de porta publica
 
 Variaveis adicionais uteis para a trilha com Docker Compose:
 
 - `VPS_APP_PORT` para mapear a porta publica da API na VPS
-- `MCP_BRASIL_LOCAL_PATH` para informar o clone local do `mcp-brasil` ao container
+- `MCP_BRASIL_RUNTIME=python` para forcar o uso do `mcp-brasil` preinstalado na imagem
 
 ### 2.2 Frontend na Vercel
 
@@ -89,16 +85,6 @@ git clone <repo-mcp-brasil> /opt/mcp-brasil
 
 ### 3.2 Processo
 
-Usar o arquivo [ecosystem.config.cjs](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/apps/api/ecosystem.config.cjs). O deploy via Action publica releases em `releases/<sha>` e atualiza o symlink `current`.
-
-```bash
-pm2 start apps/api/ecosystem.config.cjs
-pm2 save
-pm2 status
-```
-
-### 3.2.1 Alternativa com Docker Compose
-
 Tambem existe uma trilha minima de containerizacao do backend com:
 
 - [Dockerfile](/Users/cezar.zaleski/workspace/pessoal/memoria_civica/apps/api/Dockerfile)
@@ -111,15 +97,35 @@ cd /opt/memoria-civica/current
 docker compose -f docker-compose.backend.yml up -d --build
 ```
 
-Se quiser parametrizar sem editar o arquivo:
+Essa imagem instala no build:
+
+- `python3`;
+- `mcp-brasil`;
+- `truststore`.
+
+O backend continua falando com o `mcp-brasil` via `stdio`, mas agora usando o modulo
+Python ja empacotado na imagem. Isso elimina a necessidade de `clone` local do
+`mcp-brasil` na VPS para o fluxo em container.
+
+Se quiser parametrizar a porta sem editar o arquivo:
 
 ```bash
 export VPS_APP_PORT=3000
-export MCP_BRASIL_LOCAL_PATH=/opt/mcp-brasil
 docker compose -f docker-compose.backend.yml up -d --build
 ```
 
-Essa opcao e util se voce preferir padronizar o runtime da API no servidor, mas ela ainda nao substitui os workflows atuais de release via SSH. Hoje ela entra como base pronta para a proxima iteracao de deploy.
+Validacao local antes de staging:
+
+```bash
+docker compose -f docker-compose.backend.yml up -d --build
+curl -fsS http://127.0.0.1:${VPS_APP_PORT:-3000}/health
+curl -fsS http://127.0.0.1:${VPS_APP_PORT:-3000}/consultas \
+  -H 'content-type: application/json' \
+  -d '{"candidate_name":"Tabata Amaral","uf":"SP"}'
+```
+
+Essa opcao passa a ser a base recomendada para staging quando o objetivo for um deploy
+Docker-first do backend. O workflow da VPS agora segue essa trilha e nao usa mais `pm2`.
 
 ### 3.3 Health Check
 
@@ -202,7 +208,7 @@ Na interface publicada:
 
 Nesta primeira versao:
 
-- usar logs de processo do PM2 para o backend;
+- usar logs do container para o backend;
 - usar logs nativos da Vercel para o frontend e proxy.
 
 Se o backend estiver rodando por container:
@@ -212,13 +218,6 @@ docker compose -f docker-compose.backend.yml logs -f
 docker compose -f docker-compose.backend.yml ps
 ```
 
-Comandos uteis:
-
-```bash
-pm2 logs memoria-civica-api
-pm2 status
-```
-
 ## 7. Limitacoes Conhecidas
 
 - nao existe autenticacao;
@@ -226,5 +225,5 @@ pm2 status
 - nao existe persistencia de consultas;
 - nao existe monitoramento externo estruturado;
 - o backend depende da disponibilidade operacional das fontes e do `mcp-brasil`;
-- a trilha com Docker Compose do backend existe, mas ainda nao esta acoplada ao workflow de deploy automatizado;
+- o deploy da VPS continua dependente de Docker e Docker Compose instalados no host remoto;
 - a publicacao real ainda depende de URL da VPS, DNS e credenciais da Vercel.
