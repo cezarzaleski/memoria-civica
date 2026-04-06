@@ -1,8 +1,6 @@
 services:
   memoria-civica-api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ${MEMORIA_CIVICA_API_IMAGE:?MEMORIA_CIVICA_API_IMAGE is required}
     container_name: memoria-civica-api
     environment:
       HOST: 0.0.0.0

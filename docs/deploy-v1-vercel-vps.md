@@ -28,7 +28,7 @@ O fluxo recomendado passa a ser:
 - `ci.yml` para verificacao continua;
 - `deploy-staging.yml` para publicar staging em `push` na `main`;
 - `deploy-branch.yml` para publicar manualmente uma branch especifica em staging;
-- `deploy-vps-reusable.yml` como rotina reaproveitavel de release-based deploy na VPS com `docker compose`.
+- `deploy-vps-reusable.yml` como rotina reaproveitavel de build/push em Docker Hub e deploy na VPS com `docker compose pull`.
 
 ## 2. Variaveis de Ambiente
 
@@ -43,6 +43,8 @@ Segredos esperados no GitHub Environment `staging`:
 - `DEPLOY_PATH`
 - `VPS_APP_PORT`
 - `API_PUBLIC_URL`
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
 
 Variaveis aplicadas no runtime:
 
@@ -51,7 +53,7 @@ Variaveis aplicadas no runtime:
 Variaveis adicionais uteis para a trilha com Docker Compose:
 
 - `VPS_APP_PORT` para mapear a porta publica da API na VPS
-- `MCP_BRASIL_RUNTIME=python` para forcar o uso do `mcp-brasil` preinstalado na imagem
+- `MEMORIA_CIVICA_API_IMAGE=docker.io/<usuario>/memoria-civica-api:<sha>`
 
 ### 2.2 Frontend na Vercel
 
@@ -74,13 +76,8 @@ No servidor:
 ```bash
 git clone <repo> /opt/memoria-civica
 cd /opt/memoria-civica
-npm install
-```
-
-Se o `mcp-brasil` for usado via clone local:
-
-```bash
-git clone <repo-mcp-brasil> /opt/mcp-brasil
+docker --version
+docker compose version
 ```
 
 ### 3.2 Processo
@@ -94,30 +91,27 @@ Uso esperado na VPS:
 
 ```bash
 cd /opt/memoria-civica/current
-docker compose -f docker-compose.backend.yml up -d --build
+export MEMORIA_CIVICA_API_IMAGE=docker.io/<usuario>/memoria-civica-api:<sha>
+export VPS_APP_PORT=3000
+docker compose -f docker-compose.backend.yml pull
+docker compose -f docker-compose.backend.yml up -d
 ```
 
-Essa imagem instala no build:
+A imagem publicada no Docker Hub instala no build:
 
 - `python3`;
 - `mcp-brasil`;
 - `truststore`.
 
 O backend continua falando com o `mcp-brasil` via `stdio`, mas agora usando o modulo
-Python ja empacotado na imagem. Isso elimina a necessidade de `clone` local do
-`mcp-brasil` na VPS para o fluxo em container.
-
-Se quiser parametrizar a porta sem editar o arquivo:
-
-```bash
-export VPS_APP_PORT=3000
-docker compose -f docker-compose.backend.yml up -d --build
-```
+Python ja empacotado na imagem.
 
 Validacao local antes de staging:
 
 ```bash
-docker compose -f docker-compose.backend.yml up -d --build
+export MEMORIA_CIVICA_API_IMAGE=docker.io/<usuario>/memoria-civica-api:<sha>
+docker compose -f docker-compose.backend.yml pull
+docker compose -f docker-compose.backend.yml up -d
 curl -fsS http://127.0.0.1:${VPS_APP_PORT:-3000}/health
 curl -fsS http://127.0.0.1:${VPS_APP_PORT:-3000}/consultas \
   -H 'content-type: application/json' \
@@ -125,7 +119,8 @@ curl -fsS http://127.0.0.1:${VPS_APP_PORT:-3000}/consultas \
 ```
 
 Essa opcao passa a ser a base recomendada para staging quando o objetivo for um deploy
-Docker-first do backend. O workflow da VPS agora segue essa trilha e nao usa mais `pm2`.
+Docker-first do backend. O workflow da VPS faz `push` da imagem no Docker Hub e usa
+SSH apenas para atualizar o checkout do compose e executar `pull` + `up -d` no host.
 
 ### 3.3 Health Check
 
@@ -225,5 +220,5 @@ docker compose -f docker-compose.backend.yml ps
 - nao existe persistencia de consultas;
 - nao existe monitoramento externo estruturado;
 - o backend depende da disponibilidade operacional das fontes e do `mcp-brasil`;
-- o deploy da VPS continua dependente de Docker e Docker Compose instalados no host remoto;
+- o deploy da VPS continua dependente de Docker, Docker Compose e credenciais validas do Docker Hub no GitHub Actions;
 - a publicacao real ainda depende de URL da VPS, DNS e credenciais da Vercel.

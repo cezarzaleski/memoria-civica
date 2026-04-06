@@ -89,6 +89,8 @@ jobs:
     secrets:
       API_PUBLIC_URL: ${{ secrets.API_PUBLIC_URL }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       VPS_APP_PORT: ${{ secrets.VPS_APP_PORT }}
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_PORT: ${{ secrets.VPS_PORT }}
