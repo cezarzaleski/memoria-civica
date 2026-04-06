@@ -181,4 +181,23 @@ jobs:
 
     steps:
       - name: Smoke test web deployment
-        run: curl -fsS "${{ needs.deploy-web.outputs.deployment_url }}"
+        run: |
+          set -euo pipefail
+
+          DEPLOYMENT_URL="${{ needs.deploy-web.outputs.deployment_url }}"
+          STATUS_CODE="$(curl -sS -o /tmp/web-smoke-body.txt -w '%{http_code}' "${DEPLOYMENT_URL}")"
+
+          case "${STATUS_CODE}" in
+            2??|3??)
+              exit 0
+              ;;
+            401|403)
+              echo "Preview protegido pela Vercel (${STATUS_CODE}); smoke web tratado como nao-bloqueante."
+              exit 0
+              ;;
+            *)
+              cat /tmp/web-smoke-body.txt
+              echo "Smoke web falhou com status ${STATUS_CODE}."
+              exit 1
+              ;;
+          esac
